@@ -15,9 +15,14 @@ const LeaderboardPage: React.FC = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
         try {
-            // Fetch all users and sort client-side to avoid "Index not defined" error.
-            // Note: For large production apps, configure ".indexOn": "points" in Firebase rules 
-            // and use query(ref(db, 'users'), orderByChild('points'), limitToLast(20)) for efficiency.
+            // 1. Check Cache first
+            const cachedData = localStorage.getItem('leaderboard_cache');
+            if (cachedData) {
+                setPlayers(JSON.parse(cachedData));
+                setLoading(false); 
+            }
+
+            // 2. Fetch fresh data
             const usersRef = ref(db, 'users');
             const snapshot = await get(usersRef);
             
@@ -34,8 +39,11 @@ const LeaderboardPage: React.FC = () => {
                 // Sort descending
                 list.sort((a, b) => b.points - a.points);
                 
-                // Display top 20
-                setPlayers(list.slice(0, 20));
+                const top20 = list.slice(0, 20);
+                setPlayers(top20);
+                
+                // Update Cache
+                localStorage.setItem('leaderboard_cache', JSON.stringify(top20));
             }
         } catch (e) {
             console.error("Leaderboard error", e);
@@ -63,12 +71,14 @@ const LeaderboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 flex flex-col transition-colors">
-       <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300"><i className="fas fa-arrow-left fa-lg"></i></button>
+       <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+        <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
+            <i className="fas fa-arrow-left fa-lg"></i>
+        </button>
         <h1 className="text-2xl font-bold dark:text-white">Top Students</h1>
       </div>
 
-      {loading ? (
+      {loading && players.length === 0 ? (
         <div className="flex justify-center mt-20"><i className="fas fa-spinner fa-spin text-somali-blue text-2xl"></i></div>
       ) : (
         <div className="space-y-3 pb-20">

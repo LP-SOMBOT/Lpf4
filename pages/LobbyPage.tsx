@@ -34,11 +34,16 @@ const LobbyPage: React.FC = () => {
 
   // Fetch Subjects on Mount
   useEffect(() => {
+    // Cache check
+    const cachedSubjects = localStorage.getItem('subjects_cache');
+    if (cachedSubjects) setSubjects(JSON.parse(cachedSubjects));
+
     const subRef = ref(db, 'subjects');
     get(subRef).then(snap => {
         if(snap.exists()) {
           const list = (Object.values(snap.val()) as Subject[]).filter(s => s && s.id && s.name);
           setSubjects(list);
+          localStorage.setItem('subjects_cache', JSON.stringify(list));
         }
     });
   }, []);
@@ -52,8 +57,9 @@ const LobbyPage: React.FC = () => {
     const chapRef = ref(db, `chapters/${selectedSubject}`);
     get(chapRef).then(snap => {
         if(snap.exists()) {
-            setChapters(Object.values(snap.val()));
-            setSelectedChapter(''); // Reset chapter on subject change
+            const list = Object.values(snap.val()) as Chapter[];
+            setChapters(list);
+            if(list.length > 0) setSelectedChapter(list[0].id); // Auto select first
         } else {
             setChapters([]);
         }
@@ -287,19 +293,22 @@ const LobbyPage: React.FC = () => {
 
           <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. Select Chapter</label>
           {chapters.length > 0 ? (
-             <div className="grid grid-cols-1 gap-2">
-                 {chapters.map(c => (
-                     <button
-                        key={c.id}
-                        onClick={() => setSelectedChapter(c.id)}
-                        className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all border-2 ${selectedChapter === c.id ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'border-transparent bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200'}`}
-                     >
-                         {c.name}
-                     </button>
-                 ))}
+             <div className="relative">
+                <select 
+                    value={selectedChapter} 
+                    onChange={(e) => setSelectedChapter(e.target.value)}
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white border-2 border-gray-200 dark:border-gray-600 rounded-xl appearance-none font-bold text-gray-700 focus:border-somali-blue"
+                >
+                    {chapters.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-700 dark:text-gray-400">
+                    <i className="fas fa-chevron-down text-sm"></i>
+                </div>
              </div>
           ) : (
-              <div className="text-center text-gray-400 text-sm py-4 italic">
+              <div className="text-center text-gray-400 text-sm py-4 italic bg-gray-50 dark:bg-gray-700 rounded-xl">
                   {selectedSubject ? "No chapters found." : "Select a subject first."}
               </div>
           )}
@@ -316,7 +325,7 @@ const LobbyPage: React.FC = () => {
          </div>
        )}
 
-      <div className="flex items-center gap-4 mb-6">
+      <div className="sticky top-0 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
         <h1 className="text-2xl font-bold dark:text-white">Battle Lobby</h1>
       </div>
 

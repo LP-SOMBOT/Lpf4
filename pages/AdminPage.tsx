@@ -209,31 +209,19 @@ const AdminPage: React.FC = () => {
 
       rows.forEach((row) => {
         // Expected structure roughly: [Question, Opt1, Opt2, Opt3, Opt4, AnswerIndex(1-4)]
-        // Note: sheet_to_json with header:1 returns array of arrays.
-        // If the row has empty cells at start, they might be undefined.
-        
         if (!row || row.length < 3) return; 
         
         const question = row[0];
-        // Collect options: check columns 1, 2, 3, 4, 5, 6 etc. Stop when empty or hit answer column.
-        // We assume strictly: Col 0=Q, 1=A, 2=B, 3=C, 4=D (optional), 5=AnswerIndex
-        // But user might only have 2 options.
-        // Let's grab columns 1 to 4 as options if they exist.
-        
         const possibleOptions = [row[1], row[2], row[3], row[4]];
         const validOptions = possibleOptions.filter(o => o !== undefined && o !== null && String(o).trim() !== '').map(String);
         
-        // The answer index is likely in column 5 (F). 
         let answerVal = row[5];
         let answerIdx = parseInt(answerVal);
         
-        // Validation
         if (!question || validOptions.length < 2) return;
         
         // Adjust 1-based to 0-based
         if (isNaN(answerIdx) || answerIdx < 1 || answerIdx > validOptions.length) {
-            // Fallback: try to match text? Nah, just default to 1 (Option A) to be safe or skip?
-            // Let's default to 1 and let admin fix it if their excel is bad.
             answerIdx = 1; 
         }
         
@@ -263,7 +251,6 @@ const AdminPage: React.FC = () => {
       alert("Error parsing file. Ensure it is a valid Excel file.");
     } finally {
         setLoading(false);
-        // Reset file input
         e.target.value = '';
     }
   };
@@ -364,10 +351,10 @@ const AdminPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 pb-24 transition-colors">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Fixed Header */}
+      <div className="sticky top-0 z-30 bg-gray-100/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center justify-between transition-colors">
         <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300">
+            <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
                 <i className="fas fa-arrow-left fa-lg"></i>
             </button>
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Admin Panel</h1>
@@ -375,7 +362,7 @@ const AdminPage: React.FC = () => {
       </div>
 
       <div className="grid gap-6">
-        
+        {/* ... (Rest of content identical) ... */}
         {/* Management Controls */}
         <Card className="border-l-8 border-somali-blue">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { ref, onValue, off } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { auth, db } from './firebase';
 import { UserProfile } from './types';
 import { Navbar } from './components/Navbar';
@@ -15,6 +15,7 @@ import SoloPage from './pages/SoloPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
+import AboutPage from './pages/AboutPage';
 
 // Context for User Data
 export const UserContext = React.createContext<{
@@ -31,7 +32,9 @@ export const ThemeContext = React.createContext<{
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
-  const { user } = React.useContext(UserContext);
+  const { user, loading } = React.useContext(UserContext);
+  // Allow loading state to pass, otherwise it flickers to auth
+  if (loading) return null; 
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
@@ -70,6 +73,12 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
+    // 1. Load from Cache immediately for perceived performance
+    const cachedProfile = localStorage.getItem('userProfile');
+    if (cachedProfile) {
+        setProfile(JSON.parse(cachedProfile));
+    }
+
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -78,7 +87,11 @@ const AppContent: React.FC = () => {
         onValue(userRef, (snapshot) => {
           const data = snapshot.val();
           if (data) {
-            setProfile({ uid: currentUser.uid, ...data });
+            const updatedProfile = { uid: currentUser.uid, ...data };
+            setProfile(updatedProfile);
+            // Update Cache
+            localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+            
             // Auto-redirect to game if active match found (and not already there)
             if (data.activeMatch && !location.pathname.includes('/game')) {
               navigate(`/game/${data.activeMatch}`);
@@ -88,6 +101,7 @@ const AppContent: React.FC = () => {
         });
       } else {
         setProfile(null);
+        localStorage.removeItem('userProfile');
         setLoading(false);
       }
     });
@@ -97,36 +111,77 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-somali-blue">
-        <div className="text-white text-2xl font-bold animate-pulse">Loading LP-F4...</div>
+      <div className={`min-h-screen flex flex-col items-center justify-center transition-colors ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="relative w-24 h-24 mb-4">
+             <div className="absolute inset-0 bg-somali-blue opacity-20 rounded-full animate-ping"></div>
+             <div className="relative w-full h-full bg-somali-blue rounded-full flex items-center justify-center shadow-xl z-10">
+                 <img src="https://img.icons8.com/fluency/96/mortarboard.png" alt="Logo" className="w-12 h-12" />
+             </div>
+        </div>
+        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600 mb-2 animate-pulse">
+            LP-F4
+        </h1>
+        <div className="w-48 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-full bg-somali-blue animate-[progress_1.5s_ease-in-out_infinite] origin-left w-full transform -translate-x-full"></div>
+        </div>
+        <style>{`
+          @keyframes progress {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(0%); }
+            100% { transform: translateX(100%); }
+          }
+        `}</style>
       </div>
     );
   }
 
   // Define which paths show the Navbar
-  const showNavbar = ['/', '/lobby', '/leaderboard', '/profile'].includes(location.pathname);
+  const showNavbar = ['/', '/lobby', '/leaderboard', '/profile', '/about'].includes(location.pathname);
 
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
       <ThemeContext.Provider value={{ theme, toggleTheme }}>
-        <div className={`min-h-screen font-sans flex justify-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
-          {/* Mobile Container with Fixed Height Layout and Theme Class */}
-          <div className={`w-full max-w-md shadow-2xl overflow-hidden relative flex flex-col h-[100dvh] transition-colors duration-300 ${theme === 'dark' ? 'dark bg-gray-900 text-white' : 'bg-white text-gray-800'}`}>
-            <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
-              <Routes>
-                <Route path="/auth" element={!user ? <AuthPage /> : <Navigate to="/" />} />
-                <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-                <Route path="/lobby" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
-                <Route path="/game/:matchId" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
-                <Route path="/solo" element={<ProtectedRoute><SoloPage /></ProtectedRoute>} />
-                <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-                <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
-              </Routes>
-            </div>
+        <div className={`min-h-screen font-sans flex justify-center items-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
+          
+          {/* Main Layout Container - Responsive */}
+          <div className={`
+             w-full h-[100dvh] flex flex-col md:flex-row
+             md:max-w-5xl md:h-[90vh] md:rounded-3xl md:overflow-hidden md:shadow-2xl md:border dark:border-gray-700
+             transition-all duration-300
+             ${theme === 'dark' ? 'dark bg-gray-900 text-white' : 'bg-white text-gray-800'}
+          `}>
             
-            {/* Footer Navbar */}
-            {user && showNavbar && <Navbar />}
+            {/* Desktop Navigation (Sidebar) */}
+            {user && showNavbar && (
+                <div className="hidden md:block w-24 lg:w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
+                    <Navbar orientation="vertical" />
+                </div>
+            )}
+
+            {/* Mobile/Content Area */}
+            <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
+                <Routes>
+                    <Route path="/auth" element={!user ? <AuthPage /> : <Navigate to="/" />} />
+                    <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+                    <Route path="/lobby" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
+                    <Route path="/game/:matchId" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
+                    <Route path="/solo" element={<ProtectedRoute><SoloPage /></ProtectedRoute>} />
+                    <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
+                    <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                    <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
+                    <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+                </Routes>
+                </div>
+                
+                {/* Mobile Bottom Navigation */}
+                {user && showNavbar && (
+                    <div className="md:hidden">
+                        <Navbar orientation="horizontal" />
+                    </div>
+                )}
+            </div>
+
           </div>
         </div>
       </ThemeContext.Provider>

@@ -13,6 +13,27 @@ const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const getErrorMessage = (code: string) => {
+    switch (code) {
+        case 'auth/invalid-credential': 
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+            return 'Incorrect email or password.';
+        case 'auth/email-already-in-use': 
+            return 'This email is already registered. Please login.';
+        case 'auth/weak-password': 
+            return 'Password should be at least 6 characters.';
+        case 'auth/invalid-email': 
+            return 'Please enter a valid email address.';
+        case 'auth/too-many-requests': 
+            return 'Too many attempts. Please try again later.';
+        case 'auth/network-request-failed':
+            return 'Network error. Please check your connection.';
+        default: 
+            return 'An error occurred. Please try again.';
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -39,7 +60,8 @@ const AuthPage: React.FC = () => {
         await updateProfile(user, { displayName: name });
       }
     } catch (err: any) {
-      setError(err.message.replace('Firebase:', '').trim());
+      console.error(err.code);
+      setError(getErrorMessage(err.code || ''));
     } finally {
       setLoading(false);
     }
@@ -55,7 +77,12 @@ const AuthPage: React.FC = () => {
       <Card className="animate__animated animate__fadeInUp">
         <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Welcome Back' : 'Join the Battle'}</h2>
         
-        {error && <div className="bg-red-100 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
+        {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-4 text-sm font-medium flex items-center gap-2 animate__animated animate__shakeX">
+                <i className="fas fa-exclamation-circle text-lg"></i>
+                <span>{error}</span>
+            </div>
+        )}
 
         <form onSubmit={handleAuth}>
           {!isLogin && (

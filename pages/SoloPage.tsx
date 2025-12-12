@@ -19,7 +19,7 @@ const SoloPage: React.FC = () => {
   
   // Selection State
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
+  const [selectedChapterId, setSelectedChapterId] = useState<string>('');
 
   // Game State
   const [loading, setLoading] = useState(true);
@@ -31,11 +31,16 @@ const SoloPage: React.FC = () => {
 
   // 1. Fetch Subjects on Load
   useEffect(() => {
+    // Cache Check
+    const cachedSubjects = localStorage.getItem('subjects_cache');
+    if (cachedSubjects) setSubjects(JSON.parse(cachedSubjects));
+
     const subRef = ref(db, 'subjects');
     const unsub = onValue(subRef, (snapshot) => {
         if (snapshot.exists()) {
             const list = (Object.values(snapshot.val()) as Subject[]).filter(s => s && s.id && s.name);
             setSubjects(list);
+            localStorage.setItem('subjects_cache', JSON.stringify(list));
         }
         setLoading(false);
     });
@@ -51,7 +56,11 @@ const SoloPage: React.FC = () => {
       const chapRef = ref(db, `chapters/${sub.id}`);
       const snapshot = await get(chapRef);
       if (snapshot.exists()) {
-          setChapters(Object.values(snapshot.val()));
+          const loadedChapters = Object.values(snapshot.val()) as Chapter[];
+          setChapters(loadedChapters);
+          if (loadedChapters.length > 0) {
+              setSelectedChapterId(loadedChapters[0].id); // Default to first
+          }
           setStep('chapter');
       } else {
           alert("No chapters found for this subject.");
@@ -59,13 +68,13 @@ const SoloPage: React.FC = () => {
       setLoading(false);
   };
 
-  // 3. Fetch Questions when Chapter Selected
-  const handleSelectChapter = async (chap: Chapter) => {
+  // 3. Start Game
+  const handleStartGame = async () => {
+      if (!selectedChapterId) return;
       setLoading(true);
       playSound('click');
-      setSelectedChapter(chap);
 
-      const qRef = ref(db, `questions/${chap.id}`);
+      const qRef = ref(db, `questions/${selectedChapterId}`);
       const snapshot = await get(qRef);
       if (snapshot.exists()) {
           const qList = Object.values(snapshot.val()) as Question[];
@@ -110,24 +119,31 @@ const SoloPage: React.FC = () => {
   // --- Render Selection Screens ---
 
   if (loading) {
-    return <div className="min-h-screen bg-somali-blue flex items-center justify-center text-white font-bold animate-pulse">Loading...</div>;
+    return <div className="min-h-screen bg-somali-blue flex items-center justify-center text-white font-bold animate-pulse">Loading Content...</div>;
   }
 
   // STEP 1: Select Subject
   if (step === 'subject') {
       return (
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-              <div className="flex items-center gap-4 mb-6">
-                  <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300"><i className="fas fa-arrow-left fa-lg"></i></button>
+              <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+                  <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
+                    <i className="fas fa-arrow-left fa-lg"></i>
+                  </button>
                   <h1 className="text-2xl font-bold dark:text-white">Select Subject</h1>
               </div>
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {subjects.length === 0 && <div className="text-gray-500 text-center mt-10">No subjects available.</div>}
                   {subjects.map(sub => (
-                      <Card key={sub.id} className="cursor-pointer hover:scale-105 transition-transform border-l-4 border-somali-blue">
+                      <Card key={sub.id} className="cursor-pointer hover:scale-105 transition-transform border-l-4 border-somali-blue group">
                           <div onClick={() => handleSelectSubject(sub)} className="flex justify-between items-center">
-                              <span className="font-bold text-lg">{sub.name}</span>
-                              <i className="fas fa-chevron-right text-gray-400"></i>
+                              <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-somali-blue dark:text-blue-300 group-hover:bg-somali-blue group-hover:text-white transition-colors">
+                                      <i className="fas fa-book"></i>
+                                  </div>
+                                  <span className="font-bold text-lg">{sub.name}</span>
+                              </div>
+                              <i className="fas fa-chevron-right text-gray-400 group-hover:translate-x-1 transition-transform"></i>
                           </div>
                       </Card>
                   ))}
@@ -136,25 +152,48 @@ const SoloPage: React.FC = () => {
       );
   }
 
-  // STEP 2: Select Chapter
+  // STEP 2: Select Chapter (Dropdown)
   if (step === 'chapter') {
       return (
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-              <div className="flex items-center gap-4 mb-6">
-                  <button onClick={() => setStep('subject')} className="text-gray-600 dark:text-gray-300"><i className="fas fa-arrow-left fa-lg"></i></button>
+              <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+                  <button onClick={() => setStep('subject')} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
+                    <i className="fas fa-arrow-left fa-lg"></i>
+                  </button>
                   <h1 className="text-2xl font-bold dark:text-white">{selectedSubject?.name}</h1>
               </div>
-              <p className="mb-4 text-gray-500 dark:text-gray-400">Select a topic to start practicing:</p>
-              <div className="grid grid-cols-1 gap-4">
-                  {chapters.map(chap => (
-                      <Card key={chap.id} className="cursor-pointer hover:scale-105 transition-transform border-l-4 border-green-500">
-                          <div onClick={() => handleSelectChapter(chap)} className="flex justify-between items-center">
-                              <span className="font-bold text-lg">{chap.name}</span>
-                              <i className="fas fa-play text-green-500"></i>
+              
+              <Card className="max-w-xl mx-auto">
+                  <div className="text-center mb-6">
+                      <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-3 text-green-600 dark:text-green-400">
+                          <i className="fas fa-layer-group text-3xl"></i>
+                      </div>
+                      <h2 className="text-xl font-bold dark:text-white">Select Topic</h2>
+                      <p className="text-sm text-gray-500">Choose a chapter to begin your practice.</p>
+                  </div>
+
+                  <div className="mb-6">
+                      <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Chapter</label>
+                      <div className="relative">
+                          <select 
+                            value={selectedChapterId} 
+                            onChange={(e) => setSelectedChapterId(e.target.value)}
+                            className="w-full p-4 bg-gray-50 dark:bg-gray-700 dark:text-white border-2 border-gray-200 dark:border-gray-600 rounded-xl appearance-none font-bold text-gray-700 focus:outline-none focus:border-green-500"
+                          >
+                              {chapters.map(chap => (
+                                  <option key={chap.id} value={chap.id}>{chap.name}</option>
+                              ))}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-700 dark:text-gray-400">
+                                <i className="fas fa-chevron-down"></i>
                           </div>
-                      </Card>
-                  ))}
-              </div>
+                      </div>
+                  </div>
+
+                  <Button fullWidth onClick={handleStartGame} disabled={!selectedChapterId}>
+                      <i className="fas fa-play mr-2"></i> Start Practice
+                  </Button>
+              </Card>
           </div>
       );
   }
@@ -193,7 +232,7 @@ const SoloPage: React.FC = () => {
              </div>
 
              <div className="bg-white text-gray-900 rounded-2xl p-8 shadow-2xl text-center mb-6 min-h-[150px] flex items-center justify-center flex-col">
-                 <span className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-widest">{selectedChapter?.name}</span>
+                 <span className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-widest">{selectedChapterId && chapters.find(c => c.id === selectedChapterId)?.name}</span>
                  <h2 className="text-xl font-bold">{currentQ.question}</h2>
              </div>
 
