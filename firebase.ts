@@ -4,13 +4,13 @@ import { getDatabase } from "firebase/database";
 
 // REPLACE WITH YOUR FIREBASE CONFIGURATION
 const firebaseConfig = {
-  apiKey: "AIzaSyDKFpwQU9W4Njvtmtz6N_Jc2kZjdY_CIEc",
-  authDomain: "connectsphare-a27d6.firebaseapp.com",
-  databaseURL: "https://connectsphare-a27d6-default-rtdb.firebaseio.com",
-  projectId: "connectsphare-a27d6",
-  storageBucket: "connectsphare-a27d6.firebasestorage.app",
-  messagingSenderId: "277886142393",
-  appId: "1:277886142393:web:44fedcbec4e9cc5363d868"
+  apiKey: "AIzaSyCXt3G4mGZE4sNf1DwVIaQYPAxsJ7smKlo",
+  authDomain: "lp-f4-fcb08.firebaseapp.com",
+  databaseURL: "https://lp-f4-fcb08-default-rtdb.firebaseio.com",
+  projectId: "lp-f4-fcb08",
+  storageBucket: "lp-f4-fcb08.firebasestorage.app",
+  messagingSenderId: "603327699524",
+  appId: "1:603327699524:web:76512d16b9779ffdce7a11"
 };
 
 const app = initializeApp(firebaseConfig);

@@ -115,7 +115,7 @@ const AppContent: React.FC = () => {
         <div className="relative w-24 h-24 mb-4">
              <div className="absolute inset-0 bg-somali-blue opacity-20 rounded-full animate-ping"></div>
              <div className="relative w-full h-full bg-somali-blue rounded-full flex items-center justify-center shadow-xl z-10">
-                 <img src="https://img.icons8.com/fluency/96/mortarboard.png" alt="Logo" className="w-12 h-12" />
+                 <img src="https://files.catbox.moe/qn40s6.png" alt="Logo" className="w-12 h-12" />
              </div>
         </div>
         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600 mb-2 animate-pulse">

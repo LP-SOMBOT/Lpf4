@@ -22,7 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
         <div className="h-full flex flex-col justify-between py-8">
             <div className="flex flex-col gap-2">
                 <div className="px-6 mb-8 flex items-center gap-2">
-                    <img src="https://img.icons8.com/fluency/96/mortarboard.png" alt="Logo" className="w-8 h-8" />
+                    <img src="https://files.catbox.moe/qn40s6.png" alt="Logo" className="w-8 h-8" />
                     <span className="font-extrabold text-xl tracking-tight hidden lg:block text-somali-blue dark:text-blue-400">LP-F4</span>
                 </div>
                 {navItems.map((item) => {
