@@ -1,12 +1,24 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/UI';
 
 const AboutPage: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 pb-24 transition-colors">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-6 pb-8 transition-colors max-w-4xl mx-auto w-full">
+      
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+          <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
+            <i className="fas fa-arrow-left fa-lg"></i>
+          </button>
+          <h1 className="text-2xl font-bold dark:text-white">About Us</h1>
+      </div>
+
+      <div className="space-y-6">
         
-        {/* Header */}
+        {/* Intro */}
         <div className="text-center mb-8 animate__animated animate__fadeInDown">
           <h1 className="text-4xl font-extrabold text-somali-blue dark:text-blue-400 mb-2">LP-F4</h1>
           <p className="text-gray-600 dark:text-gray-300">Empowering Somali Students Through Knowledge</p>

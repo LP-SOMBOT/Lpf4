@@ -111,7 +111,7 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className={`min-h-screen flex flex-col items-center justify-center transition-colors ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center transition-colors ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="relative w-24 h-24 mb-4">
              <div className="absolute inset-0 bg-somali-blue opacity-20 rounded-full animate-ping"></div>
              <div className="relative w-full h-full bg-somali-blue rounded-full flex items-center justify-center shadow-xl z-10">
@@ -141,48 +141,40 @@ const AppContent: React.FC = () => {
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
       <ThemeContext.Provider value={{ theme, toggleTheme }}>
-        <div className={`min-h-screen font-sans flex justify-center items-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
-          
-          {/* Main Layout Container - Responsive */}
-          <div className={`
-             w-full h-[100dvh] flex flex-col md:flex-row
-             md:max-w-5xl md:h-[90vh] md:rounded-3xl md:overflow-hidden md:shadow-2xl md:border dark:border-gray-700
-             transition-all duration-300
-             ${theme === 'dark' ? 'dark bg-gray-900 text-white' : 'bg-white text-gray-800'}
-          `}>
+        {/* Full Screen Layout - Removed desktop frame constraints */}
+        <div className={`w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden transition-colors duration-300 ${theme === 'dark' ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-800'}`}>
             
             {/* Desktop Navigation (Sidebar) */}
             {user && showNavbar && (
-                <div className="hidden md:block w-24 lg:w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
+                <div className="hidden md:block w-24 lg:w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 z-20">
                     <Navbar orientation="vertical" />
                 </div>
             )}
 
-            {/* Mobile/Content Area */}
+            {/* Content Area */}
             <div className="flex-1 flex flex-col h-full relative overflow-hidden">
-                <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
-                <Routes>
-                    <Route path="/auth" element={!user ? <AuthPage /> : <Navigate to="/" />} />
-                    <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-                    <Route path="/lobby" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
-                    <Route path="/game/:matchId" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
-                    <Route path="/solo" element={<ProtectedRoute><SoloPage /></ProtectedRoute>} />
-                    <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
-                    <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-                    <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
-                    <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
-                </Routes>
+                <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
+                  <Routes>
+                      <Route path="/auth" element={!user ? <AuthPage /> : <Navigate to="/" />} />
+                      <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+                      <Route path="/lobby" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
+                      <Route path="/game/:matchId" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
+                      <Route path="/solo" element={<ProtectedRoute><SoloPage /></ProtectedRoute>} />
+                      <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
+                      <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                      <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
+                      <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+                  </Routes>
                 </div>
                 
                 {/* Mobile Bottom Navigation */}
                 {user && showNavbar && (
-                    <div className="md:hidden">
+                    <div className="md:hidden z-20">
                         <Navbar orientation="horizontal" />
                     </div>
                 )}
             </div>
 
-          </div>
         </div>
       </ThemeContext.Provider>
     </UserContext.Provider>

@@ -125,7 +125,7 @@ const SoloPage: React.FC = () => {
   // STEP 1: Select Subject
   if (step === 'subject') {
       return (
-          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+          <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-6 max-w-4xl mx-auto w-full">
               <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
                   <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
@@ -155,7 +155,7 @@ const SoloPage: React.FC = () => {
   // STEP 2: Select Chapter (Dropdown)
   if (step === 'chapter') {
       return (
-          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+          <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-6 max-w-4xl mx-auto w-full">
               <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
                   <button onClick={() => setStep('subject')} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
@@ -202,7 +202,7 @@ const SoloPage: React.FC = () => {
   const currentQ = questions[currentQIndex];
 
   return (
-    <div className="min-h-screen bg-somali-blue p-6 flex flex-col items-center justify-center text-white">
+    <div className="min-h-full bg-somali-blue p-6 flex flex-col items-center justify-center text-white w-full h-full">
       <div className="w-full max-w-md">
         <div className="flex justify-between items-center mb-6">
           <button onClick={() => setFinished(true)} className="text-white/80 hover:text-white">

@@ -70,7 +70,7 @@ const LeaderboardPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 flex flex-col transition-colors">
+    <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-6 flex flex-col transition-colors pb-8 max-w-4xl mx-auto w-full">
        <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
         <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
             <i className="fas fa-arrow-left fa-lg"></i>
@@ -81,7 +81,7 @@ const LeaderboardPage: React.FC = () => {
       {loading && players.length === 0 ? (
         <div className="flex justify-center mt-20"><i className="fas fa-spinner fa-spin text-somali-blue text-2xl"></i></div>
       ) : (
-        <div className="space-y-3 pb-20">
+        <div className="space-y-3">
             {players.length === 0 && <div className="text-center text-gray-500 dark:text-gray-400">No players found.</div>}
             {players.map((p, idx) => {
                 const isMe = p.uid === user?.uid;

@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ref, push, get, remove, set, onValue, off } from 'firebase/database';
+import { ref, push, get, remove, set, onValue } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../App';
 import { Button, Input, Card } from '../components/UI';
@@ -10,7 +10,6 @@ import { Subject, Chapter } from '../types';
 
 const LobbyPage: React.FC = () => {
   const { user } = useContext(UserContext);
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'auto' | 'custom'>('auto');
   
   // Selection State
@@ -316,7 +315,7 @@ const LobbyPage: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col p-6 min-h-full relative pb-24">
+    <div className="flex flex-col p-6 min-h-full relative pb-8 max-w-4xl mx-auto w-full">
       {/* Notification Toast */}
        {notification && (
          <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-2 rounded-full shadow-lg font-bold text-white flex items-center gap-2 animate__animated animate__fadeInDown ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
