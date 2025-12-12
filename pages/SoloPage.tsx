@@ -34,7 +34,8 @@ const SoloPage: React.FC = () => {
     const subRef = ref(db, 'subjects');
     const unsub = onValue(subRef, (snapshot) => {
         if (snapshot.exists()) {
-            setSubjects(Object.values(snapshot.val()));
+            const list = (Object.values(snapshot.val()) as Subject[]).filter(s => s && s.id && s.name);
+            setSubjects(list);
         }
         setLoading(false);
     });

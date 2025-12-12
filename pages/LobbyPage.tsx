@@ -36,7 +36,10 @@ const LobbyPage: React.FC = () => {
   useEffect(() => {
     const subRef = ref(db, 'subjects');
     get(subRef).then(snap => {
-        if(snap.exists()) setSubjects(Object.values(snap.val()));
+        if(snap.exists()) {
+          const list = (Object.values(snap.val()) as Subject[]).filter(s => s && s.id && s.name);
+          setSubjects(list);
+        }
     });
   }, []);
 

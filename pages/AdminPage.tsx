@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ref, push, set, get, remove, onValue, off } from 'firebase/database';
+import { ref, push, set, get, remove, onValue, off, update } from 'firebase/database';
 import { db } from '../firebase';
 import { Button, Input, Card, Modal } from '../components/UI';
 import { Question, Subject, Chapter } from '../types';
@@ -34,25 +34,22 @@ const AdminPage: React.FC = () => {
     const unsub = onValue(subRef, (snapshot) => {
         if (snapshot.exists()) {
             const data = snapshot.val();
-            const list = Object.values(data) as Subject[];
+            // Filter out empty or invalid subjects
+            const list = (Object.values(data) as Subject[]).filter(s => s && s.id && s.name);
             setSubjects(list);
-            // Default select first if none selected
-            if (!selectedSubject && list.length > 0) {
-                setSelectedSubject(list[0].id);
-            }
+            // We do not auto-select here to avoid jumping selection if user deletes one
         } else {
-            // Seed initial subject
-            const initSub = { id: 'math', name: 'Mathematics' };
-            set(ref(db, 'subjects/math'), initSub);
+            setSubjects([]);
         }
     });
     return () => off(subRef);
-  }, []); // Run once on mount
+  }, []);
 
   // 2. Fetch Chapters when Subject changes
   useEffect(() => {
     if (!selectedSubject) {
         setChapters([]);
+        setSelectedChapter('');
         return;
     }
     
@@ -63,6 +60,7 @@ const AdminPage: React.FC = () => {
             const list = Object.values(data) as Chapter[];
             setChapters(list);
             if (list.length > 0) {
+                // Keep selected if valid, else select first
                 if (!list.find(c => c.id === selectedChapter)) {
                     setSelectedChapter(list[0].id);
                 }
@@ -207,6 +205,60 @@ const AdminPage: React.FC = () => {
       }
   };
 
+  const handleDeleteSubject = async () => {
+    if (!selectedSubject) return;
+    if (!window.confirm("DANGER: Delete this Subject? \n\nThis will permanently delete:\n- The Subject itself\n- All Chapters in it\n- All Questions in those chapters")) return;
+    
+    setLoading(true);
+    try {
+        const chaptersRef = ref(db, `chapters/${selectedSubject}`);
+        const snap = await get(chaptersRef);
+        
+        const updates: any = {};
+        updates[`subjects/${selectedSubject}`] = null;
+        updates[`chapters/${selectedSubject}`] = null;
+
+        if (snap.exists()) {
+             const chaps = snap.val();
+             Object.keys(chaps).forEach(chapId => {
+                 updates[`questions/${chapId}`] = null;
+                 updates[`queue/${chapId}`] = null;
+             });
+        }
+        
+        await update(ref(db), updates);
+        
+        setSelectedSubject('');
+        setSelectedChapter('');
+    } catch(e) {
+        console.error(e);
+        alert("Error deleting subject.");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleDeleteChapter = async () => {
+    if (!selectedChapter || !selectedSubject) return;
+    if (!window.confirm("Delete this Chapter? \n\nAll questions in this chapter will be deleted.")) return;
+
+    setLoading(true);
+    try {
+        const updates: any = {};
+        updates[`chapters/${selectedSubject}/${selectedChapter}`] = null;
+        updates[`questions/${selectedChapter}`] = null;
+        updates[`queue/${selectedChapter}`] = null;
+
+        await update(ref(db), updates);
+        setSelectedChapter('');
+    } catch(e) {
+        console.error(e);
+        alert("Error deleting chapter.");
+    } finally {
+         setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 pb-24 transition-colors">
       {/* Header */}
@@ -228,9 +280,16 @@ const AdminPage: React.FC = () => {
                 <div>
                     <div className="flex justify-between items-center mb-2">
                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Subject</label>
-                        <button onClick={() => setModalType('subject')} className="text-xs text-somali-blue font-bold hover:underline">
-                            + New Subject
-                        </button>
+                        <div className="flex gap-2">
+                             {selectedSubject && (
+                                <button onClick={handleDeleteSubject} className="text-xs text-red-500 font-bold hover:text-red-600 transition-colors bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                                    <i className="fas fa-trash mr-1"></i>Delete
+                                </button>
+                             )}
+                            <button onClick={() => setModalType('subject')} className="text-xs text-somali-blue font-bold hover:underline bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                                + New
+                            </button>
+                        </div>
                     </div>
                     <div className="relative">
                         <select 
@@ -238,6 +297,7 @@ const AdminPage: React.FC = () => {
                             onChange={(e) => setSelectedSubject(e.target.value)}
                             className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white border-2 border-gray-200 dark:border-gray-600 rounded-xl appearance-none font-bold text-gray-700"
                         >
+                            <option value="">Select Subject</option>
                             {subjects.map(s => (
                                 <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
@@ -252,9 +312,16 @@ const AdminPage: React.FC = () => {
                 <div className={`${!selectedSubject ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="flex justify-between items-center mb-2">
                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Chapter</label>
-                        <button onClick={() => setModalType('chapter')} className="text-xs text-somali-blue font-bold hover:underline">
-                            + New Chapter
-                        </button>
+                        <div className="flex gap-2">
+                             {selectedChapter && (
+                                <button onClick={handleDeleteChapter} className="text-xs text-red-500 font-bold hover:text-red-600 transition-colors bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                                    <i className="fas fa-trash mr-1"></i>Delete
+                                </button>
+                             )}
+                            <button onClick={() => setModalType('chapter')} className="text-xs text-somali-blue font-bold hover:underline bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                                + New
+                            </button>
+                        </div>
                     </div>
                     <div className="relative">
                         <select 
@@ -279,7 +346,7 @@ const AdminPage: React.FC = () => {
         {/* Add Question Form */}
         <Card className={`${!selectedChapter ? 'opacity-50 pointer-events-none grayscale' : ''} transition-all`}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">
+            <h2 className="text-xl font-bold dark:text-white">
                 Add Question
             </h2>
             <span className="text-xs text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{selectedChapter}</span>
@@ -344,7 +411,7 @@ const AdminPage: React.FC = () => {
         {/* Existing Questions List */}
         <Card>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Existing Questions</h2>
+            <h2 className="text-xl font-bold dark:text-white">Existing Questions</h2>
             <div className="flex items-center gap-2">
                  <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded text-xs font-bold">{questions.length}</span>
                  <button onClick={fetchQuestions} className="text-somali-blue hover:rotate-180 transition-transform"><i className="fas fa-sync"></i></button>
