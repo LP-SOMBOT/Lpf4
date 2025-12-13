@@ -156,7 +156,7 @@ const SoloPage: React.FC = () => {
                                   <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-somali-blue dark:text-blue-300 group-hover:bg-somali-blue group-hover:text-white transition-colors">
                                       <i className="fas fa-book"></i>
                                   </div>
-                                  <span className="font-bold text-lg">{sub.name}</span>
+                                  <span className="font-bold text-lg dark:text-white">{sub.name}</span>
                               </div>
                               <i className="fas fa-chevron-right text-gray-400 group-hover:translate-x-1 transition-transform"></i>
                           </div>

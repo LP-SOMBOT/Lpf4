@@ -33,7 +33,6 @@ export const ThemeContext = React.createContext<{
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   const { user, loading } = React.useContext(UserContext);
-  // Allow loading state to pass, otherwise it flickers to auth
   if (loading) return null; 
   if (!user) {
     return <Navigate to="/auth" replace />;
@@ -66,6 +65,11 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [theme]);
 
   const toggleTheme = () => {
@@ -73,7 +77,6 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    // 1. Load from Cache immediately for perceived performance
     const cachedProfile = localStorage.getItem('userProfile');
     if (cachedProfile) {
         setProfile(JSON.parse(cachedProfile));
@@ -82,17 +85,14 @@ const AppContent: React.FC = () => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Fetch User Profile
         const userRef = ref(db, `users/${currentUser.uid}`);
         onValue(userRef, (snapshot) => {
           const data = snapshot.val();
           if (data) {
             const updatedProfile = { uid: currentUser.uid, ...data };
             setProfile(updatedProfile);
-            // Update Cache
             localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
             
-            // Auto-redirect to game if active match found (and not already there)
             if (data.activeMatch && !location.pathname.includes('/game')) {
               navigate(`/game/${data.activeMatch}`);
             }
@@ -121,32 +121,21 @@ const AppContent: React.FC = () => {
         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600 mb-2 animate-pulse">
             LP-F4
         </h1>
-        <div className="w-48 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full bg-somali-blue animate-[progress_1.5s_ease-in-out_infinite] origin-left w-full transform -translate-x-full"></div>
-        </div>
-        <style>{`
-          @keyframes progress {
-            0% { transform: translateX(-100%); }
-            50% { transform: translateX(0%); }
-            100% { transform: translateX(100%); }
-          }
-        `}</style>
       </div>
     );
   }
 
-  // Define which paths show the Navbar
   const showNavbar = ['/', '/lobby', '/leaderboard', '/profile', '/about'].includes(location.pathname);
 
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
       <ThemeContext.Provider value={{ theme, toggleTheme }}>
-        {/* Full Screen Layout - Removed desktop frame constraints */}
-        <div className={`w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden transition-colors duration-300 ${theme === 'dark' ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-800'}`}>
+        {/* Full Screen Layout */}
+        <div className={`w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors`}>
             
             {/* Desktop Navigation (Sidebar) */}
             {user && showNavbar && (
-                <div className="hidden md:block w-24 lg:w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 z-20">
+                <div className="hidden md:block w-24 lg:w-64 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0 z-20">
                     <Navbar orientation="vertical" />
                 </div>
             )}

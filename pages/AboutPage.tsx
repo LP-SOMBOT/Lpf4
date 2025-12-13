@@ -6,7 +6,7 @@ const AboutPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-6 pb-8 transition-colors max-w-4xl mx-auto w-full">
+    <div className="min-h-full p-6 pb-8 transition-colors max-w-4xl mx-auto w-full">
       
       {/* Sticky Header */}
       <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
@@ -21,25 +21,25 @@ const AboutPage: React.FC = () => {
         {/* Intro */}
         <div className="text-center mb-8 animate__animated animate__fadeInDown">
           <h1 className="text-4xl font-extrabold text-somali-blue dark:text-blue-400 mb-2">LP-F4</h1>
-          <p className="text-gray-600 dark:text-gray-300">Empowering Somali Students Through Knowledge</p>
+          <p className="text-gray-600 dark:text-gray-300 font-medium">Empowering Somali Students Through Knowledge</p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate__animated animate__fadeInUp">
             <Card className="text-center border-b-4 border-blue-500">
                 <i className="fas fa-users text-3xl text-blue-500 mb-2"></i>
-                <h3 className="text-2xl font-bold dark:text-white">1,200+</h3>
-                <p className="text-xs text-gray-500 uppercase font-bold">Active Learners</p>
+                <h3 className="text-3xl font-extrabold dark:text-white">1,200+</h3>
+                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Active Learners</p>
             </Card>
             <Card className="text-center border-b-4 border-green-500">
                 <i className="fas fa-layer-group text-3xl text-green-500 mb-2"></i>
-                <h3 className="text-2xl font-bold dark:text-white">500+</h3>
-                <p className="text-xs text-gray-500 uppercase font-bold">Total Quizzes</p>
+                <h3 className="text-3xl font-extrabold dark:text-white">500+</h3>
+                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Total Quizzes</p>
             </Card>
             <Card className="text-center border-b-4 border-yellow-500">
                 <i className="fas fa-headset text-3xl text-yellow-500 mb-2"></i>
-                <h3 className="text-2xl font-bold dark:text-white">24/7</h3>
-                <p className="text-xs text-gray-500 uppercase font-bold">Student Support</p>
+                <h3 className="text-3xl font-extrabold dark:text-white">24/7</h3>
+                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Student Support</p>
             </Card>
         </div>
 
@@ -72,7 +72,7 @@ const AboutPage: React.FC = () => {
 
         {/* Our Story */}
         <Card className="animate__animated animate__fadeInUp" style={{animationDelay: '0.2s'}}>
-            <h2 className="text-xl font-bold mb-4 dark:text-white">Our Story</h2>
+            <h2 className="text-xl font-bold mb-4 dark:text-white border-l-4 border-somali-blue pl-3">Our Story</h2>
             <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
                 LP-F4 started as a small project to help students prepare for exams using simple flashcards. We realized that students learn best when they are challenged and having fun. 
             </p>
@@ -83,32 +83,32 @@ const AboutPage: React.FC = () => {
 
         {/* Contact Info */}
         <Card className="bg-gray-800 text-white animate__animated animate__fadeInUp" style={{animationDelay: '0.3s'}}>
-            <h2 className="text-xl font-bold mb-6">Get in Touch</h2>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><i className="fas fa-paper-plane text-somali-blue"></i> Get in Touch</h2>
             <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                <div className="flex items-center gap-4 bg-gray-700 p-3 rounded-xl">
+                    <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center">
                         <i className="fas fa-envelope"></i>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400 uppercase">Email</p>
+                        <p className="text-xs text-gray-400 uppercase tracking-widest">Email</p>
                         <p className="font-bold">support@lpf4.edu.so</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                <div className="flex items-center gap-4 bg-gray-700 p-3 rounded-xl">
+                    <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center">
                         <i className="fas fa-phone"></i>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400 uppercase">Phone</p>
+                        <p className="text-xs text-gray-400 uppercase tracking-widest">Phone</p>
                         <p className="font-bold">+252 61 500 0000</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                <div className="flex items-center gap-4 bg-gray-700 p-3 rounded-xl">
+                    <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center">
                         <i className="fas fa-map-marker-alt"></i>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-400 uppercase">Location</p>
+                        <p className="text-xs text-gray-400 uppercase tracking-widest">Location</p>
                         <p className="font-bold">Mogadishu, Somalia</p>
                     </div>
                 </div>

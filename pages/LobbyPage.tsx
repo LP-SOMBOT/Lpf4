@@ -80,8 +80,6 @@ const LobbyPage: React.FC = () => {
       timer: 3000,
       timerProgressBar: true,
       showCloseButton: true,
-      background: isDark ? '#1f2937' : '#fff',
-      color: isDark ? '#fff' : '#000',
     });
   };
 

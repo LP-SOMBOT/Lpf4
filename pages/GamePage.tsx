@@ -50,7 +50,6 @@ const GamePage: React.FC = () => {
       setMatch(data);
 
       // Load Questions if not loaded
-      // data.subject holds the Chapter ID in the new system
       if (questions.length === 0 && data.subject) {
           const qRef = ref(db, `questions/${data.subject}`);
           const qSnap = await get(qRef);
@@ -58,7 +57,6 @@ const GamePage: React.FC = () => {
               const loadedQ = Object.values(qSnap.val()) as Question[];
               setQuestions(loadedQ);
           } else {
-              // Handle case where questions are missing/deleted for a chapter
               console.error("No questions found for chapter: " + data.subject);
           }
       }
@@ -169,8 +167,6 @@ const GamePage: React.FC = () => {
   const handleSurrender = async () => {
     if(!matchId || !user || !opponentProfile) return;
     
-    const isDark = document.documentElement.classList.contains('dark');
-    
     const result = await Swal.fire({
       title: 'Surrender?',
       text: "You will lose this match and exit to the lobby.",
@@ -180,8 +176,6 @@ const GamePage: React.FC = () => {
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Yes, I give up',
       cancelButtonText: 'No, keep fighting',
-      background: isDark ? '#1f2937' : '#fff',
-      color: isDark ? '#fff' : '#000',
     });
 
     if (result.isConfirmed) {
@@ -197,13 +191,13 @@ const GamePage: React.FC = () => {
   };
 
   if (!match || !opponentProfile || (!currentQuestion && !isGameOver)) {
-    return <div className="min-h-screen flex items-center justify-center bg-somali-blue text-white animate-pulse">
+    return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white animate-pulse">
         {match && questions.length === 0 ? "Loading Questions..." : "Initializing Battle..."}
     </div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-800 flex flex-col text-white relative overflow-hidden">
+    <div className="min-h-screen bg-gray-900 flex flex-col text-white relative overflow-hidden">
       {/* HUD */}
       <div className="flex justify-between items-center p-4 bg-gray-900 shadow-md z-10">
         <div className={`flex flex-col items-center transition-all ${isMyTurn ? 'scale-110 opacity-100' : 'opacity-60 scale-90'}`}>

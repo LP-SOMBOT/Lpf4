@@ -68,14 +68,15 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col justify-center p-6 bg-somali-blue min-h-screen">
+    <div className="h-full flex flex-col justify-center p-6 min-h-screen relative bg-gradient-to-br from-somali-blue to-blue-900">
       <div className="text-center mb-8 animate__animated animate__fadeInDown">
+        <img src="https://files.catbox.moe/qn40s6.png" className="w-24 h-24 mx-auto mb-4 drop-shadow-md" />
         <h1 className="text-4xl font-extrabold text-white mb-2">LP-F4</h1>
-        <p className="text-blue-100">Tartanka Aqoonta (Quiz Battle)</p>
+        <p className="text-blue-100 font-medium tracking-wide">Tartanka Aqoonta</p>
       </div>
 
-      <Card className="animate__animated animate__fadeInUp">
-        <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Welcome Back' : 'Join the Battle'}</h2>
+      <Card className="animate__animated animate__fadeInUp shadow-2xl border-none">
+        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">{isLogin ? 'Welcome Back' : 'Join the Battle'}</h2>
         
         {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-4 text-sm font-medium flex items-center gap-2 animate__animated animate__shakeX">
@@ -111,7 +112,7 @@ const AuthPage: React.FC = () => {
             required 
           />
 
-          <Button type="submit" fullWidth isLoading={loading} className="mt-2">
+          <Button type="submit" fullWidth isLoading={loading} className="mt-4 font-extrabold shadow-lg">
             {isLogin ? 'Login' : 'Start Journey'}
           </Button>
         </form>

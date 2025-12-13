@@ -50,10 +50,18 @@
       .perspective-1000 {
         perspective: 1000px;
       }
-      /* SweetAlert2 Dark Mode Overrides if needed, though we handle via JS config */
+      /* Standard SweetAlert2 Dark Mode Overrides */
       .swal2-popup {
         font-family: 'Inter', sans-serif;
         border-radius: 1rem;
+      }
+      .dark .swal2-popup {
+        background: #1f2937 !important;
+        color: #fff !important;
+        border: 1px solid #374151;
+      }
+      .dark .swal2-title, .dark .swal2-content {
+        color: #fff !important;
       }
     </style>
   <script type="importmap">
