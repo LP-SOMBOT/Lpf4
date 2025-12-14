@@ -5,6 +5,7 @@ import { ref, onValue } from 'firebase/database';
 import { auth, db } from './firebase';
 import { UserProfile } from './types';
 import { Navbar } from './components/Navbar';
+import { LPAssistant } from './components/LPAssistant';
 
 // Pages
 import AuthPage from './pages/AuthPage';
@@ -127,6 +128,7 @@ const AppContent: React.FC = () => {
   }
 
   const showNavbar = ['/', '/lobby', '/leaderboard', '/profile', '/about'].includes(location.pathname);
+  const showAssistant = user && !location.pathname.includes('/game');
 
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
@@ -172,6 +174,9 @@ const AppContent: React.FC = () => {
                   </Routes>
                 </div>
                 
+                {/* LP Assistant */}
+                {showAssistant && <LPAssistant />}
+
                 {/* Mobile Bottom Navigation */}
                 {user && showNavbar && (
                     <div className="md:hidden z-20">

@@ -3,6 +3,9 @@ import { GoogleGenAI } from "@google/genai";
 import { Card } from './UI';
 import { playSound } from '../services/audioService';
 
+// Specific API Key for Player Assistant
+const ASSISTANT_API_KEY = "AIzaSyANNTSat_EsUKxz38GoyWWqUR5rEa5OHfY";
+
 interface Message {
   role: 'user' | 'model';
   text: string;
@@ -55,7 +58,7 @@ export const LPAssistant: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const ai = new GoogleGenAI({ apiKey: ASSISTANT_API_KEY });
       
       const systemPrompt = `You are LP Assistant, a helpful AI guide for the LP-F4 Quiz Battle app (Somali Student Quiz Battle). 
       The app allows students to compete in real-time quizzes (Battle Mode), practice solo (Solo Mode), and view Leaderboards.

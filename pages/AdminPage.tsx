@@ -6,6 +6,10 @@ import { Question, Subject, Chapter } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { read, utils, writeFile } from 'xlsx';
 import Swal from 'sweetalert2';
+import { GoogleGenAI } from "@google/genai";
+
+// Specific API Key for Admin Scraper as requested
+const SCRAPER_API_KEY = "AIzaSyChoJ18ekOxW4nNnWHRJMCwdbgetSFcbFg";
 
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,11 +24,14 @@ const AdminPage: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   
   // Form State
-  const [inputMode, setInputMode] = useState<'manual' | 'bulk'>('manual');
+  const [inputMode, setInputMode] = useState<'manual' | 'bulk' | 'ai'>('manual');
   const [questionText, setQuestionText] = useState('');
   const [options, setOptions] = useState<string[]>(['', '', '', '']); // Dynamic array
   const [correctAnswer, setCorrectAnswer] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  // AI Scraper State
+  const [aiRawText, setAiRawText] = useState('');
 
   // Modals
   const [modalType, setModalType] = useState<'subject' | 'chapter' | null>(null);
@@ -286,6 +293,91 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleAiScrape = async () => {
+    if (!aiRawText.trim() || !selectedChapter) {
+        fireAlert("Missing Info", "Please provide the text and ensure a chapter is selected.", "warning");
+        return;
+    }
+
+    setLoading(true);
+    try {
+        const genAI = new GoogleGenAI({ apiKey: SCRAPER_API_KEY });
+        const systemPrompt = `
+        You are a smart quiz parser. Extract multiple choice questions from the user's text.
+        
+        Expected Format in text (it might be messy):
+        "Question text? a) option1 b) option2 c) option3 d) option4 c=a" 
+        (Where c=a means 'a' is correct, or c=correct_answer_text).
+
+        Your Output MUST be a valid JSON array of objects. No markdown formatting.
+        Schema:
+        [
+            {
+                "question": "The question string",
+                "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+                "answer": 0  // Integer index (0 for A, 1 for B, 2 for C, 3 for D)
+            }
+        ]
+        
+        Rules:
+        1. If the correct answer is indicated by a letter (e.g. c=a), convert to index (a=0, b=1...).
+        2. Ensure exactly 4 options if possible. If less, allow it.
+        3. Only return the JSON.
+        `;
+
+        const response = await genAI.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: aiRawText,
+            config: {
+                systemInstruction: systemPrompt,
+                responseMimeType: "application/json"
+            }
+        });
+
+        const jsonStr = response.text || "[]";
+        const parsedQuestions = JSON.parse(jsonStr);
+
+        if (!Array.isArray(parsedQuestions) || parsedQuestions.length === 0) {
+             throw new Error("Failed to parse valid questions.");
+        }
+
+        // Upload to Firebase
+        const updates: any = {};
+        let count = 0;
+        
+        parsedQuestions.forEach((q: any) => {
+            if (q.question && Array.isArray(q.options) && typeof q.answer === 'number') {
+                 const newRefKey = push(ref(db, `questions/${selectedChapter}`)).key;
+                 if (newRefKey) {
+                    updates[`questions/${selectedChapter}/${newRefKey}`] = {
+                        question: q.question,
+                        options: q.options,
+                        answer: q.answer,
+                        subject: selectedChapter,
+                        createdAt: Date.now()
+                    };
+                    count++;
+                 }
+            }
+        });
+
+        if (count > 0) {
+            await update(ref(db), updates);
+            setAiRawText('');
+            fireAlert("Success", `AI successfully extracted and added ${count} questions!`, "success");
+            fetchQuestions();
+        } else {
+            fireAlert("Warning", "AI response valid but no questions could be formatted for upload.", "warning");
+        }
+
+    } catch (e) {
+        console.error(e);
+        fireAlert("AI Error", "Failed to process text. Try formatting it more clearly.", "error");
+    } finally {
+        setLoading(false);
+    }
+  };
+
   const handleDeleteQuestion = async (id: string | number) => {
     const result = await fireConfirm("Delete Question?", "You won't be able to revert this!");
     if(!result.isConfirmed) return;
@@ -476,9 +568,9 @@ const AdminPage: React.FC = () => {
 
         {/* Add Question Card */}
         <Card className={`${!selectedChapter ? 'opacity-50 pointer-events-none grayscale' : ''} transition-all`}>
-          <div className="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
+          <div className="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-gray-700 pb-4 flex-wrap gap-2">
             <h2 className="text-xl font-bold dark:text-white">
-                {inputMode === 'manual' ? 'Add Single Question' : 'Bulk Upload'}
+                {inputMode === 'manual' ? 'Add Single Question' : inputMode === 'ai' ? 'AI Scraper' : 'Bulk Upload'}
             </h2>
             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 <button 
@@ -488,15 +580,21 @@ const AdminPage: React.FC = () => {
                     Manual
                 </button>
                 <button 
-                    onClick={() => setInputMode('bulk')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${inputMode === 'bulk' ? 'bg-white dark:bg-gray-600 shadow text-somali-blue' : 'text-gray-400'}`}
+                    onClick={() => setInputMode('ai')}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${inputMode === 'ai' ? 'bg-white dark:bg-gray-600 shadow text-purple-600' : 'text-gray-400'}`}
                 >
-                    Excel Upload
+                    <i className="fas fa-magic mr-1"></i>AI
+                </button>
+                <button 
+                    onClick={() => setInputMode('bulk')}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${inputMode === 'bulk' ? 'bg-white dark:bg-gray-600 shadow text-green-600' : 'text-gray-400'}`}
+                >
+                    Excel
                 </button>
             </div>
           </div>
           
-          {inputMode === 'manual' ? (
+          {inputMode === 'manual' && (
             <form onSubmit={handleAddQuestion}>
                 <Input 
                 label="Question"
@@ -551,10 +649,36 @@ const AdminPage: React.FC = () => {
                 <i className="fas fa-plus mr-2"></i> Upload Question
                 </Button>
             </form>
-          ) : (
+          )}
+
+          {inputMode === 'ai' && (
+              <div className="space-y-4">
+                  <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800">
+                     <h3 className="font-bold text-purple-800 dark:text-purple-200 mb-2"><i className="fas fa-robot mr-2"></i>AI Scraper</h3>
+                     <p className="text-sm text-purple-700 dark:text-purple-300">
+                        Paste your raw text below. Example format:
+                        <br />
+                        <em>"What is 2+2? a) 3 b) 4 c) 5 c=b"</em>
+                        <br />
+                        The AI will automatically parse questions, options, and answers.
+                     </p>
+                  </div>
+                  <textarea 
+                    className="w-full h-48 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-mono text-sm"
+                    placeholder="Paste your quiz text here..."
+                    value={aiRawText}
+                    onChange={(e) => setAiRawText(e.target.value)}
+                  ></textarea>
+                  <Button fullWidth onClick={handleAiScrape} isLoading={loading} className="!bg-purple-600 hover:!bg-purple-700 text-white">
+                      <i className="fas fa-magic mr-2"></i> Parse & Upload
+                  </Button>
+              </div>
+          )}
+
+          {inputMode === 'bulk' && (
              <div className="space-y-6">
                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
-                     <h3 className="font-bold text-blue-800 dark:text-blue-200 mb-2">Instructions</h3>
+                     <h3 className="font-bold text-blue-800 dark:text-blue-200 mb-2">Excel Instructions</h3>
                      <ul className="text-sm text-blue-700 dark:text-blue-300 list-disc list-inside space-y-1">
                          <li>Download the template file.</li>
                          <li>Fill in the Questions, Options (A, B, C, D) and Correct Answer (1-4).</li>
