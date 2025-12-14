@@ -5,7 +5,6 @@ import { ref, onValue } from 'firebase/database';
 import { auth, db } from './firebase';
 import { UserProfile } from './types';
 import { Navbar } from './components/Navbar';
-import { LPAssistant } from './components/LPAssistant';
 
 // Pages
 import AuthPage from './pages/AuthPage';
@@ -172,9 +171,6 @@ const AppContent: React.FC = () => {
                       <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </div>
-                
-                {/* LP Assistant (Always visible if logged in) */}
-                {user && <LPAssistant />}
                 
                 {/* Mobile Bottom Navigation */}
                 {user && showNavbar && (

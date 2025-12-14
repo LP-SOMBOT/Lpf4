@@ -19,7 +19,7 @@ const HomePage: React.FC = () => {
   return (
     <div className="min-h-full flex flex-col pb-6">
       {/* Header */}
-      <header className="bg-gradient-to-r from-somali-blue to-blue-600 dark:from-gray-800 dark:to-gray-900 p-6 rounded-b-3xl shadow-lg relative z-10">
+      <header className="bg-gradient-to-r from-somali-blue to-blue-600 dark:from-gray-800 dark:to-gray-900 p-4 rounded-b-3xl shadow-lg relative z-10">
         <div className="max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-6">
             <div>
@@ -46,7 +46,7 @@ const HomePage: React.FC = () => {
       </header>
 
       {/* Main Menu */}
-      <main className="flex-1 p-6 space-y-4 -mt-2 max-w-4xl mx-auto w-full">
+      <main className="flex-1 p-4 space-y-4 -mt-2 max-w-4xl mx-auto w-full">
         
         {/* Admin Button */}
         {profile?.role === 'admin' && (

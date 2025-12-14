@@ -348,7 +348,7 @@ const LobbyPage: React.FC = () => {
     <div className="flex flex-col min-h-full relative pb-8 w-full">
       {/* --- SCENE 1: MODE SELECTION (Full Screen) --- */}
       {viewMode === 'selection' && (
-        <div className="flex flex-col items-center justify-center p-6 min-h-[85vh] animate__animated animate__fadeIn">
+        <div className="flex flex-col items-center justify-center p-4 min-h-[85vh] animate__animated animate__fadeIn">
              <div className="w-full max-w-4xl mx-auto">
                  <div className="flex items-center gap-4 mb-8">
                      <button onClick={() => navigate('/')} className="w-12 h-12 rounded-full bg-white/50 dark:bg-gray-800/50 backdrop-blur shadow-sm flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-somali-blue transition-colors border border-white/40">
@@ -404,8 +404,8 @@ const LobbyPage: React.FC = () => {
 
       {/* --- SCENE 2: SPECIFIC MODE UI --- */}
       {viewMode !== 'selection' && (
-          <div className="p-6 max-w-4xl mx-auto w-full animate__animated animate__fadeInRight">
-              <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl -mx-6 px-6 py-4 mb-6 border-b border-white/20 dark:border-white/10 shadow-sm flex items-center gap-4 transition-colors">
+          <div className="p-4 max-w-4xl mx-auto w-full animate__animated animate__fadeInRight">
+              <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl -mx-4 px-4 py-3 mb-6 border-b border-white/20 dark:border-white/10 shadow-sm flex items-center gap-4 transition-colors">
                 <button onClick={goBack} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
                 </button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ref, get, update } from 'firebase/database';
+import { ref, update, onValue, off } from 'firebase/database';
 import { db } from '../firebase';
 import { UserProfile } from '../types';
 import { Button, Card, Input } from '../components/UI';
@@ -11,11 +11,35 @@ const SuperAdminPage: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Real-time listener for users
+  useEffect(() => {
+    if (isAuthenticated) {
+        setLoading(true);
+        const userRef = ref(db, 'users');
+        
+        const handleData = (snap: any) => {
+            if (snap.exists()) {
+                const data = snap.val();
+                const list: UserProfile[] = Object.keys(data).map(key => ({
+                    uid: key,
+                    ...data[key]
+                }));
+                setUsers(list);
+            } else {
+                setUsers([]);
+            }
+            setLoading(false);
+        };
+
+        const unsubscribe = onValue(userRef, handleData);
+        return () => off(userRef, 'value', handleData);
+    }
+  }, [isAuthenticated]);
+
   const checkPin = (e: React.FormEvent) => {
     e.preventDefault();
     if (pin === '1234') { 
         setIsAuthenticated(true);
-        fetchUsers();
     } else {
         Swal.fire({
             icon: 'error',
@@ -25,17 +49,6 @@ const SuperAdminPage: React.FC = () => {
             color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
         });
     }
-  };
-
-  const fetchUsers = async () => {
-      setLoading(true);
-      const userRef = ref(db, 'users');
-      const snap = await get(userRef);
-      if (snap.exists()) {
-          const list: UserProfile[] = Object.values(snap.val());
-          setUsers(list);
-      }
-      setLoading(false);
   };
 
   const toggleRole = async (uid: string, currentRole?: string) => {
@@ -54,7 +67,6 @@ const SuperAdminPage: React.FC = () => {
             background: isDark ? '#1f2937' : '#fff',
             color: isDark ? '#fff' : '#000'
         });
-        fetchUsers(); // Refresh
       } catch (e) {
         Swal.fire('Error', 'Failed to update role', 'error');
       }
@@ -88,14 +100,15 @@ const SuperAdminPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-full bg-gray-100 dark:bg-gray-900 p-6 absolute inset-0 overflow-y-auto">
+    <div className="min-h-full bg-gray-100 dark:bg-gray-900 p-4 absolute inset-0 overflow-y-auto">
         <div className="max-w-6xl mx-auto pb-12">
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold dark:text-white">User Management</h1>
                     <p className="text-gray-500 dark:text-gray-400">Manage roles and permissions</p>
                 </div>
-                <Button onClick={fetchUsers} isLoading={loading} variant="secondary"><i className="fas fa-sync mr-2"></i> Refresh</Button>
+                {/* Refresh button not strictly needed with realtime, but kept for UX */}
+                <Button onClick={() => {}} isLoading={loading} variant="secondary" className="opacity-50 cursor-default"><i className="fas fa-satellite-dish mr-2"></i> Realtime</Button>
             </div>
             
             <Card className="!bg-white dark:!bg-gray-800 overflow-hidden shadow-lg border-0">
