@@ -21,6 +21,9 @@ const LobbyPage: React.FC = () => {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedChapter, setSelectedChapter] = useState<string>('');
+  
+  // Custom Room Settings
+  const [quizLimit, setQuizLimit] = useState<number>(5);
 
   // Match State
   const [matchStatus, setMatchStatus] = useState<string>('');
@@ -112,6 +115,7 @@ const LobbyPage: React.FC = () => {
           const matchData = {
             matchId,
             status: 'active',
+            mode: 'auto',
             turn: user.uid, 
             currentQ: 0,
             scores: { [user.uid]: 0, [opponentUid]: 0 },
@@ -183,6 +187,7 @@ const LobbyPage: React.FC = () => {
       host: user.uid,
       sid: selectedSubject,
       lid: selectedChapter,
+      questionLimit: quizLimit,
       createdAt: Date.now()
     });
 
@@ -217,12 +222,16 @@ const LobbyPage: React.FC = () => {
 
       const hostUid = roomData.host;
       const chapterId = roomData.lid;
+      const qLimit = roomData.questionLimit || 5;
+
       await remove(roomRef);
 
       const matchId = `match_${Date.now()}`;
       await set(ref(db, `matches/${matchId}`), {
         matchId,
         status: 'active',
+        mode: 'custom',
+        questionLimit: qLimit,
         turn: hostUid,
         currentQ: 0,
         scores: { [hostUid]: 0, [user.uid]: 0 },
@@ -279,27 +288,27 @@ const LobbyPage: React.FC = () => {
   // --- RENDER COMPONENTS ---
 
   const SelectionUI = () => (
-      <div className="mb-6 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">1. Select Subject</label>
+      <div className="mb-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-4 rounded-3xl shadow-sm border border-white/40 dark:border-white/10">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-3 ml-1">1. Select Subject</label>
           <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
               {subjects.map(s => (
                   <button 
                     key={s.id} 
                     onClick={() => setSelectedSubject(s.id)}
-                    className={`px-4 py-2 rounded-lg whitespace-nowrap text-sm font-bold transition-all ${selectedSubject === s.id ? 'bg-somali-blue text-white shadow-md' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                    className={`px-5 py-3 rounded-2xl whitespace-nowrap text-sm font-bold transition-all shadow-sm ${selectedSubject === s.id ? 'bg-somali-blue text-white shadow-md scale-105' : 'bg-white/60 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300 hover:bg-white/80'}`}
                   >
                       {s.name}
                   </button>
               ))}
           </div>
 
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. Select Chapter</label>
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-3 ml-1">2. Select Chapter</label>
           {chapters.length > 0 ? (
-             <div className="relative">
+             <div className="relative group mb-4">
                 <select 
                     value={selectedChapter} 
                     onChange={(e) => setSelectedChapter(e.target.value)}
-                    className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white border-2 border-gray-200 dark:border-gray-600 rounded-xl appearance-none font-bold text-gray-700 focus:border-somali-blue"
+                    className="w-full p-4 bg-white/60 dark:bg-gray-700/60 dark:text-white border border-white/40 dark:border-white/10 rounded-2xl appearance-none font-bold text-gray-700 focus:ring-2 focus:ring-somali-blue/50 backdrop-blur-sm transition-shadow"
                 >
                     {chapters.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -310,9 +319,27 @@ const LobbyPage: React.FC = () => {
                 </div>
              </div>
           ) : (
-              <div className="text-center text-gray-400 text-sm py-4 italic bg-gray-50 dark:bg-gray-700 rounded-xl">
+              <div className="text-center text-gray-400 text-sm py-4 italic bg-white/30 dark:bg-gray-700/30 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 mb-4">
                   {selectedSubject ? "No chapters found." : "Select a subject first."}
               </div>
+          )}
+
+          {/* Quiz Limit Selection (Only visible for custom room creation) */}
+          {viewMode === 'custom' && !hostedCode && (
+              <>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-3 ml-1">3. Number of Questions</label>
+                <div className="flex gap-2">
+                    {[5, 10, 15, 20].map(n => (
+                        <button
+                            key={n}
+                            onClick={() => setQuizLimit(n)}
+                            className={`flex-1 py-3 rounded-2xl font-bold transition-all ${quizLimit === n ? 'bg-green-500 text-white shadow-lg' : 'bg-white/60 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300'}`}
+                        >
+                            {n}
+                        </button>
+                    ))}
+                </div>
+              </>
           )}
       </div>
   );
@@ -324,24 +351,24 @@ const LobbyPage: React.FC = () => {
         <div className="flex flex-col items-center justify-center p-6 min-h-[85vh] animate__animated animate__fadeIn">
              <div className="w-full max-w-4xl mx-auto">
                  <div className="flex items-center gap-4 mb-8">
-                     <button onClick={() => navigate('/')} className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-md flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-somali-blue transition-colors">
+                     <button onClick={() => navigate('/')} className="w-12 h-12 rounded-full bg-white/50 dark:bg-gray-800/50 backdrop-blur shadow-sm flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-somali-blue transition-colors border border-white/40">
                         <i className="fas fa-arrow-left fa-lg"></i>
                      </button>
-                     <h1 className="text-3xl font-extrabold dark:text-white">Choose Battle Mode</h1>
+                     <h1 className="text-3xl font-extrabold dark:text-white drop-shadow-sm">Choose Battle Mode</h1>
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      {/* Auto Match Card */}
                      <button 
                         onClick={() => { playSound('click'); setViewMode('auto'); }}
-                        className="group relative h-64 rounded-3xl overflow-hidden shadow-xl transition-all hover:scale-[1.02] hover:shadow-2xl text-left"
+                        className="group relative h-64 rounded-[2rem] overflow-hidden shadow-2xl transition-all hover:scale-[1.02] hover:shadow-blue-500/20 text-left border border-white/20"
                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 opacity-90 transition-opacity group-hover:opacity-100"></div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/90 to-purple-600/90 backdrop-blur-sm"></div>
                         {/* Decor */}
                         <i className="fas fa-bolt text-9xl text-white absolute -bottom-8 -right-8 opacity-20 rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
                         
                         <div className="relative z-10 p-8 h-full flex flex-col justify-between">
-                            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4">
+                            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4 border border-white/20 shadow-inner">
                                 <i className="fas fa-search text-3xl"></i>
                             </div>
                             <div>
@@ -354,14 +381,14 @@ const LobbyPage: React.FC = () => {
                      {/* Custom Room Card */}
                      <button 
                         onClick={() => { playSound('click'); setViewMode('custom'); }}
-                        className="group relative h-64 rounded-3xl overflow-hidden shadow-xl transition-all hover:scale-[1.02] hover:shadow-2xl text-left"
+                        className="group relative h-64 rounded-[2rem] overflow-hidden shadow-2xl transition-all hover:scale-[1.02] hover:shadow-orange-500/20 text-left border border-white/20"
                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-red-500 opacity-90 transition-opacity group-hover:opacity-100"></div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-orange-400/90 to-red-500/90 backdrop-blur-sm"></div>
                         {/* Decor */}
                         <i className="fas fa-users text-9xl text-white absolute -bottom-8 -right-8 opacity-20 -rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
                         
                         <div className="relative z-10 p-8 h-full flex flex-col justify-between">
-                            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4">
+                            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4 border border-white/20 shadow-inner">
                                 <i className="fas fa-key text-3xl"></i>
                             </div>
                             <div>
@@ -378,7 +405,7 @@ const LobbyPage: React.FC = () => {
       {/* --- SCENE 2: SPECIFIC MODE UI --- */}
       {viewMode !== 'selection' && (
           <div className="p-6 max-w-4xl mx-auto w-full animate__animated animate__fadeInRight">
-              <div className="sticky top-0 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md -mx-6 px-6 py-4 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+              <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl -mx-6 px-6 py-4 mb-6 border-b border-white/20 dark:border-white/10 shadow-sm flex items-center gap-4 transition-colors">
                 <button onClick={goBack} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
                 </button>
@@ -391,19 +418,19 @@ const LobbyPage: React.FC = () => {
                   // AUTO MATCH UI
                   <>
                     {!isSearching && <SelectionUI />}
-                    <Card className="text-center py-10">
-                        <div className="w-24 h-24 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Card className="text-center py-12">
+                        <div className="w-24 h-24 bg-blue-100/50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm border border-blue-200 dark:border-blue-800">
                             <i className={`fas fa-search text-4xl text-somali-blue dark:text-blue-300 ${isSearching ? 'animate-bounce' : ''}`}></i>
                         </div>
-                        <h2 className="text-xl font-bold mb-2 dark:text-white">Find Opponent</h2>
-                        <p className="text-gray-500 dark:text-gray-400 mb-6">{matchStatus || "Select a topic and find a match!"}</p>
+                        <h2 className="text-2xl font-bold mb-2 dark:text-white">Find Opponent</h2>
+                        <p className="text-gray-500 dark:text-gray-400 mb-8">{matchStatus || "Select a topic and find a match!"}</p>
                         
                         {isSearching ? (
-                            <Button fullWidth onClick={cancelSearch} variant="danger">
+                            <Button fullWidth onClick={cancelSearch} variant="danger" className="shadow-red-500/20">
                                 Cancel Search
                             </Button>
                         ) : (
-                            <Button fullWidth onClick={handleAutoMatch} disabled={!selectedChapter}>
+                            <Button fullWidth onClick={handleAutoMatch} disabled={!selectedChapter} className="shadow-blue-500/20">
                                 Find Match
                             </Button>
                         )}
@@ -418,10 +445,10 @@ const LobbyPage: React.FC = () => {
                         {!hostedCode && <div className="mb-4 text-left"><SelectionUI /></div>}
 
                         {hostedCode ? (
-                            <div className="bg-yellow-100 dark:bg-yellow-900/50 p-6 rounded-2xl border-2 border-yellow-400 mb-4 relative">
+                            <div className="bg-yellow-50/80 dark:bg-yellow-900/30 p-8 rounded-3xl border-2 border-yellow-400 border-dashed mb-4 relative backdrop-blur-sm">
                                 <p className="text-xs uppercase text-yellow-700 dark:text-yellow-300 font-bold tracking-widest mb-2">Room Code</p>
                                 <div className="flex items-center justify-center gap-3 mb-2">
-                                    <p className="text-5xl font-mono tracking-widest text-black dark:text-white font-black">{hostedCode}</p>
+                                    <p className="text-6xl font-mono tracking-widest text-black dark:text-white font-black drop-shadow-sm">{hostedCode}</p>
                                 </div>
                                 <div className="flex justify-center">
                                     <button onClick={handleCopyCode} className="text-sm flex items-center gap-2 text-yellow-800 dark:text-yellow-200 font-bold hover:underline">
@@ -441,16 +468,16 @@ const LobbyPage: React.FC = () => {
                       </Card>
                       
                       <div className="relative flex py-2 items-center">
-                            <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
-                            <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 font-bold">OR</span>
-                            <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+                            <div className="flex-grow border-t border-gray-300 dark:border-gray-600 opacity-50"></div>
+                            <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 font-bold bg-white/50 dark:bg-gray-800/50 px-3 py-1 rounded-full backdrop-blur-sm">OR</span>
+                            <div className="flex-grow border-t border-gray-300 dark:border-gray-600 opacity-50"></div>
                       </div>
 
                       <Card className="text-center">
                         <h3 className="font-bold mb-4 dark:text-white text-lg">Join a Game</h3>
                         <Input 
                             placeholder="0000" 
-                            className="text-center text-3xl tracking-[1rem] font-mono h-16 font-bold"
+                            className="text-center text-3xl tracking-[1rem] font-mono h-20 font-bold"
                             maxLength={4}
                             value={roomCode}
                             onChange={(e) => setRoomCode(e.target.value)}

@@ -5,6 +5,7 @@ import { ref, onValue } from 'firebase/database';
 import { auth, db } from './firebase';
 import { UserProfile } from './types';
 import { Navbar } from './components/Navbar';
+import { LPAssistant } from './components/LPAssistant';
 
 // Pages
 import AuthPage from './pages/AuthPage';
@@ -16,6 +17,7 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import AboutPage from './pages/AboutPage';
+import SuperAdminPage from './pages/SuperAdminPage';
 
 // Context for User Data
 export const UserContext = React.createContext<{
@@ -130,12 +132,23 @@ const AppContent: React.FC = () => {
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
       <ThemeContext.Provider value={{ theme, toggleTheme }}>
+        {/* Animated Background Blobs */}
+        <div className="fixed inset-0 -z-10 overflow-hidden transition-colors duration-500 pointer-events-none">
+           <div className={`absolute inset-0 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}></div>
+           <div className={`absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob ${theme === 'dark' ? 'hidden' : 'block'}`}></div>
+           <div className={`absolute top-[-10%] right-[-10%] w-96 h-96 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-2000 ${theme === 'dark' ? 'hidden' : 'block'}`}></div>
+           <div className={`absolute bottom-[-20%] left-[20%] w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-4000 ${theme === 'dark' ? 'hidden' : 'block'}`}></div>
+           <div className={`absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-900 rounded-full filter blur-[80px] opacity-40 animate-blob ${theme === 'dark' ? 'block' : 'hidden'}`}></div>
+           <div className={`absolute top-[20%] right-[-10%] w-96 h-96 bg-blue-900 rounded-full filter blur-[80px] opacity-40 animate-blob animation-delay-2000 ${theme === 'dark' ? 'block' : 'hidden'}`}></div>
+           <div className={`absolute bottom-[-10%] left-[10%] w-96 h-96 bg-indigo-900 rounded-full filter blur-[80px] opacity-40 animate-blob animation-delay-4000 ${theme === 'dark' ? 'block' : 'hidden'}`}></div>
+        </div>
+
         {/* Full Screen Layout */}
-        <div className={`w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors`}>
+        <div className={`w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden text-gray-800 dark:text-gray-100`}>
             
             {/* Desktop Navigation (Sidebar) */}
             {user && showNavbar && (
-                <div className="hidden md:block w-24 lg:w-64 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0 z-20">
+                <div className="hidden md:block w-24 lg:w-64 border-r border-white/20 dark:border-white/5 bg-white/40 dark:bg-gray-900/40 backdrop-blur-xl shrink-0 z-20">
                     <Navbar orientation="vertical" />
                 </div>
             )}
@@ -153,8 +166,12 @@ const AppContent: React.FC = () => {
                       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                       <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
                       <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+                      <Route path="/adminlp" element={<SuperAdminPage />} />
                   </Routes>
                 </div>
+                
+                {/* LP Assistant (Always visible if logged in) */}
+                {user && <LPAssistant />}
                 
                 {/* Mobile Bottom Navigation */}
                 {user && showNavbar && (

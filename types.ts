@@ -31,6 +31,7 @@ export interface Question {
 export interface MatchState {
   matchId: string;
   status: 'active' | 'completed' | 'cancelled';
+  mode: 'auto' | 'custom';
   turn: string; // uid of current player
   currentQ: number; // index of DEMO_DATA
   scores: {
@@ -44,11 +45,14 @@ export interface MatchState {
   };
   winner?: string | null; // 'draw', 'disconnect', or uid
   subject: string;
+  questionLimit?: number; // Total quizzes to play
 }
 
 export interface Room {
   host: string;
   sid: string; // Subject ID
+  lid: string; // Chapter ID (lid was used in LobbyPage)
   code: string;
+  questionLimit: number;
   createdAt: number;
 }

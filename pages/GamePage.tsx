@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, update, onDisconnect, get, set } from 'firebase/database';
+import { ref, onValue, update, onDisconnect, get, set, remove } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../App';
 import { POINTS_PER_QUESTION } from '../constants';
@@ -22,6 +22,7 @@ const GamePage: React.FC = () => {
   // Local UI State
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState<{correct: boolean, answer: number} | null>(null);
+  const [pointsAwardedForDisconnect, setPointsAwardedForDisconnect] = useState(false);
   
   // Refs for processing turns to avoid loops
   const processingRef = useRef(false);
@@ -32,7 +33,7 @@ const GamePage: React.FC = () => {
     const matchRef = ref(db, `matches/${matchId}`);
     const userMatchRef = ref(db, `users/${user.uid}/activeMatch`);
 
-    // Setup Disconnect handler
+    // Setup Disconnect handler (Server-side trigger)
     onDisconnect(matchRef).update({ 
         status: 'completed', 
         winner: 'disconnect' 
@@ -41,7 +42,7 @@ const GamePage: React.FC = () => {
     const unsubscribe = onValue(matchRef, async (snapshot) => {
       const data = snapshot.val();
       if (!data) {
-        // Match cancelled or doesn't exist
+        // Match cancelled or deleted
         set(userMatchRef, null);
         navigate('/');
         return;
@@ -54,7 +55,16 @@ const GamePage: React.FC = () => {
           const qRef = ref(db, `questions/${data.subject}`);
           const qSnap = await get(qRef);
           if (qSnap.exists()) {
-              const loadedQ = Object.values(qSnap.val()) as Question[];
+              let loadedQ = Object.values(qSnap.val()) as Question[];
+              
+              // Custom Room: Limit questions if configured
+              if (data.mode === 'custom' && data.questionLimit && loadedQ.length > data.questionLimit) {
+                  // Shuffle first then slice? Or just slice. Let's just slice for consistency.
+                  // Ideally shuffle, but randomizing on client needs syncing. 
+                  // For simplicity, just take the first N.
+                  loadedQ = loadedQ.slice(0, data.questionLimit);
+              }
+
               setQuestions(loadedQ);
           } else {
               console.error("No questions found for chapter: " + data.subject);
@@ -73,14 +83,14 @@ const GamePage: React.FC = () => {
         }
       }
 
-      // Handle Game End
+      // Handle Game End - Normal
       if (data.status === 'completed') {
         if (data.winner && data.winner !== 'draw' && data.winner !== 'disconnect') {
              if (data.winner === user.uid) {
                  playSound('win');
                  confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-             } else {
-                 playSound('wrong'); // Defeat sound
+             } else if (data.winner !== 'draw') {
+                 playSound('wrong'); 
              }
         }
       }
@@ -96,6 +106,25 @@ const GamePage: React.FC = () => {
   const currentQuestion = match && questions.length > 0 ? questions[match.currentQ] : null;
   const isMyTurn = match?.turn === user?.uid;
   const isGameOver = match?.status === 'completed';
+
+  // Handle Disconnect Logic (Client Side)
+  useEffect(() => {
+      if (isGameOver && match?.winner === 'disconnect' && !pointsAwardedForDisconnect && match.mode === 'auto' && questions.length > 0 && user) {
+          // If I am still here seeing this, it means the opponent disconnected.
+          // Award half marks: Total Questions * Points / 2
+          const totalPossible = questions.length * POINTS_PER_QUESTION;
+          const award = Math.floor(totalPossible / 2);
+          
+          setPointsAwardedForDisconnect(true);
+
+          // Update my points
+          const myPointsRef = ref(db, `users/${user.uid}/points`);
+          get(myPointsRef).then(snap => {
+              const cur = snap.val() || 0;
+              update(ref(db, `users/${user.uid}`), { points: cur + award });
+          });
+      }
+  }, [isGameOver, match, questions, user, pointsAwardedForDisconnect]);
 
   const handleOptionClick = async (index: number) => {
     if (!match || !user || !isMyTurn || selectedOption !== null || processingRef.current || !currentQuestion) return;
@@ -160,6 +189,16 @@ const GamePage: React.FC = () => {
 
   const handleLeave = async () => {
       if(!user || !matchId) return;
+      
+      // Delete match from DB if it is completed to clean up
+      if (match?.status === 'completed') {
+        try {
+            await remove(ref(db, `matches/${matchId}`));
+        } catch(e) {
+            // It might already be deleted by opponent, ignore
+        }
+      }
+
       await set(ref(db, `users/${user.uid}/activeMatch`), null);
       navigate('/');
   };
@@ -191,71 +230,90 @@ const GamePage: React.FC = () => {
   };
 
   if (!match || !opponentProfile || (!currentQuestion && !isGameOver)) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white animate-pulse">
-        {match && questions.length === 0 ? "Loading Questions..." : "Initializing Battle..."}
+    return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white animate-pulse font-bold text-xl">
+        <i className="fas fa-spinner fa-spin mr-3"></i> {match && questions.length === 0 ? "Loading Questions..." : "Initializing Battle..."}
     </div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col text-white relative overflow-hidden">
-      {/* HUD */}
-      <div className="flex justify-between items-center p-4 bg-gray-900 shadow-md z-10">
-        <div className={`flex flex-col items-center transition-all ${isMyTurn ? 'scale-110 opacity-100' : 'opacity-60 scale-90'}`}>
-           <Avatar src={profile?.avatar} seed={user!.uid} size="sm" className={isMyTurn ? 'ring-2 ring-green-400' : ''} />
-           <span className="font-bold text-xs mt-1">You</span>
-           <span className="text-yellow-400 font-mono text-lg">{match.scores[user!.uid]}</span>
+    <div className="min-h-screen bg-gray-900/95 flex flex-col text-white relative overflow-hidden">
+      {/* Background Glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/30 rounded-full blur-[100px] animate-blob pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-600/30 rounded-full blur-[100px] animate-blob animation-delay-2000 pointer-events-none"></div>
+
+      {/* HUD - Glassy */}
+      <div className="flex justify-between items-center p-4 bg-white/5 backdrop-blur-xl border-b border-white/10 shadow-lg z-20">
+        <div className={`flex flex-col items-center transition-all ${!isGameOver && isMyTurn ? 'scale-110 opacity-100' : 'opacity-60 scale-90'}`}>
+           <Avatar src={profile?.avatar} seed={user!.uid} size="sm" className={!isGameOver && isMyTurn ? 'ring-4 ring-green-400/80 shadow-[0_0_20px_rgba(74,222,128,0.5)]' : ''} />
+           <span className="font-bold text-xs mt-1 text-gray-300">You</span>
+           <span className="text-yellow-400 font-mono text-xl font-bold drop-shadow-sm">{match.scores[user!.uid]}</span>
         </div>
         
         <div className="flex flex-col items-center">
-            <div className="font-bold text-gray-500 mb-1">VS</div>
+            <div className="font-extrabold text-white/50 mb-2 text-2xl italic tracking-widest">VS</div>
             {!isGameOver && (
                 <button 
                     onClick={handleSurrender} 
-                    className="text-xs bg-red-900/50 hover:bg-red-800 text-red-300 px-3 py-1 rounded-full border border-red-800 transition-colors"
+                    className="text-xs bg-red-500/20 hover:bg-red-500/40 text-red-300 px-3 py-1 rounded-full border border-red-500/30 transition-colors backdrop-blur-sm"
                 >
                     <i className="fas fa-flag mr-1"></i> Exit
                 </button>
             )}
         </div>
 
-        <div className={`flex flex-col items-center transition-all ${!isMyTurn ? 'scale-110 opacity-100' : 'opacity-60 scale-90'}`}>
-           <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="sm" className={!isMyTurn ? 'ring-2 ring-red-400 animate-pulse' : ''} />
-           <span className="font-bold text-xs mt-1 truncate max-w-[60px]">{opponentProfile.name}</span>
-           <span className="text-yellow-400 font-mono text-lg">{match.scores[opponentProfile.uid]}</span>
+        <div className={`flex flex-col items-center transition-all ${!isGameOver && !isMyTurn ? 'scale-110 opacity-100' : 'opacity-60 scale-90'}`}>
+           <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="sm" className={!isGameOver && !isMyTurn ? 'ring-4 ring-red-400/80 shadow-[0_0_20px_rgba(248,113,113,0.5)]' : ''} />
+           <span className="font-bold text-xs mt-1 text-gray-300 truncate max-w-[60px]">{opponentProfile.name}</span>
+           <span className="text-yellow-400 font-mono text-xl font-bold drop-shadow-sm">{match.scores[opponentProfile.uid]}</span>
         </div>
       </div>
 
       {/* Game Area */}
-      <div className="flex-1 flex flex-col p-6 items-center justify-center z-10">
+      <div className="flex-1 flex flex-col p-6 items-center justify-center z-10 max-w-2xl mx-auto w-full">
         {isGameOver ? (
-           <div className="text-center animate__animated animate__zoomIn">
-               <h2 className="text-4xl font-bold mb-4">
-                   {match.winner === user!.uid ? 'VICTORY!' : match.winner === 'draw' ? 'DRAW!' : 'DEFEAT'}
-               </h2>
-               <div className="text-6xl mb-8">
-                   {match.winner === user!.uid ? '🏆' : match.winner === 'draw' ? '🤝' : '💀'}
-               </div>
-               <Button onClick={handleLeave} variant={match.winner === user!.uid ? 'primary' : 'secondary'}>Return Home</Button>
+           <div className="text-center animate__animated animate__zoomIn bg-white/10 backdrop-blur-xl p-8 rounded-3xl border border-white/20 shadow-2xl">
+               {match.winner === 'disconnect' ? (
+                   <>
+                       <h2 className="text-3xl font-bold mb-2 text-red-400">Opponent Disconnected</h2>
+                       <div className="text-6xl mb-6">🔌</div>
+                       <p className="mb-6 text-gray-300">
+                           {match.mode === 'auto' 
+                               ? "You have been awarded half marks for this match."
+                               : "The match has ended."}
+                       </p>
+                   </>
+               ) : (
+                   <>
+                       <h2 className="text-4xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 to-orange-500">
+                           {match.winner === user!.uid ? 'VICTORY!' : match.winner === 'draw' ? 'DRAW!' : 'DEFEAT'}
+                       </h2>
+                       <div className="text-7xl mb-8 filter drop-shadow-lg">
+                           {match.winner === user!.uid ? '🏆' : match.winner === 'draw' ? '🤝' : '💀'}
+                       </div>
+                   </>
+               )}
+               <Button onClick={handleLeave} variant="primary" className="shadow-lg">Return Home</Button>
            </div>
         ) : (
             <>
                 {currentQuestion && (
                     <>
-                        <div className="bg-white text-gray-900 rounded-2xl p-6 shadow-2xl w-full text-center mb-8 min-h-[160px] flex items-center justify-center flex-col relative">
-                            <span className="absolute top-2 right-4 text-xs font-bold text-gray-300">Q{match.currentQ + 1}</span>
-                            <h2 className="text-2xl font-bold">{currentQuestion.question}</h2>
+                        {/* Question Card - Glassy */}
+                        <div className="bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-3xl p-8 shadow-2xl w-full text-center mb-8 min-h-[180px] flex items-center justify-center flex-col relative animate__animated animate__fadeIn">
+                            <span className="absolute top-3 right-5 text-xs font-bold text-white/40 tracking-widest bg-black/20 px-2 py-1 rounded-lg">QUESTION {match.currentQ + 1} / {questions.length}</span>
+                            <h2 className="text-2xl font-bold leading-relaxed">{currentQuestion.question}</h2>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 w-full">
                             {currentQuestion.options.map((opt, idx) => {
-                                let btnClass = "bg-white text-gray-800 hover:bg-gray-100";
-                                if (selectedOption === idx) btnClass = "bg-somali-blue text-white ring-4 ring-blue-300"; // Blind select
+                                let btnClass = "bg-white/5 text-gray-200 hover:bg-white/10 border-white/10"; // Default glass
+                                if (selectedOption === idx) btnClass = "bg-somali-blue text-white ring-4 ring-blue-400/50 border-transparent shadow-[0_0_15px_rgba(59,130,246,0.5)]"; // Selected
                                 
                                 // Feedback Override
                                 if (showFeedback) {
-                                    if (idx === showFeedback.answer) btnClass = "bg-green-500 text-white";
-                                    else if (idx === selectedOption && !showFeedback.correct) btnClass = "bg-red-500 text-white";
-                                    else btnClass = "bg-gray-300 text-gray-500";
+                                    if (idx === showFeedback.answer) btnClass = "bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)] border-transparent";
+                                    else if (idx === selectedOption && !showFeedback.correct) btnClass = "bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)] border-transparent";
+                                    else btnClass = "bg-black/30 text-gray-500 border-transparent";
                                 }
 
                                 return (
@@ -263,7 +321,7 @@ const GamePage: React.FC = () => {
                                         key={idx}
                                         disabled={!isMyTurn || selectedOption !== null}
                                         onClick={() => handleOptionClick(idx)}
-                                        className={`h-24 rounded-xl font-bold text-lg shadow-lg transition-all transform active:scale-95 ${btnClass} ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        className={`h-28 rounded-2xl font-bold text-lg border transition-all transform active:scale-95 shadow-md flex items-center justify-center p-2 backdrop-blur-sm ${btnClass} ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         {opt}
                                     </button>
@@ -273,17 +331,17 @@ const GamePage: React.FC = () => {
                     </>
                 )}
                 
-                <div className="mt-8 text-center text-sm font-bold text-gray-400">
-                    {isMyTurn ? "IT'S YOUR TURN!" : `${opponentProfile.name} is thinking...`}
+                <div className="mt-8 text-center">
+                    <div className={`inline-block px-4 py-2 rounded-full text-sm font-bold backdrop-blur-md border border-white/10 shadow-lg ${isMyTurn ? 'bg-green-500/20 text-green-300' : 'bg-white/10 text-gray-400'}`}>
+                         {isMyTurn ? (
+                             <span className="flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div> IT'S YOUR TURN</span>
+                         ) : (
+                             <span className="flex items-center gap-2"><i className="fas fa-hourglass-half"></i> {opponentProfile.name} IS THINKING...</span>
+                         )}
+                    </div>
                 </div>
             </>
         )}
-      </div>
-      
-      {/* Background Decor */}
-      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-           <i className="fas fa-question text-9xl absolute top-20 left-10 text-white animate-spin-slow"></i>
-           <i className="fas fa-shapes text-8xl absolute bottom-20 right-10 text-white animate-bounce"></i>
       </div>
     </div>
   );

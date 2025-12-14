@@ -16,7 +16,8 @@
     "react": "^19.2.3",
     "howler": "^2.2.4",
     "xlsx": "0.18.5",
-    "sweetalert2": "11"
+    "sweetalert2": "11",
+    "@google/genai": "latest"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
