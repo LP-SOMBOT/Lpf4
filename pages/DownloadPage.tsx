@@ -6,9 +6,9 @@ const DownloadPage: React.FC = () => {
   const navigate = useNavigate();
 
   const handleDownload = () => {
-    // Attempt to trigger download with correct filename
+    // Attempt to trigger download with correct filename from local public folder
     const link = document.createElement('a');
-    link.href = 'https://files.catbox.moe/je70y8.apk';
+    link.href = '/LP-F4.apk';
     link.target = '_blank'; // Use blank to avoid navigating away if download fails or opens in view
     link.setAttribute('download', 'LP-F4.apk'); 
     document.body.appendChild(link);

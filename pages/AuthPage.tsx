@@ -130,16 +130,6 @@ const AuthPage: React.FC = () => {
               {isLogin ? 'Register' : 'Login'}
             </button>
           </p>
-          
-          <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-               <button 
-                  onClick={() => navigate('/download')}
-                  className="flex items-center justify-center gap-2 w-full text-gray-500 dark:text-gray-400 hover:text-somali-blue dark:hover:text-blue-300 transition-colors text-sm font-medium"
-               >
-                   <i className="fab fa-android text-lg"></i>
-                   Get the Android App
-               </button>
-          </div>
         </div>
       </Card>
     </div>
