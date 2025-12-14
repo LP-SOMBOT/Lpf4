@@ -163,6 +163,11 @@ const SoloPage: React.FC = () => {
                       </Card>
                   ))}
               </div>
+              <div className="mt-8 text-center animate__animated animate__fadeInUp">
+                  <p className="inline-block px-4 py-2 rounded-full bg-blue-50 dark:bg-blue-900/20 text-somali-blue dark:text-blue-300 text-xs font-bold border border-blue-100 dark:border-blue-800/50">
+                      <i className="fas fa-bullhorn mr-2"></i> More subjects will be added soon!
+                  </p>
+              </div>
           </div>
       );
   }

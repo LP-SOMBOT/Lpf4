@@ -283,7 +283,7 @@ const LobbyPage: React.FC = () => {
   const SelectionUI = () => (
       <div className="mb-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-4 rounded-3xl shadow-sm border border-white/40 dark:border-white/10">
           <label className="block text-xs font-bold text-gray-700 dark:text-gray-400 uppercase mb-3 ml-1">1. Select Subject</label>
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-2 scrollbar-hide">
               {subjects.map(s => (
                   <button 
                     key={s.id} 
@@ -294,6 +294,9 @@ const LobbyPage: React.FC = () => {
                   </button>
               ))}
           </div>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 italic mb-4 ml-1 flex items-center gap-1">
+             <i className="fas fa-info-circle"></i> More subjects will be added soon!
+          </p>
 
           <label className="block text-xs font-bold text-gray-700 dark:text-gray-400 uppercase mb-3 ml-1">2. Select Chapter</label>
           {chapters.length > 0 ? (
