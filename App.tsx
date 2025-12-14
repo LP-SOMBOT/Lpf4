@@ -166,7 +166,10 @@ const AppContent: React.FC = () => {
                       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                       <Route path="/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
                       <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+                      {/* AdminLP Route */}
                       <Route path="/adminlp" element={<SuperAdminPage />} />
+                      {/* Fallback Route to prevent blank screens */}
+                      <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </div>
                 

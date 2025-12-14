@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
-import { Avatar, Button, Card, Input } from './UI';
+import { Card } from './UI';
 import { playSound } from '../services/audioService';
 
 interface Message {
@@ -55,9 +55,6 @@ export const LPAssistant: React.FC = () => {
     setIsTyping(true);
 
     try {
-      // NOTE: Using process.env.API_KEY as per instructions. 
-      // In a real Vite app, this would be import.meta.env.VITE_API_KEY
-      // We assume process.env.API_KEY is replaced by the bundler.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       
       const systemPrompt = `You are LP Assistant, a helpful AI guide for the LP-F4 Quiz Battle app (Somali Student Quiz Battle). 
@@ -89,7 +86,7 @@ export const LPAssistant: React.FC = () => {
       {/* Floating Action Button */}
       <button 
         onClick={toggleChat}
-        className="fixed bottom-20 md:bottom-8 right-6 w-14 h-14 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg flex items-center justify-center text-white z-50 hover:scale-110 transition-transform animate-bounce hover:animate-none"
+        className="fixed bottom-20 md:bottom-8 right-6 w-14 h-14 bg-somali-blue hover:bg-blue-600 rounded-full shadow-xl flex items-center justify-center text-white z-50 transition-transform transform hover:scale-105 active:scale-95 border-2 border-white/20"
       >
         <i className={`fas ${isOpen ? 'fa-times' : 'fa-robot'} text-xl`}></i>
       </button>
@@ -97,26 +94,31 @@ export const LPAssistant: React.FC = () => {
       {/* Chat Window */}
       {isOpen && (
         <div className="fixed bottom-36 md:bottom-24 right-6 w-[90vw] md:w-96 h-[60vh] md:h-[500px] z-50 flex flex-col animate__animated animate__fadeInUp origin-bottom-right">
-           <Card className="flex-1 flex flex-col !p-0 overflow-hidden !bg-white/90 dark:!bg-gray-900/90 backdrop-blur-xl border border-white/20 shadow-2xl">
+           <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
                {/* Header */}
-               <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 flex justify-between items-center text-white">
+               <div className="bg-somali-blue p-4 flex justify-between items-center text-white shadow-md">
                    <div className="flex items-center gap-2">
-                       <i className="fas fa-robot"></i>
-                       <span className="font-bold">LP Assistant</span>
+                       <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                          <i className="fas fa-robot text-sm"></i>
+                       </div>
+                       <div>
+                          <span className="font-bold block leading-none">LP Assistant</span>
+                          <span className="text-[10px] opacity-80">Online</span>
+                       </div>
                    </div>
-                   <button onClick={() => setMessages([])} className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30" title="Clear History">
+                   <button onClick={() => setMessages([])} className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition-colors" title="Clear History">
                        Clear
                    </button>
                </div>
 
                {/* Messages */}
-               <div className="flex-1 overflow-y-auto p-4 space-y-3">
+               <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
                    {messages.map((msg, i) => (
                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                           <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+                           <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${
                                msg.role === 'user' 
-                               ? 'bg-purple-500 text-white rounded-br-none' 
-                               : 'bg-gray-100 dark:bg-gray-700 dark:text-gray-200 rounded-bl-none'
+                               ? 'bg-somali-blue text-white rounded-br-none' 
+                               : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-bl-none'
                            }`}>
                                {msg.text}
                            </div>
@@ -124,10 +126,10 @@ export const LPAssistant: React.FC = () => {
                    ))}
                    {isTyping && (
                        <div className="flex justify-start">
-                           <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-2xl rounded-bl-none flex gap-1">
-                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+                           <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl rounded-bl-none flex gap-1 border border-gray-200 dark:border-gray-700 shadow-sm">
+                               <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                               <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
+                               <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
                            </div>
                        </div>
                    )}
@@ -135,18 +137,22 @@ export const LPAssistant: React.FC = () => {
                </div>
 
                {/* Input */}
-               <form onSubmit={handleSend} className="p-3 bg-white/50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+               <form onSubmit={handleSend} className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-2">
                    <input 
                       value={inputText}
                       onChange={e => setInputText(e.target.value)}
-                      placeholder="Ask me..."
-                      className="flex-1 bg-transparent border-none focus:ring-0 text-sm dark:text-white placeholder-gray-500"
+                      placeholder="Ask a question..."
+                      className="flex-1 bg-gray-100 dark:bg-gray-800 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-somali-blue dark:text-white placeholder-gray-500 transition-all"
                    />
-                   <button type="submit" disabled={!inputText.trim() || isTyping} className="text-purple-500 font-bold px-2 hover:text-purple-600 disabled:opacity-50">
+                   <button 
+                      type="submit" 
+                      disabled={!inputText.trim() || isTyping} 
+                      className="w-10 h-10 rounded-xl bg-somali-blue text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                   >
                        <i className="fas fa-paper-plane"></i>
                    </button>
                </form>
-           </Card>
+           </div>
         </div>
       )}
     </>

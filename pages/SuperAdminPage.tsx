@@ -13,12 +13,17 @@ const SuperAdminPage: React.FC = () => {
 
   const checkPin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple "hidden" pin for demonstration. In production, use Firebase Auth Claims.
     if (pin === '1234') { 
         setIsAuthenticated(true);
         fetchUsers();
     } else {
-        Swal.fire('Access Denied', 'Incorrect PIN', 'error');
+        Swal.fire({
+            icon: 'error',
+            title: 'Access Denied', 
+            text: 'Incorrect PIN',
+            background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#fff',
+            color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+        });
     }
   };
 
@@ -37,7 +42,18 @@ const SuperAdminPage: React.FC = () => {
       const newRole = currentRole === 'admin' ? 'user' : 'admin';
       try {
         await update(ref(db, `users/${uid}`), { role: newRole });
-        Swal.fire('Success', `User is now ${newRole}`, 'success');
+        const isDark = document.documentElement.classList.contains('dark');
+        Swal.fire({
+            icon: 'success',
+            title: 'Success',
+            text: `User is now ${newRole}`,
+            toast: true,
+            position: 'top-end',
+            timer: 2000,
+            showConfirmButton: false,
+            background: isDark ? '#1f2937' : '#fff',
+            color: isDark ? '#fff' : '#000'
+        });
         fetchUsers(); // Refresh
       } catch (e) {
         Swal.fire('Error', 'Failed to update role', 'error');
@@ -46,18 +62,25 @@ const SuperAdminPage: React.FC = () => {
 
   if (!isAuthenticated) {
       return (
-          <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
-              <Card className="w-full max-w-md !bg-white/10 backdrop-blur-xl border border-white/20">
-                  <h1 className="text-2xl font-bold text-white mb-4 text-center">Super Admin Access</h1>
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-900 p-4 min-h-full">
+              <Card className="w-full max-w-md !bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl">
+                  <div className="text-center mb-6">
+                      <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/50">
+                          <i className="fas fa-user-shield text-3xl text-red-500"></i>
+                      </div>
+                      <h1 className="text-2xl font-bold text-white mb-1">Restricted Access</h1>
+                      <p className="text-gray-400 text-sm">Super Admin Dashboard</p>
+                  </div>
                   <form onSubmit={checkPin}>
                       <Input 
                         type="password" 
-                        placeholder="Enter Security PIN" 
+                        placeholder="Security PIN" 
                         value={pin} 
                         onChange={e => setPin(e.target.value)}
-                        className="text-center text-xl tracking-widest"
+                        className="text-center text-2xl tracking-[0.5em] font-mono h-14"
+                        autoFocus
                       />
-                      <Button fullWidth>Unlock Dashboard</Button>
+                      <Button fullWidth variant="danger" className="mt-4">Unlock System</Button>
                   </form>
               </Card>
           </div>
@@ -65,47 +88,70 @@ const SuperAdminPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6">
-        <div className="max-w-6xl mx-auto">
-            <h1 className="text-3xl font-bold dark:text-white mb-6">User Management</h1>
-            <div className="mb-4">
-                <Button onClick={fetchUsers} isLoading={loading} variant="secondary"><i className="fas fa-sync mr-2"></i> Refresh List</Button>
+    <div className="min-h-full bg-gray-100 dark:bg-gray-900 p-6 absolute inset-0 overflow-y-auto">
+        <div className="max-w-6xl mx-auto pb-12">
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold dark:text-white">User Management</h1>
+                    <p className="text-gray-500 dark:text-gray-400">Manage roles and permissions</p>
+                </div>
+                <Button onClick={fetchUsers} isLoading={loading} variant="secondary"><i className="fas fa-sync mr-2"></i> Refresh</Button>
             </div>
             
-            <Card className="!bg-white/80 dark:!bg-gray-800/80 overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
-                            <th className="p-3">User</th>
-                            <th className="p-3">Email</th>
-                            <th className="p-3">Points</th>
-                            <th className="p-3">Role</th>
-                            <th className="p-3">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {users.map(u => (
-                            <tr key={u.uid} className="border-b border-gray-100 dark:border-gray-700 hover:bg-black/5 dark:hover:bg-white/5">
-                                <td className="p-3 font-bold dark:text-white">{u.name}</td>
-                                <td className="p-3 text-sm dark:text-gray-300">{u.email}</td>
-                                <td className="p-3 font-mono text-somali-blue">{u.points}</td>
-                                <td className="p-3">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${u.role === 'admin' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-500'}`}>
-                                        {u.role || 'user'}
-                                    </span>
-                                </td>
-                                <td className="p-3">
-                                    <button 
-                                        onClick={() => toggleRole(u.uid, u.role)}
-                                        className={`text-xs font-bold px-3 py-1 rounded transition-colors ${u.role === 'admin' ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}
-                                    >
-                                        {u.role === 'admin' ? 'Demote' : 'Promote'}
-                                    </button>
-                                </td>
+            <Card className="!bg-white dark:!bg-gray-800 overflow-hidden shadow-lg border-0">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+                                <th className="p-4">User Details</th>
+                                <th className="p-4">Stats</th>
+                                <th className="p-4">Role</th>
+                                <th className="p-4 text-right">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                            {users.map(u => (
+                                <tr key={u.uid} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                                                <img src={u.avatar} alt="" className="w-full h-full object-cover" />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-gray-800 dark:text-white">{u.name}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <span className="font-mono font-bold text-somali-blue">{u.points}</span> pts
+                                    </td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-bold border ${
+                                            u.role === 'admin' 
+                                            ? 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800' 
+                                            : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                                        }`}>
+                                            {u.role || 'user'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <button 
+                                            onClick={() => toggleRole(u.uid, u.role)}
+                                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors border ${
+                                                u.role === 'admin' 
+                                                ? 'bg-white border-red-200 text-red-600 hover:bg-red-50' 
+                                                : 'bg-somali-blue text-white border-transparent hover:bg-blue-600'
+                                            }`}
+                                        >
+                                            {u.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </Card>
         </div>
     </div>
