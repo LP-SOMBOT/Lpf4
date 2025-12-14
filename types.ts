@@ -5,6 +5,7 @@ export interface UserProfile {
   email: string;
   points: number;
   avatar: string; // URL
+  gender?: 'male' | 'female';
   activeMatch?: string | null;
   role?: 'user' | 'admin';
 }

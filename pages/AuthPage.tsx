@@ -4,6 +4,7 @@ import { ref, set } from 'firebase/database';
 import { auth, db } from '../firebase';
 import { Button, Input, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
+import { generateAvatarUrl } from '../constants';
 import { useNavigate } from 'react-router-dom';
 
 const AuthPage: React.FC = () => {
@@ -50,12 +51,15 @@ const AuthPage: React.FC = () => {
         const user = userCred.user;
         const seed = Math.random().toString(36).substring(7);
         
+        // Generate random avatar (no gender specific)
+        const avatarUrl = generateAvatarUrl(seed);
+        
         // Initial Profile
         await set(ref(db, `users/${user.uid}`), {
           name: name || 'Student',
           email: user.email,
           points: 0,
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`,
+          avatar: avatarUrl,
           activeMatch: null
         });
         
@@ -78,8 +82,7 @@ const AuthPage: React.FC = () => {
       </div>
 
       <Card className="animate__animated animate__fadeInUp shadow-2xl border-none">
-        {/* Removed text-gray-800 to allow dark mode text color from Card to apply */}
-        <h2 className="text-2xl font-bold text-center mb-6">{isLogin ? 'Welcome Back' : 'Join the Battle'}</h2>
+        <h2 className="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">{isLogin ? 'Welcome Back' : 'Join the Battle'}</h2>
         
         {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-4 text-sm font-medium flex items-center gap-2 animate__animated animate__shakeX">

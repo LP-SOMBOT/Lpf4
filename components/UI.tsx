@@ -65,7 +65,6 @@ export const Input: React.FC<InputProps> = ({ label, icon, rightElement, classNa
 
 // --- Card ---
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  // Enforce text-gray-900 for light mode and text-white for dark mode to ensure visibility
   <div className={`bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-6 transition-all ${className}`}>
     {children}
   </div>
@@ -78,7 +77,8 @@ export const Avatar: React.FC<{
   size?: 'sm' | 'md' | 'lg' | 'xl'; 
   className?: string; 
   pulse?: boolean; 
-}> = ({ src, seed, size = 'md', className = '', pulse = false }) => {
+  onClick?: () => void;
+}> = ({ src, seed, size = 'md', className = '', pulse = false, onClick }) => {
   const sizes = {
     sm: "w-10 h-10",
     md: "w-16 h-16",
@@ -86,27 +86,39 @@ export const Avatar: React.FC<{
     xl: "w-32 h-32"
   };
 
-  const imageUrl = src || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed || 'guest'}`;
+  const safeSeed = seed || 'guest';
+  const imageUrl = src || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(safeSeed)}&mouth=default&eyes=default&eyebrows=default&facialHairProbability=0`;
 
   return (
-    <div className={`relative rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden ${sizes[size]} ${className} ${pulse ? 'animate-pulse ring-4 ring-red-400' : ''}`}>
+    <div 
+      onClick={onClick}
+      className={`relative rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden ${sizes[size]} ${className} ${pulse ? 'animate-pulse ring-4 ring-red-400' : ''}`}
+    >
       <img src={imageUrl} alt="Avatar" className="w-full h-full object-cover" />
     </div>
   );
 };
 
 // --- Modal ---
-export const Modal: React.FC<{ isOpen: boolean; title?: string; children: React.ReactNode }> = ({ isOpen, title, children }) => {
+export const Modal: React.FC<{ isOpen: boolean; title?: string; children: React.ReactNode; onClose?: () => void }> = ({ isOpen, title, children, onClose }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate__animated animate__fadeIn">
-      <div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-gray-100 dark:border-gray-700 animate__animated animate__zoomIn">
+      {/* Click outside to close */}
+      <div className="absolute inset-0" onClick={onClose}></div>
+      
+      <div className="relative bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-gray-100 dark:border-gray-700 animate__animated animate__zoomIn max-h-[90vh] flex flex-col">
         {title && (
-            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 border-b border-gray-100 dark:border-gray-700 text-center font-bold text-lg">
-                {title}
+            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 border-b border-gray-100 dark:border-gray-700 text-center font-bold text-lg flex justify-between items-center">
+                <span>{title}</span>
+                {onClose && (
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition-colors">
+                        <i className="fas fa-times"></i>
+                    </button>
+                )}
             </div>
         )}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto">
           {children}
         </div>
       </div>

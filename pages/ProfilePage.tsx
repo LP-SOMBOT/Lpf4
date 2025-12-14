@@ -4,8 +4,9 @@ import { signOut, updateProfile } from 'firebase/auth';
 import { ref, update } from 'firebase/database';
 import { auth, db } from '../firebase';
 import { UserContext, ThemeContext } from '../App';
-import { Avatar, Button, Card, Input } from '../components/UI';
+import { Avatar, Button, Card, Input, Modal } from '../components/UI';
 import { playSound } from '../services/audioService';
+import { generateAvatarUrl } from '../constants';
 
 const ProfilePage: React.FC = () => {
   const { profile, user } = useContext(UserContext);
@@ -16,6 +17,10 @@ const ProfilePage: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Avatar Selection State
+  const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+  const [randomAvatars, setRandomAvatars] = useState<string[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -24,14 +29,23 @@ const ProfilePage: React.FC = () => {
     }
   }, [profile]);
 
+  useEffect(() => {
+      if (showAvatarSelector) {
+          // Generate 9 random seeds
+          const seeds = Array.from({length: 9}, () => Math.random().toString(36).substring(7));
+          setRandomAvatars(seeds);
+      }
+  }, [showAvatarSelector]);
+
   const handleLogout = () => {
     signOut(auth);
     navigate('/auth');
   };
 
-  const handleRandomizeAvatar = () => {
-    const newSeed = Math.random().toString(36).substring(7);
-    setCurrentAvatarUrl(`https://api.dicebear.com/7.x/avataaars/svg?seed=${newSeed}`);
+  const selectAvatar = (seed: string) => {
+    const url = generateAvatarUrl(seed);
+    setCurrentAvatarUrl(url);
+    setShowAvatarSelector(false);
     playSound('click');
   };
 
@@ -45,7 +59,7 @@ const ProfilePage: React.FC = () => {
       // Update Database Profile
       await update(ref(db, `users/${user.uid}`), {
         name: editName,
-        avatar: currentAvatarUrl
+        avatar: currentAvatarUrl,
       });
       
       playSound('correct');
@@ -66,7 +80,6 @@ const ProfilePage: React.FC = () => {
 
   if (!profile) return null;
 
-  // Level Logic: 10 points per level
   const level = Math.floor(profile.points / 10) + 1;
   const pointsInCurrentLevel = profile.points % 10;
   const progressPercent = (pointsInCurrentLevel / 10) * 100;
@@ -81,7 +94,7 @@ const ProfilePage: React.FC = () => {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
         <div className="flex-1 text-right">
             {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="text-somali-blue dark:text-blue-400 font-bold text-sm bg-blue-50 dark:bg-blue-500/10 px-3 py-1 rounded-full border border-blue-100 dark:border-blue-500/20">
+                <button onClick={() => setIsEditing(true)} className="font-bold text-sm px-3 py-1 rounded-full border transition-all text-somali-blue dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-100 dark:border-blue-500/20">
                     <i className="fas fa-edit mr-1"></i> Edit
                 </button>
             )}
@@ -93,36 +106,60 @@ const ProfilePage: React.FC = () => {
             <Avatar src={currentAvatarUrl} seed={user?.uid} size="xl" className="mb-4 border-4 border-white dark:border-gray-800 shadow-xl" />
             {isEditing && (
                 <button 
-                    onClick={handleRandomizeAvatar}
-                    className="absolute bottom-4 right-0 bg-gray-900 text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform"
-                    title="Randomize Avatar"
+                    onClick={() => setShowAvatarSelector(true)}
+                    className="absolute bottom-4 right-0 bg-somali-blue text-white p-2.5 rounded-full shadow-lg hover:scale-110 transition-transform border-2 border-white dark:border-gray-800"
+                    title="Choose Avatar"
                 >
-                    <i className="fas fa-random"></i>
+                    <i className="fas fa-camera"></i>
                 </button>
             )}
         </div>
 
         {isEditing ? (
-            <div className="w-full max-w-xs animate__animated animate__fadeIn space-y-3">
-                <Input 
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Enter new name"
-                    className="text-center font-bold text-lg"
-                    autoFocus
-                />
-                <div className="flex gap-3">
-                    <Button fullWidth variant="secondary" onClick={() => setIsEditing(false)}>Cancel</Button>
+            <div className="w-full max-w-xs animate__animated animate__fadeIn space-y-4">
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">Display Name</label>
+                    <Input 
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Enter new name"
+                        className="text-center font-bold text-lg"
+                        autoFocus
+                    />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                    <Button fullWidth variant="secondary" onClick={() => { setIsEditing(false); setEditName(profile.name); setCurrentAvatarUrl(profile.avatar); }}>Cancel</Button>
                     <Button fullWidth onClick={handleSaveProfile} isLoading={loading}>Save</Button>
                 </div>
             </div>
         ) : (
             <>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{profile.name}</h2>
-                <p className="text-gray-500 dark:text-gray-400 font-medium">{profile.email}</p>
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 font-medium">
+                    {profile.email}
+                </div>
             </>
         )}
       </div>
+
+      {/* Avatar Selection Modal */}
+      <Modal isOpen={showAvatarSelector} title="Choose Avatar" onClose={() => setShowAvatarSelector(false)}>
+          <div className="grid grid-cols-3 gap-4">
+              {randomAvatars.map((seed, idx) => (
+                  <div 
+                    key={idx} 
+                    onClick={() => selectAvatar(seed)}
+                    className="aspect-square rounded-full overflow-hidden border-2 border-transparent hover:border-somali-blue cursor-pointer transition-all hover:scale-110 bg-gray-100"
+                  >
+                      <img src={generateAvatarUrl(seed)} alt="avatar" className="w-full h-full object-cover" />
+                  </div>
+              ))}
+          </div>
+          <Button fullWidth variant="secondary" className="mt-6" onClick={() => setRandomAvatars(Array.from({length: 9}, () => Math.random().toString(36).substring(7)))}>
+             <i className="fas fa-sync mr-2"></i> Load New List
+          </Button>
+      </Modal>
 
       <Card className="mb-6 relative overflow-hidden">
         <div className="flex justify-between items-end mb-2 relative z-10">
