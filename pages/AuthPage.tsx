@@ -4,8 +4,10 @@ import { ref, set } from 'firebase/database';
 import { auth, db } from '../firebase';
 import { Button, Input, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
+import { useNavigate } from 'react-router-dom';
 
 const AuthPage: React.FC = () => {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -118,7 +120,7 @@ const AuthPage: React.FC = () => {
           </Button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-4">
           <p className="text-gray-500 dark:text-gray-400 text-sm">
             {isLogin ? "Don't have an account?" : "Already playing?"}
             <button 
@@ -128,6 +130,16 @@ const AuthPage: React.FC = () => {
               {isLogin ? 'Register' : 'Login'}
             </button>
           </p>
+          
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+               <button 
+                  onClick={() => navigate('/download')}
+                  className="flex items-center justify-center gap-2 w-full text-gray-500 dark:text-gray-400 hover:text-somali-blue dark:hover:text-blue-300 transition-colors text-sm font-medium"
+               >
+                   <i className="fab fa-android text-lg"></i>
+                   Get the Android App
+               </button>
+          </div>
         </div>
       </Card>
     </div>

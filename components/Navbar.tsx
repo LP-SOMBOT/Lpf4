@@ -21,7 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
       return (
         <div className="h-full flex flex-col justify-between py-8">
             <div className="flex flex-col gap-2">
-                <div className="px-6 mb-8 flex items-center gap-3">
+                <div className="px-6 mb-8 flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
                     <img src="https://files.catbox.moe/qn40s6.png" alt="Logo" className="w-9 h-9" />
                     <span className="font-extrabold text-2xl tracking-tight hidden lg:block text-somali-blue dark:text-white">LP-F4</span>
                 </div>
@@ -43,8 +43,20 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
                     );
                 })}
             </div>
-            <div className="px-6 text-xs text-gray-400 text-center lg:text-left">
-                <span className="hidden lg:inline">v2.5 Stable</span>
+            <div className="px-6 space-y-4">
+                <button 
+                    onClick={() => navigate('/download')}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl shadow-md hover:shadow-lg transition-all"
+                >
+                    <i className="fab fa-android text-xl"></i>
+                    <div className="text-left hidden lg:block">
+                        <div className="text-[10px] uppercase font-bold opacity-80">Download</div>
+                        <div className="text-sm font-bold">Mobile App</div>
+                    </div>
+                </button>
+                <div className="text-xs text-gray-400 text-center lg:text-left">
+                    <span className="hidden lg:inline">v2.5 Stable</span>
+                </div>
             </div>
         </div>
       );

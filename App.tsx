@@ -18,6 +18,7 @@ import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import AboutPage from './pages/AboutPage';
 import SuperAdminPage from './pages/SuperAdminPage';
+import DownloadPage from './pages/DownloadPage'; // Imported DownloadPage
 
 // Context for User Data
 export const UserContext = React.createContext<{
@@ -165,6 +166,7 @@ const AppContent: React.FC = () => {
                 <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth relative">
                   <Routes>
                       <Route path="/auth" element={!user ? <AuthPage /> : <Navigate to="/" />} />
+                      <Route path="/download" element={<DownloadPage />} />
                       <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
                       <Route path="/lobby" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
                       <Route path="/game/:matchId" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
