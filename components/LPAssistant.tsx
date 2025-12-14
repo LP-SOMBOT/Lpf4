@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
+import { ref, onValue } from 'firebase/database';
+import { db } from '../firebase';
 import { playSound } from '../services/audioService';
 
-const ASSISTANT_API_KEY = "AIzaSyBxS3g1glyhOy_z-i-5BLAn3Bs2xN8Q_Kk";
+const ASSISTANT_API_KEY = "AIzaSyANNTSat_EsUKxz38GoyWWqUR5rEa5OHfY";
 
 interface Message {
   role: 'user' | 'model';
@@ -14,7 +16,23 @@ export const LPAssistant: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  
+  // Global Enable State
+  const [isGlobalEnabled, setIsGlobalEnabled] = useState(true);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Listen for Global Disable Switch
+  useEffect(() => {
+    const settingsRef = ref(db, 'settings/aiAssistantEnabled');
+    const unsubscribe = onValue(settingsRef, (snapshot) => {
+        // Default to true if setting doesn't exist
+        const val = snapshot.exists() ? snapshot.val() : true;
+        setIsGlobalEnabled(val);
+        if (!val) setIsOpen(false); // Close if open when disabled
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('lp_assistant_history');
@@ -70,6 +88,9 @@ export const LPAssistant: React.FC = () => {
       setIsTyping(false);
     }
   };
+
+  // If disabled globally, render nothing
+  if (!isGlobalEnabled) return null;
 
   return (
     <>

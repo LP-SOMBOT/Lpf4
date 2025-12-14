@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ref, update, onValue, off } from 'firebase/database';
+import { ref, update, onValue, off, set } from 'firebase/database';
 import { db } from '../firebase';
 import { UserProfile } from '../types';
 import { Button, Card, Input } from '../components/UI';
@@ -10,6 +10,9 @@ const SuperAdminPage: React.FC = () => {
   const [pin, setPin] = useState('');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Settings State
+  const [aiEnabled, setAiEnabled] = useState(true);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -24,7 +27,18 @@ const SuperAdminPage: React.FC = () => {
             setLoading(false);
         };
         const unsubscribe = onValue(userRef, handleData);
-        return () => off(userRef, 'value', handleData);
+
+        // Listen for AI Settings
+        const settingsRef = ref(db, 'settings/aiAssistantEnabled');
+        const handleSettings = (snap: any) => {
+             setAiEnabled(snap.exists() ? snap.val() : true);
+        };
+        const unsubSettings = onValue(settingsRef, handleSettings);
+
+        return () => {
+            off(userRef, 'value', handleData);
+            off(settingsRef, 'value', handleSettings);
+        }
     }
   }, [isAuthenticated]);
 
@@ -61,6 +75,25 @@ const SuperAdminPage: React.FC = () => {
       } catch (e) {
         Swal.fire('Error', 'Failed to update role', 'error');
       }
+  };
+
+  const toggleAiFeature = async () => {
+    try {
+        await set(ref(db, 'settings/aiAssistantEnabled'), !aiEnabled);
+        const isDark = document.documentElement.classList.contains('dark');
+        Swal.fire({
+            icon: 'success',
+            title: !aiEnabled ? 'AI Enabled' : 'AI Disabled',
+            toast: true,
+            position: 'top-end',
+            timer: 2000,
+            showConfirmButton: false,
+            background: isDark ? '#1e293b' : '#fff',
+            color: isDark ? '#fff' : '#000'
+        });
+    } catch (e) {
+        console.error(e);
+    }
   };
 
   if (!isAuthenticated) {
@@ -102,6 +135,37 @@ const SuperAdminPage: React.FC = () => {
                     <i className="fas fa-satellite-dish mr-2"></i> Realtime
                 </Button>
             </div>
+
+            {/* System Control Card */}
+            <Card className="mb-8 border-l-4 border-indigo-500">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                            <i className="fas fa-robot text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold dark:text-white">AI Assistant</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Control Gemini AI assistant availability</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={toggleAiFeature}
+                        className={`
+                            relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2  focus-visible:ring-white/75
+                            ${aiEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}
+                        `}
+                    >
+                        <span className="sr-only">Use setting</span>
+                        <span
+                            aria-hidden="true"
+                            className={`
+                                pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out
+                                ${aiEnabled ? 'translate-x-6' : 'translate-x-0'}
+                            `}
+                        />
+                    </button>
+                </div>
+            </Card>
             
             <Card className="!bg-white dark:!bg-gray-800 overflow-hidden shadow-lg border-0 p-0">
                 <div className="overflow-x-auto">
