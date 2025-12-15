@@ -210,7 +210,7 @@ const GamePage: React.FC = () => {
             </div>
             <div className="flex flex-col items-center z-10">
                  <div className="w-16 h-16 border-4 border-somali-blue border-t-transparent rounded-full animate-spin mb-4"></div>
-                 <h2 className="text-xl font-bold text-gray-700 dark:text-gray-300 animate-pulse">
+                 <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 animate-pulse">
                      {match && questions.length === 0 ? "Loading Quiz Data..." : "Initializing Battlefield..."}
                  </h2>
             </div>
@@ -239,7 +239,7 @@ const GamePage: React.FC = () => {
                  </div>
                  <div className="flex flex-col">
                      <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">You</span>
-                     <span className="text-xl font-black text-gray-800 dark:text-white font-mono leading-none">{match.scores[user!.uid]}</span>
+                     <span className="text-xl font-black text-gray-900 dark:text-white font-mono leading-none">{match.scores[user!.uid]}</span>
                  </div>
             </div>
 
@@ -264,7 +264,7 @@ const GamePage: React.FC = () => {
                  </div>
                  <div className="flex flex-col">
                      <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate max-w-[80px]">{opponentProfile.name}</span>
-                     <span className="text-xl font-black text-gray-800 dark:text-white font-mono leading-none">{match.scores[opponentProfile.uid]}</span>
+                     <span className="text-xl font-black text-gray-900 dark:text-white font-mono leading-none">{match.scores[opponentProfile.uid]}</span>
                  </div>
             </div>
          </div>
@@ -280,7 +280,7 @@ const GamePage: React.FC = () => {
                            <i className="fas fa-plug text-4xl text-red-500"></i>
                        </div>
                        <h2 className="text-3xl font-extrabold mb-2 text-gray-900 dark:text-white">Opponent Left</h2>
-                       <p className="mb-8 text-gray-500 dark:text-gray-300">
+                       <p className="mb-8 text-gray-600 dark:text-gray-300">
                            {match.mode === 'auto' 
                                ? "They disconnected. You get half points!"
                                : "The match was interrupted."}
@@ -297,11 +297,11 @@ const GamePage: React.FC = () => {
                        <div className="flex justify-center gap-8 mb-8">
                            <div className="flex flex-col items-center">
                                <Avatar src={profile?.avatar} seed={user!.uid} size="md" className="border-4 border-white dark:border-gray-700 shadow-lg" />
-                               <span className="font-bold mt-2 dark:text-white text-lg">{match.scores[user!.uid]}</span>
+                               <span className="font-bold mt-2 text-gray-900 dark:text-white text-lg">{match.scores[user!.uid]}</span>
                            </div>
                            <div className="flex flex-col items-center opacity-70">
                                <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="md" className="border-4 border-white dark:border-gray-700 shadow-lg grayscale" />
-                               <span className="font-bold mt-2 dark:text-white text-lg">{match.scores[opponentProfile.uid]}</span>
+                               <span className="font-bold mt-2 text-gray-900 dark:text-white text-lg">{match.scores[opponentProfile.uid]}</span>
                            </div>
                        </div>
                    </>
@@ -322,7 +322,7 @@ const GamePage: React.FC = () => {
                         </div>
 
                         {/* Glass Question Card */}
-                        <div className="w-full bg-white/70 dark:bg-gray-800/40 backdrop-blur-xl border border-white/60 dark:border-white/10 text-gray-900 dark:text-white rounded-[2rem] p-8 md:p-10 shadow-xl text-center mb-8 min-h-[200px] flex items-center justify-center animate__animated animate__fadeIn">
+                        <div className="w-full bg-white/80 dark:bg-gray-800/50 backdrop-blur-xl border border-white/60 dark:border-white/10 text-gray-900 dark:text-white rounded-[2rem] p-8 md:p-10 shadow-xl text-center mb-8 min-h-[200px] flex items-center justify-center animate__animated animate__fadeIn">
                             <h2 className="text-2xl md:text-3xl font-bold leading-snug drop-shadow-sm">
                                 {currentQuestion.question}
                             </h2>
@@ -331,7 +331,7 @@ const GamePage: React.FC = () => {
                         {/* Options Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                             {currentQuestion.options.map((opt, idx) => {
-                                let btnStyle = "bg-white/50 dark:bg-gray-800/30 text-gray-700 dark:text-gray-200 border-white/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-gray-700/50"; // Default Glass
+                                let btnStyle = "bg-white/60 dark:bg-gray-800/40 text-gray-800 dark:text-gray-200 border-white/60 dark:border-white/10 hover:bg-white/90 dark:hover:bg-gray-700/60"; // Default Glass
                                 
                                 if (selectedOption === idx) {
                                     btnStyle = "bg-somali-blue/90 text-white border-somali-blue ring-4 ring-blue-400/30 scale-[1.02] shadow-lg"; // Selected
@@ -373,7 +373,7 @@ const GamePage: React.FC = () => {
                         px-6 py-3 rounded-full font-bold backdrop-blur-xl border shadow-lg flex items-center gap-3 transition-all duration-500
                         ${isMyTurn 
                             ? 'bg-green-500/90 dark:bg-green-600/90 text-white border-green-400/50 scale-105 shadow-green-500/30' 
-                            : 'bg-white/80 dark:bg-gray-800/80 text-gray-500 dark:text-gray-400 border-white/40 dark:border-white/10 scale-95'}
+                            : 'bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-300 border-white/50 dark:border-white/10 scale-95'}
                      `}>
                          {isMyTurn ? (
                              <>

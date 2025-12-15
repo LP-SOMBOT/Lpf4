@@ -279,54 +279,54 @@ const LobbyPage: React.FC = () => {
   };
 
   const SelectionUI = () => (
-      <div className="mb-6 bg-white/40 dark:bg-black/40 backdrop-blur-md p-6 rounded-3xl shadow-lg border border-white/20 dark:border-white/5">
-          <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">1. Select Subject</label>
+      <div className="mb-6 bg-white/60 dark:bg-black/40 backdrop-blur-md p-6 rounded-3xl shadow-lg border border-white/40 dark:border-white/5">
+          <label className="block text-xs font-bold text-gray-900 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">1. Select Subject</label>
           <div className="flex gap-2 overflow-x-auto pb-4 mb-2 custom-scrollbar">
               {subjects.map(s => (
                   <button 
                     key={s.id} 
                     onClick={() => setSelectedSubject(s.id)}
-                    className={`px-5 py-3 rounded-2xl whitespace-nowrap text-sm font-bold transition-all shadow-sm border ${selectedSubject === s.id ? 'bg-somali-blue text-white shadow-blue-500/30 border-blue-400 scale-105' : 'bg-white/60 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-white border-white/30 dark:border-white/10'}`}
+                    className={`px-5 py-3 rounded-2xl whitespace-nowrap text-sm font-bold transition-all shadow-sm border ${selectedSubject === s.id ? 'bg-somali-blue text-white shadow-blue-500/30 border-blue-400 scale-105' : 'bg-white/70 dark:bg-gray-800/60 text-gray-800 dark:text-gray-300 hover:bg-white border-white/30 dark:border-white/10'}`}
                   >
                       {s.name}
                   </button>
               ))}
           </div>
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 italic mb-6 ml-1 flex items-center gap-1 font-medium">
+          <p className="text-[10px] text-gray-700 dark:text-gray-400 italic mb-6 ml-1 flex items-center gap-1 font-medium">
              <i className="fas fa-info-circle"></i> More subjects will be added soon!
           </p>
 
-          <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">2. Select Chapter</label>
+          <label className="block text-xs font-bold text-gray-900 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">2. Select Chapter</label>
           {chapters.length > 0 ? (
              <div className="relative group mb-6">
                 <select 
                     value={selectedChapter} 
                     onChange={(e) => setSelectedChapter(e.target.value)}
-                    className="w-full p-4 pl-5 bg-white/60 dark:bg-black/30 text-gray-800 dark:text-white border border-white/40 dark:border-white/10 rounded-2xl appearance-none font-bold focus:ring-2 focus:ring-somali-blue/50 backdrop-blur-sm transition-shadow shadow-inner"
+                    className="w-full p-4 pl-5 bg-white/70 dark:bg-black/30 text-gray-900 dark:text-white border border-gray-300 dark:border-white/10 rounded-2xl appearance-none font-bold focus:ring-2 focus:ring-somali-blue/50 backdrop-blur-sm transition-shadow shadow-inner"
                 >
                     {chapters.map(c => (
-                        <option key={c.id} value={c.id} className="dark:bg-gray-900">{c.name}</option>
+                        <option key={c.id} value={c.id} className="dark:bg-gray-900 text-gray-900 dark:text-white">{c.name}</option>
                     ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-5 text-gray-600 dark:text-gray-400">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-5 text-gray-700 dark:text-gray-400">
                     <i className="fas fa-chevron-down text-sm"></i>
                 </div>
              </div>
           ) : (
-              <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-8 italic bg-white/20 dark:bg-white/5 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 mb-6 font-medium">
+              <div className="text-center text-gray-600 dark:text-gray-400 text-sm py-8 italic bg-white/20 dark:bg-white/5 rounded-2xl border border-dashed border-gray-400 dark:border-gray-600 mb-6 font-medium">
                   {selectedSubject ? "No chapters found." : "Select a subject first."}
               </div>
           )}
 
           {viewMode === 'custom' && !hostedCode && (
               <>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">3. Number of Questions</label>
+                <label className="block text-xs font-bold text-gray-900 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">3. Number of Questions</label>
                 <div className="flex gap-2">
                     {[5, 10, 15, 20].map(n => (
                         <button
                             key={n}
                             onClick={() => setQuizLimit(n)}
-                            className={`flex-1 py-3 rounded-2xl font-bold transition-all border ${quizLimit === n ? 'bg-green-500 text-white shadow-lg shadow-green-500/30 border-green-400' : 'bg-white/60 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 border-white/30 dark:border-white/10'}`}
+                            className={`flex-1 py-3 rounded-2xl font-bold transition-all border ${quizLimit === n ? 'bg-green-500 text-white shadow-lg shadow-green-500/30 border-green-400' : 'bg-white/70 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border-white/30 dark:border-white/10'}`}
                         >
                             {n}
                         </button>
@@ -343,7 +343,7 @@ const LobbyPage: React.FC = () => {
         <div className="flex flex-col items-center justify-center p-4 min-h-[85vh] animate__animated animate__fadeIn">
              <div className="w-full max-w-4xl mx-auto">
                  <div className="flex items-center gap-4 mb-8 pl-2">
-                     <button onClick={() => navigate('/')} className="w-12 h-12 rounded-full bg-white/30 dark:bg-black/30 backdrop-blur-lg shadow-lg flex items-center justify-center text-gray-700 dark:text-white hover:text-somali-blue transition-colors border border-white/40 dark:border-white/10">
+                     <button onClick={() => navigate('/')} className="w-12 h-12 rounded-full bg-white/30 dark:bg-black/30 backdrop-blur-lg shadow-lg flex items-center justify-center text-gray-800 dark:text-white hover:text-somali-blue transition-colors border border-white/40 dark:border-white/10">
                         <i className="fas fa-arrow-left fa-lg"></i>
                      </button>
                      <h1 className="text-3xl font-black text-gray-900 dark:text-white drop-shadow-sm tracking-tight">Choose Mode</h1>
@@ -395,7 +395,7 @@ const LobbyPage: React.FC = () => {
       {viewMode !== 'selection' && (
           <div className="p-4 max-w-4xl mx-auto w-full animate__animated animate__fadeInRight">
               <div className="sticky top-0 z-30 bg-white/70 dark:bg-black/60 backdrop-blur-xl -mx-4 px-4 py-4 mb-6 border-b border-white/20 dark:border-white/5 shadow-sm flex items-center gap-4 transition-colors">
-                <button onClick={goBack} className="text-gray-600 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
+                <button onClick={goBack} className="text-gray-700 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
                 </button>
                 <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
@@ -406,12 +406,12 @@ const LobbyPage: React.FC = () => {
               {viewMode === 'auto' ? (
                   <>
                     {!isSearching && <SelectionUI />}
-                    <Card className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-700 bg-white/40 dark:bg-black/40">
+                    <Card className="text-center py-12 border-2 border-dashed border-gray-400 dark:border-gray-700 bg-white/50 dark:bg-black/40">
                         <div className="w-24 h-24 bg-blue-100/50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm border border-blue-200 dark:border-blue-800">
                             <i className={`fas fa-search text-4xl text-somali-blue dark:text-blue-300 ${isSearching ? 'animate-bounce' : ''}`}></i>
                         </div>
                         <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">Find Opponent</h2>
-                        <p className="text-gray-500 dark:text-gray-400 mb-8 font-medium">{matchStatus || "Select a topic and find a match!"}</p>
+                        <p className="text-gray-600 dark:text-gray-400 mb-8 font-medium">{matchStatus || "Select a topic and find a match!"}</p>
                         
                         {isSearching ? (
                             <Button fullWidth onClick={cancelSearch} variant="danger" className="shadow-red-500/20 max-w-xs mx-auto">
@@ -455,9 +455,9 @@ const LobbyPage: React.FC = () => {
                       </Card>
                       
                       <div className="relative flex py-2 items-center">
-                            <div className="flex-grow border-t border-gray-300 dark:border-gray-600 opacity-50"></div>
-                            <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 font-bold bg-white/50 dark:bg-gray-800/50 px-3 py-1 rounded-full backdrop-blur-sm">OR</span>
-                            <div className="flex-grow border-t border-gray-300 dark:border-gray-600 opacity-50"></div>
+                            <div className="flex-grow border-t border-gray-400 dark:border-gray-600 opacity-50"></div>
+                            <span className="flex-shrink-0 mx-4 text-gray-500 dark:text-gray-500 font-bold bg-white/50 dark:bg-gray-800/50 px-3 py-1 rounded-full backdrop-blur-sm">OR</span>
+                            <div className="flex-grow border-t border-gray-400 dark:border-gray-600 opacity-50"></div>
                       </div>
 
                       <Card className="text-center">
@@ -465,14 +465,14 @@ const LobbyPage: React.FC = () => {
                         <div className="relative mb-6">
                             <Input 
                                 placeholder="0000" 
-                                className="text-center text-4xl tracking-[1.5rem] font-mono h-24 font-black text-gray-900 dark:text-white !bg-gray-100 dark:!bg-black/30 border-2 !border-gray-200 dark:!border-gray-700 focus:!border-somali-blue dark:focus:!border-blue-500 rounded-3xl"
+                                className="text-center text-4xl tracking-[1.5rem] font-mono h-24 font-black text-gray-900 dark:text-white !bg-gray-100 dark:!bg-black/30 border-2 !border-gray-300 dark:!border-gray-700 focus:!border-somali-blue dark:focus:!border-blue-500 rounded-3xl"
                                 maxLength={4}
                                 value={roomCode}
                                 onChange={(e) => setRoomCode(e.target.value)}
                             />
                             <button 
                                 onClick={handlePasteCode} 
-                                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-400 hover:text-somali-blue shadow-md transition-colors" 
+                                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-500 hover:text-somali-blue shadow-md transition-colors" 
                                 title="Paste Code"
                             >
                                 <i className="fas fa-paste text-xl"></i>
