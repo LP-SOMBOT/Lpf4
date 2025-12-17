@@ -484,27 +484,42 @@ const LobbyPage: React.FC = () => {
                       </div>
                       
                       {!hostedCode && (
-                          <div className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-200 dark:border-gray-700 shadow-xl text-center">
-                                <h3 className="text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Enter Access Code</h3>
-                                <div className="relative max-w-xs mx-auto mb-6">
-                                    <Input 
-                                        placeholder="----" 
-                                        className="text-center text-4xl tracking-[1rem] font-mono h-20 font-black text-gray-900 dark:text-white !bg-gray-100 dark:!bg-black/30 border-2 !border-gray-300 dark:!border-gray-600 focus:!border-somali-blue rounded-2xl"
-                                        maxLength={4}
-                                        value={roomCode}
-                                        onChange={(e) => setRoomCode(e.target.value)}
-                                    />
-                                    <button 
-                                        onClick={handlePasteCode} 
-                                        className="absolute -right-12 top-1/2 -translate-y-1/2 w-10 h-10 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-500 hover:text-somali-blue shadow-md transition-colors border border-gray-200 dark:border-gray-600" 
-                                        title="Paste Code"
-                                    >
-                                        <i className="fas fa-paste"></i>
-                                    </button>
+                          <div className="relative overflow-hidden bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-200 dark:border-gray-700 shadow-xl text-center group">
+                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-blue-50/50 dark:from-indigo-900/10 dark:to-blue-900/10"></div>
+                                
+                                <div className="relative z-10">
+                                    <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-200 dark:border-indigo-800">
+                                        <i className="fas fa-terminal text-2xl"></i>
+                                    </div>
+                                    
+                                    <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-widest mb-2">Access Terminal</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm font-bold mb-6">Enter the 4-digit code to connect</p>
+                                    
+                                    <div className="flex items-center justify-center gap-3 mb-8">
+                                        <div className="relative">
+                                            <input 
+                                                className="w-48 h-16 text-center text-4xl font-mono font-black tracking-[0.5em] bg-gray-100 dark:bg-black/30 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 rounded-xl outline-none transition-all text-gray-900 dark:text-white uppercase placeholder-gray-300 dark:placeholder-gray-700"
+                                                maxLength={4}
+                                                placeholder="----"
+                                                value={roomCode}
+                                                onChange={(e) => setRoomCode(e.target.value)}
+                                            />
+                                        </div>
+                                        
+                                        <button 
+                                            onClick={handlePasteCode} 
+                                            className="h-16 w-16 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 hover:border-indigo-500 hover:text-indigo-500 dark:hover:text-indigo-400 rounded-xl flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 shadow-sm transition-all active:scale-95 group/paste"
+                                            title="Paste Code"
+                                        >
+                                            <i className="fas fa-clipboard text-xl mb-1 group-hover/paste:scale-110 transition-transform"></i>
+                                            <span className="text-[10px] font-bold uppercase">Paste</span>
+                                        </button>
+                                    </div>
+
+                                    <Button fullWidth variant="primary" onClick={joinRoom} disabled={roomCode.length !== 4} className="h-14 text-lg shadow-indigo-500/30">
+                                        <i className="fas fa-plug mr-2"></i> Connect to Room
+                                    </Button>
                                 </div>
-                                <Button fullWidth variant="primary" onClick={joinRoom} disabled={roomCode.length !== 4} className="h-14 text-lg">
-                                    Connect to Room
-                                </Button>
                           </div>
                       )}
                   </div>

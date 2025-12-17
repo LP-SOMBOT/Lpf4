@@ -19,24 +19,24 @@ const AboutPage: React.FC = () => {
       <div className="space-y-6">
         
         {/* Intro */}
-        <div className="text-center mb-8 animate__animated animate__fadeInDown">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold text-somali-blue dark:text-blue-400 mb-2">LP-F4</h1>
           <p className="text-gray-700 dark:text-gray-300 font-bold text-lg">Empowering Somali Students Through Knowledge</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate__animated animate__fadeInUp">
-            <Card className="text-center border-b-4 border-blue-500">
+        {/* Stats Cards - Removed scroll animations for stability */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="text-center border-b-4 border-blue-500 transform transition-transform hover:-translate-y-1">
                 <i className="fas fa-users text-3xl text-blue-500 mb-2"></i>
                 <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white">1,200+</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Active Learners</p>
             </Card>
-            <Card className="text-center border-b-4 border-green-500">
+            <Card className="text-center border-b-4 border-green-500 transform transition-transform hover:-translate-y-1">
                 <i className="fas fa-layer-group text-3xl text-green-500 mb-2"></i>
                 <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white">500+</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Total Quizzes</p>
             </Card>
-            <Card className="text-center border-b-4 border-yellow-500">
+            <Card className="text-center border-b-4 border-yellow-500 transform transition-transform hover:-translate-y-1">
                 <i className="fas fa-headset text-3xl text-yellow-500 mb-2"></i>
                 <h3 className="text-3xl font-extrabold text-gray-900 dark:text-white">24/7</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Student Support</p>
@@ -44,7 +44,7 @@ const AboutPage: React.FC = () => {
         </div>
 
         {/* Mission & Vision */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate__animated animate__fadeInUp" style={{animationDelay: '0.1s'}}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="h-full">
                 <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-somali-blue dark:text-blue-300">
@@ -71,7 +71,7 @@ const AboutPage: React.FC = () => {
         </div>
 
         {/* Our Story */}
-        <Card className="animate__animated animate__fadeInUp" style={{animationDelay: '0.2s'}}>
+        <Card>
             <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white border-l-4 border-somali-blue pl-3">Our Story</h2>
             <p className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed font-medium">
                 LP-F4 started as a small project to help students prepare for exams using simple flashcards. We realized that students learn best when they are challenged and having fun. 
@@ -81,30 +81,31 @@ const AboutPage: React.FC = () => {
             </p>
         </Card>
 
-        {/* Contact Info - Now Adaptive for Light/Dark Mode */}
-        <Card className="animate__animated animate__fadeInUp" style={{animationDelay: '0.3s'}}>
+        {/* Contact Info */}
+        <Card>
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-900 dark:text-white"><i className="fas fa-paper-plane text-somali-blue"></i> Get in Touch</h2>
             <div className="space-y-4">
                 <div className="flex items-center gap-4 bg-gray-100 dark:bg-gray-800 p-3 rounded-xl transition-colors">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center shrink-0">
                         <i className="fas fa-envelope"></i>
                     </div>
-                    <div>
+                    <div className="overflow-hidden">
                         <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-widest font-bold">Email</p>
-                        <p className="font-bold text-gray-900 dark:text-white">support@lpf4.edu.so</p>
+                        <p className="font-bold text-gray-900 dark:text-white truncate">libaanpro5@gmail.com</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-4 bg-gray-100 dark:bg-gray-800 p-3 rounded-xl transition-colors">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center shrink-0">
                         <i className="fas fa-phone"></i>
                     </div>
                     <div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-widest font-bold">Phone</p>
-                        <p className="font-bold text-gray-900 dark:text-white">+252 61 500 0000</p>
+                        <p className="font-bold text-gray-900 dark:text-white">+252 61 398 2172</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-bold mt-0.5">or +1 (250) 288-0729</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-4 bg-gray-100 dark:bg-gray-800 p-3 rounded-xl transition-colors">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center shrink-0">
                         <i className="fas fa-map-marker-alt"></i>
                     </div>
                     <div>
