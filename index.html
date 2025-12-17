@@ -97,20 +97,123 @@
         border: 1px solid rgba(255, 255, 255, 0.1);
       }
 
-      /* SweetAlert2 Theme Overrides for Glass */
-      .swal2-popup {
-        font-family: 'Inter', sans-serif !important;
-        border-radius: 1.5rem !important;
-        background: rgba(255, 255, 255, 0.9) !important;
-        backdrop-filter: blur(20px) !important;
+      /* --- Custom SweetAlert2 Glass Theme --- */
+      
+      /* Popup Body */
+      .glass-swal-popup {
+        background: rgba(255, 255, 255, 0.85) !important;
+        backdrop-filter: blur(24px) !important;
+        -webkit-backdrop-filter: blur(24px) !important;
         border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        border-radius: 2rem !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+        padding: 2rem !important;
+        width: 90% !important;
+        max-width: 400px !important;
       }
       
-      .dark .swal2-popup {
+      .dark .glass-swal-popup {
+        background: rgba(15, 23, 42, 0.85) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+      }
+
+      /* Title */
+      .glass-swal-title {
+        color: #111827 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 900 !important;
+        font-size: 1.5rem !important;
+        margin-bottom: 0.5rem !important;
+      }
+      .dark .glass-swal-title {
+        color: #f3f4f6 !important;
+      }
+
+      /* Content */
+      .glass-swal-content {
+        color: #4b5563 !important;
+        font-weight: 500 !important;
+        font-size: 1rem !important;
+      }
+      .dark .glass-swal-content {
+        color: #9ca3af !important;
+      }
+
+      /* Buttons */
+      .glass-swal-btn-confirm {
+        background: linear-gradient(to right, #4189DD, #2563EB) !important;
+        color: white !important;
+        font-weight: 800 !important;
+        padding: 12px 24px !important;
+        border-radius: 1rem !important;
+        border: none !important;
+        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3) !important;
+        transition: transform 0.2s !important;
+        margin: 0 5px !important;
+      }
+      .glass-swal-btn-confirm:active {
+        transform: scale(0.95) !important;
+      }
+      
+      .glass-swal-btn-cancel {
+        background: rgba(107, 114, 128, 0.1) !important;
+        color: #374151 !important;
+        font-weight: 700 !important;
+        padding: 12px 24px !important;
+        border-radius: 1rem !important;
+        border: none !important;
+        transition: background 0.2s !important;
+        margin: 0 5px !important;
+      }
+      .dark .glass-swal-btn-cancel {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #d1d5db !important;
+      }
+      .glass-swal-btn-cancel:hover {
+        background: rgba(107, 114, 128, 0.2) !important;
+      }
+
+      /* Input */
+      .glass-swal-input {
+        background: rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        border-radius: 1rem !important;
+        color: #111827 !important;
+        font-weight: 700 !important;
+        padding: 12px !important;
+        text-align: center !important;
+      }
+      .glass-swal-input:focus {
+        box-shadow: 0 0 0 2px #4189DD !important;
+        outline: none !important;
+      }
+      .dark .glass-swal-input {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: white !important;
+      }
+
+      /* Toast Specific */
+      .glass-swal-toast {
+        border-radius: 50px !important;
+        background: rgba(255, 255, 255, 0.9) !important;
+        backdrop-filter: blur(16px) !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+        padding: 10px 20px !important;
+        margin-top: 10px !important;
+      }
+      .dark .glass-swal-toast {
         background: rgba(30, 41, 59, 0.9) !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        color: #f1f5f9 !important;
       }
+      .glass-swal-toast-title {
+        font-size: 0.9rem !important;
+        margin: 0 !important;
+      }
+      .glass-swal-timer {
+        background: #4189DD !important;
+      }
+
     </style>
   <script type="importmap">
 {

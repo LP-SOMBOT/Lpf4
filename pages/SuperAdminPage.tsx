@@ -3,7 +3,7 @@ import { ref, update, onValue, off, set } from 'firebase/database';
 import { db } from '../firebase';
 import { UserProfile } from '../types';
 import { Button, Card, Input } from '../components/UI';
-import Swal from 'sweetalert2';
+import { showAlert, showToast } from '../services/alert';
 
 const SuperAdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -45,14 +45,7 @@ const SuperAdminPage: React.FC = () => {
   const checkPin = (e: React.FormEvent) => {
     e.preventDefault();
     if (pin === '1234') { setIsAuthenticated(true); } else {
-        const isDark = document.documentElement.classList.contains('dark');
-        Swal.fire({
-            icon: 'error',
-            title: 'Access Denied', 
-            text: 'Incorrect PIN',
-            background: isDark ? '#1e293b' : '#fff',
-            color: isDark ? '#fff' : '#000'
-        });
+        showAlert('Access Denied', 'Incorrect PIN', 'error');
     }
   };
 
@@ -60,37 +53,16 @@ const SuperAdminPage: React.FC = () => {
       const newRole = currentRole === 'admin' ? 'user' : 'admin';
       try {
         await update(ref(db, `users/${uid}`), { role: newRole });
-        const isDark = document.documentElement.classList.contains('dark');
-        Swal.fire({
-            icon: 'success',
-            title: 'Success',
-            text: `User is now ${newRole}`,
-            toast: true,
-            position: 'top-end',
-            timer: 2000,
-            showConfirmButton: false,
-            background: isDark ? '#1e293b' : '#fff',
-            color: isDark ? '#fff' : '#000'
-        });
+        showToast(`User is now ${newRole}`, 'success');
       } catch (e) {
-        Swal.fire('Error', 'Failed to update role', 'error');
+        showAlert('Error', 'Failed to update role', 'error');
       }
   };
 
   const toggleAiFeature = async () => {
     try {
         await set(ref(db, 'settings/aiAssistantEnabled'), !aiEnabled);
-        const isDark = document.documentElement.classList.contains('dark');
-        Swal.fire({
-            icon: 'success',
-            title: !aiEnabled ? 'AI Enabled' : 'AI Disabled',
-            toast: true,
-            position: 'top-end',
-            timer: 2000,
-            showConfirmButton: false,
-            background: isDark ? '#1e293b' : '#fff',
-            color: isDark ? '#fff' : '#000'
-        });
+        showToast(!aiEnabled ? 'AI Enabled' : 'AI Disabled', 'success');
     } catch (e) {
         console.error(e);
     }

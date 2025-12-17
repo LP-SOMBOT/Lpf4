@@ -5,9 +5,9 @@ import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { Button, Input, Card, Avatar } from '../components/UI';
 import { playSound } from '../services/audioService';
+import { showToast } from '../services/alert';
 import { MATCH_TIMEOUT_MS } from '../constants';
 import { Subject, Chapter } from '../types';
-import Swal from 'sweetalert2';
 
 const LobbyPage: React.FC = () => {
   const { user, profile } = useContext(UserContext);
@@ -68,27 +68,10 @@ const LobbyPage: React.FC = () => {
     });
   }, [selectedSubject]);
 
-  const showNotify = (msg: string, type: 'error'|'success' = 'error') => {
-    playSound(type === 'error' ? 'wrong' : 'click');
-    const isDark = document.documentElement.classList.contains('dark');
-    Swal.fire({
-      icon: type,
-      title: msg,
-      toast: true,
-      position: 'top',
-      showConfirmButton: false,
-      timer: 3000,
-      timerProgressBar: true,
-      showCloseButton: true,
-      background: isDark ? '#1e293b' : '#fff',
-      color: isDark ? '#fff' : '#000',
-    });
-  };
-
   const handleAutoMatch = async () => {
     if (!user) return;
     if (!selectedChapter) {
-        showNotify("Please select a battlefield (chapter) first", "error");
+        showToast("Select a battlefield first", "error");
         return;
     }
 
@@ -172,7 +155,7 @@ const LobbyPage: React.FC = () => {
   const createRoom = async () => {
     if(!user) return;
     if (!selectedChapter) {
-        showNotify("Select a topic to host", "error");
+        showToast("Select a topic to host", "error");
         return;
     }
 
@@ -199,7 +182,7 @@ const LobbyPage: React.FC = () => {
   const handleCopyCode = () => {
     if (hostedCode) {
       navigator.clipboard.writeText(hostedCode);
-      showNotify("Code copied to clipboard", "success");
+      showToast("Code copied to clipboard", "success");
     }
   };
 
@@ -213,7 +196,7 @@ const LobbyPage: React.FC = () => {
     if (snapshot.exists()) {
       const roomData = snapshot.val();
       if (roomData.host === user.uid) {
-        showNotify("Cannot join your own room", "error");
+        showToast("Cannot join your own room", "error");
         return;
       }
 
@@ -242,7 +225,7 @@ const LobbyPage: React.FC = () => {
       await set(ref(db, `users/${hostUid}/activeMatch`), matchId);
       await set(ref(db, `users/${user.uid}/activeMatch`), matchId);
     } else {
-      showNotify("Invalid Room Code", "error");
+      showToast("Invalid Room Code", "error");
     }
   };
 
@@ -252,10 +235,10 @@ const LobbyPage: React.FC = () => {
       if (text) {
         const code = text.trim().slice(0, 4);
         setRoomCode(code);
-        showNotify("Code pasted", "success");
+        showToast("Code pasted", "success");
       }
     } catch (e) {
-      showNotify("Clipboard access denied", "error");
+      showToast("Clipboard access denied", "error");
     }
   };
 

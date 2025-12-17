@@ -7,8 +7,8 @@ import { POINTS_PER_QUESTION } from '../constants';
 import { MatchState, Question } from '../types';
 import { Avatar, Button } from '../components/UI';
 import { playSound } from '../services/audioService';
+import { showConfirm } from '../services/alert';
 import confetti from 'canvas-confetti';
-import Swal from 'sweetalert2';
 
 const GamePage: React.FC = () => {
   const { matchId } = useParams();
@@ -178,20 +178,15 @@ const GamePage: React.FC = () => {
   const handleSurrender = async () => {
     if(!matchId || !user || !opponentProfile) return;
     
-    const result = await Swal.fire({
-      title: 'Surrender?',
-      text: "You will lose this match and exit to the lobby.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, give up',
-      cancelButtonText: 'Cancel',
-      background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#fff',
-      color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
-    });
+    const isConfirmed = await showConfirm(
+      'Surrender?', 
+      'You will lose this match and exit to the lobby.',
+      'Yes, give up',
+      'Cancel',
+      'warning'
+    );
 
-    if (result.isConfirmed) {
+    if (isConfirmed) {
         await update(ref(db, `matches/${matchId}`), {
             status: 'completed',
             winner: opponentProfile.uid
