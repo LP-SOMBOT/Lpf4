@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { ref, push, get, remove, set, onValue } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
-import { Button, Input, Card } from '../components/UI';
+import { Button, Input, Card, Avatar } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { MATCH_TIMEOUT_MS } from '../constants';
 import { Subject, Chapter } from '../types';
 import Swal from 'sweetalert2';
 
 const LobbyPage: React.FC = () => {
-  const { user } = useContext(UserContext);
+  const { user, profile } = useContext(UserContext);
   const navigate = useNavigate();
   
   // VIEW MODE: 'selection' | 'auto' | 'custom'
@@ -80,18 +80,20 @@ const LobbyPage: React.FC = () => {
       timer: 3000,
       timerProgressBar: true,
       showCloseButton: true,
+      background: isDark ? '#1e293b' : '#fff',
+      color: isDark ? '#fff' : '#000',
     });
   };
 
   const handleAutoMatch = async () => {
     if (!user) return;
     if (!selectedChapter) {
-        showNotify("Please select a subject and chapter first", "error");
+        showNotify("Please select a battlefield (chapter) first", "error");
         return;
     }
 
     setIsSearching(true);
-    setMatchStatus('Searching for opponent...');
+    setMatchStatus('Scanning for opponents...');
     playSound('click');
 
     const queueRef = ref(db, `queue/${selectedChapter}`);
@@ -134,7 +136,7 @@ const LobbyPage: React.FC = () => {
       const newRef = push(queueRef);
       setQueueKey(newRef.key);
       await set(newRef, { uid: user.uid });
-      setMatchStatus('Waiting for opponent...');
+      setMatchStatus('Waiting in queue...');
 
       timerRef.current = setTimeout(async () => {
         if (isSearching) {
@@ -142,7 +144,7 @@ const LobbyPage: React.FC = () => {
           if (checkRef.exists()) {
              await remove(newRef);
              setQueueKey(null);
-             setMatchStatus('No opponent found. Try again.');
+             setMatchStatus('No match found. Retrying...');
              setIsSearching(false);
           }
         }
@@ -170,7 +172,7 @@ const LobbyPage: React.FC = () => {
   const createRoom = async () => {
     if(!user) return;
     if (!selectedChapter) {
-        showNotify("Please select a topic first", "error");
+        showNotify("Select a topic to host", "error");
         return;
     }
 
@@ -197,7 +199,7 @@ const LobbyPage: React.FC = () => {
   const handleCopyCode = () => {
     if (hostedCode) {
       navigator.clipboard.writeText(hostedCode);
-      showNotify("Code copied!", "success");
+      showNotify("Code copied to clipboard", "success");
     }
   };
 
@@ -211,7 +213,7 @@ const LobbyPage: React.FC = () => {
     if (snapshot.exists()) {
       const roomData = snapshot.val();
       if (roomData.host === user.uid) {
-        showNotify("You cannot join your own room.", "error");
+        showNotify("Cannot join your own room", "error");
         return;
       }
 
@@ -250,10 +252,10 @@ const LobbyPage: React.FC = () => {
       if (text) {
         const code = text.trim().slice(0, 4);
         setRoomCode(code);
-        showNotify("Code pasted!", "success");
+        showNotify("Code pasted", "success");
       }
     } catch (e) {
-      showNotify("Cannot access clipboard", "error");
+      showNotify("Clipboard access denied", "error");
     }
   };
 
@@ -278,112 +280,162 @@ const LobbyPage: React.FC = () => {
       setViewMode('selection');
   };
 
+  // --- SUB-COMPONENTS FOR GAME FEEL ---
+
   const SelectionUI = () => (
-      <div className="mb-6 bg-white/60 dark:bg-black/40 backdrop-blur-md p-6 rounded-3xl shadow-lg border border-white/40 dark:border-white/5">
-          <label className="block text-xs font-bold text-gray-900 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">1. Select Subject</label>
-          <div className="flex gap-2 overflow-x-auto pb-4 mb-2 custom-scrollbar">
-              {subjects.map(s => (
-                  <button 
-                    key={s.id} 
-                    onClick={() => setSelectedSubject(s.id)}
-                    className={`px-5 py-3 rounded-2xl whitespace-nowrap text-sm font-bold transition-all shadow-sm border ${selectedSubject === s.id ? 'bg-somali-blue text-white shadow-blue-500/30 border-blue-400 scale-105' : 'bg-white/70 dark:bg-gray-800/60 text-gray-800 dark:text-gray-300 hover:bg-white border-white/30 dark:border-white/10'}`}
-                  >
-                      {s.name}
-                  </button>
-              ))}
-          </div>
-          <p className="text-[10px] text-gray-700 dark:text-gray-400 italic mb-6 ml-1 flex items-center gap-1 font-medium">
-             <i className="fas fa-info-circle"></i> More subjects will be added soon!
-          </p>
-
-          <label className="block text-xs font-bold text-gray-900 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">2. Select Chapter</label>
-          {chapters.length > 0 ? (
-             <div className="relative group mb-6">
-                <select 
-                    value={selectedChapter} 
-                    onChange={(e) => setSelectedChapter(e.target.value)}
-                    className="w-full p-4 pl-5 bg-white/70 dark:bg-black/30 text-gray-900 dark:text-white border border-gray-300 dark:border-white/10 rounded-2xl appearance-none font-bold focus:ring-2 focus:ring-somali-blue/50 backdrop-blur-sm transition-shadow shadow-inner"
-                >
-                    {chapters.map(c => (
-                        <option key={c.id} value={c.id} className="dark:bg-gray-900 text-gray-900 dark:text-white">{c.name}</option>
-                    ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-5 text-gray-700 dark:text-gray-400">
-                    <i className="fas fa-chevron-down text-sm"></i>
-                </div>
-             </div>
-          ) : (
-              <div className="text-center text-gray-600 dark:text-gray-400 text-sm py-8 italic bg-white/20 dark:bg-white/5 rounded-2xl border border-dashed border-gray-400 dark:border-gray-600 mb-6 font-medium">
-                  {selectedSubject ? "No chapters found." : "Select a subject first."}
+      <div className="w-full animate__animated animate__fadeIn">
+          {/* Subject Bar - Horizontal Scroll */}
+          <div className="mb-6">
+              <label className="flex items-center text-xs font-black text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1 tracking-[0.2em]">
+                  <i className="fas fa-book-open mr-2"></i> Select Discipline
+              </label>
+              <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar snap-x">
+                  {subjects.map(s => (
+                      <button 
+                        key={s.id} 
+                        onClick={() => { playSound('click'); setSelectedSubject(s.id); }}
+                        className={`
+                            snap-start shrink-0 px-6 py-4 rounded-2xl whitespace-nowrap text-sm font-black transition-all duration-300 border-2
+                            ${selectedSubject === s.id 
+                                ? 'bg-somali-blue text-white border-somali-blue shadow-[0_0_20px_rgba(65,137,221,0.4)] scale-105' 
+                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}
+                        `}
+                      >
+                          {s.name.toUpperCase()}
+                      </button>
+                  ))}
               </div>
-          )}
+          </div>
 
+          {/* Chapter Grid - Tactical Cards */}
+          <div className="mb-6">
+              <label className="flex items-center text-xs font-black text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1 tracking-[0.2em]">
+                 <i className="fas fa-map-marker-alt mr-2"></i> Select Operation
+              </label>
+              {chapters.length > 0 ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {chapters.map(c => (
+                        <div 
+                            key={c.id}
+                            onClick={() => { playSound('click'); setSelectedChapter(c.id); }}
+                            className={`
+                                relative cursor-pointer p-4 rounded-xl border-2 transition-all duration-200 group overflow-hidden
+                                ${selectedChapter === c.id 
+                                    ? 'bg-gradient-to-br from-somali-blue/20 to-purple-500/20 border-somali-blue shadow-lg' 
+                                    : 'bg-white dark:bg-gray-800 border-transparent hover:border-gray-300 dark:hover:border-gray-600'}
+                            `}
+                        >
+                            <div className="flex items-center justify-between relative z-10">
+                                <span className={`font-bold ${selectedChapter === c.id ? 'text-somali-blue dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                                    {c.name}
+                                </span>
+                                {selectedChapter === c.id && <i className="fas fa-check-circle text-somali-blue text-xl animate__animated animate__zoomIn"></i>}
+                            </div>
+                            {/* Decorative Elements */}
+                            <div className={`absolute -right-4 -bottom-4 text-6xl opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity ${selectedChapter === c.id ? 'text-somali-blue' : 'text-gray-500'}`}>
+                                <i className="fas fa-crosshairs"></i>
+                            </div>
+                        </div>
+                    ))}
+                 </div>
+              ) : (
+                  <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-800/50">
+                      <i className="fas fa-ban text-gray-400 text-3xl mb-2"></i>
+                      <span className="text-gray-500 font-bold text-sm">{selectedSubject ? "No Operations Available" : "Select a Discipline First"}</span>
+                  </div>
+              )}
+          </div>
+
+          {/* Settings for Custom Room */}
           {viewMode === 'custom' && !hostedCode && (
-              <>
-                <label className="block text-xs font-bold text-gray-900 dark:text-gray-300 uppercase mb-3 ml-1 tracking-wider">3. Number of Questions</label>
-                <div className="flex gap-2">
+              <div className="animate__animated animate__fadeInUp">
+                <label className="flex items-center text-xs font-black text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1 tracking-[0.2em]">
+                    <i className="fas fa-cogs mr-2"></i> Mission Length
+                </label>
+                <div className="flex gap-2 p-1 bg-gray-200 dark:bg-gray-800 rounded-xl">
                     {[5, 10, 15, 20].map(n => (
                         <button
                             key={n}
-                            onClick={() => setQuizLimit(n)}
-                            className={`flex-1 py-3 rounded-2xl font-bold transition-all border ${quizLimit === n ? 'bg-green-500 text-white shadow-lg shadow-green-500/30 border-green-400' : 'bg-white/70 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border-white/30 dark:border-white/10'}`}
+                            onClick={() => { playSound('click'); setQuizLimit(n); }}
+                            className={`flex-1 py-2 rounded-lg font-black text-sm transition-all ${quizLimit === n ? 'bg-white dark:bg-gray-700 text-somali-blue dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                         >
-                            {n}
+                            {n} Qs
                         </button>
                     ))}
                 </div>
-              </>
+              </div>
           )}
       </div>
   );
 
   return (
     <div className="flex flex-col min-h-full relative pb-24 md:pb-8 w-full">
+      {/* --- PHASE 1: MODE SELECTION (Battle HQ) --- */}
       {viewMode === 'selection' && (
-        <div className="flex flex-col items-center justify-center p-4 min-h-[85vh] animate__animated animate__fadeIn">
-             <div className="w-full max-w-4xl mx-auto">
-                 <div className="flex items-center gap-4 mb-8 pl-2">
-                     <button onClick={() => navigate('/')} className="w-12 h-12 rounded-full bg-white/30 dark:bg-black/30 backdrop-blur-lg shadow-lg flex items-center justify-center text-gray-800 dark:text-white hover:text-somali-blue transition-colors border border-white/40 dark:border-white/10">
-                        <i className="fas fa-arrow-left fa-lg"></i>
+        <div className="flex flex-col items-center justify-center p-6 min-h-[85vh] animate__animated animate__fadeIn">
+             <div className="w-full max-w-5xl mx-auto">
+                 {/* Header */}
+                 <div className="flex items-center gap-4 mb-10">
+                     <button onClick={() => navigate('/')} className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-gray-800 dark:text-white hover:bg-white/20 transition-all">
+                        <i className="fas fa-arrow-left"></i>
                      </button>
-                     <h1 className="text-3xl font-black text-gray-900 dark:text-white drop-shadow-sm tracking-tight">Choose Mode</h1>
+                     <div>
+                        <h1 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">
+                            Battle <span className="text-transparent bg-clip-text bg-gradient-to-r from-somali-blue to-purple-500">HQ</span>
+                        </h1>
+                        <p className="text-gray-500 dark:text-gray-400 font-bold tracking-widest text-xs uppercase">Select Game Mode</p>
+                     </div>
                  </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     {/* RANKED CARD */}
                      <button 
                         onClick={() => { playSound('click'); setViewMode('auto'); }}
-                        className="group relative h-72 rounded-[2.5rem] overflow-hidden shadow-2xl transition-all hover:scale-[1.02] hover:shadow-blue-500/20 text-left border border-white/40 dark:border-white/10"
+                        className="group relative h-80 rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_50px_rgba(59,130,246,0.5)] border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 text-left"
                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/80 to-indigo-600/80 backdrop-blur-md"></div>
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                        <i className="fas fa-bolt text-[10rem] text-white absolute -bottom-10 -right-10 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-700"></i>
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 opacity-90 group-hover:opacity-100 transition-opacity"></div>
+                        <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80" className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-40 grayscale group-hover:grayscale-0 transition-all duration-700" />
                         
                         <div className="relative z-10 p-8 h-full flex flex-col justify-between">
-                            <div className="w-20 h-20 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4 border border-white/20 shadow-inner group-hover:bg-white/30 transition-colors">
-                                <i className="fas fa-search text-4xl"></i>
+                            <div className="flex justify-between items-start">
+                                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-inner group-hover:scale-110 transition-transform">
+                                    <i className="fas fa-bolt text-3xl"></i>
+                                </div>
+                                <span className="bg-blue-500/20 border border-blue-400/30 text-blue-100 text-[10px] font-black uppercase px-3 py-1 rounded-full backdrop-blur-md">
+                                    Popular
+                                </span>
                             </div>
                             <div>
-                                <h2 className="text-4xl font-black text-white mb-2 tracking-tight">Quick Match</h2>
-                                <p className="text-blue-100 font-bold text-lg opacity-90">Find a random opponent instantly.</p>
+                                <h2 className="text-4xl font-black text-white mb-2 tracking-tight italic uppercase">Ranked Battle</h2>
+                                <p className="text-blue-100 font-medium text-sm leading-relaxed max-w-xs">
+                                    Quickly match with a random opponent. Earn points and climb the global leaderboard.
+                                </p>
                             </div>
                         </div>
                      </button>
 
+                     {/* CUSTOM CARD */}
                      <button 
                         onClick={() => { playSound('click'); setViewMode('custom'); }}
-                        className="group relative h-72 rounded-[2.5rem] overflow-hidden shadow-2xl transition-all hover:scale-[1.02] hover:shadow-orange-500/20 text-left border border-white/40 dark:border-white/10"
+                        className="group relative h-80 rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_50px_rgba(249,115,22,0.5)] border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 text-left"
                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-orange-400/80 to-red-500/80 backdrop-blur-md"></div>
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                        <i className="fas fa-users text-[10rem] text-white absolute -bottom-10 -right-10 opacity-10 -rotate-12 group-hover:scale-110 transition-transform duration-700"></i>
-                        
+                        <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-red-600 to-rose-900 opacity-90 group-hover:opacity-100 transition-opacity"></div>
+                         <img src="https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80" className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-40 grayscale group-hover:grayscale-0 transition-all duration-700" />
+
                         <div className="relative z-10 p-8 h-full flex flex-col justify-between">
-                            <div className="w-20 h-20 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4 border border-white/20 shadow-inner group-hover:bg-white/30 transition-colors">
-                                <i className="fas fa-key text-4xl"></i>
+                            <div className="flex justify-between items-start">
+                                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-inner group-hover:scale-110 transition-transform">
+                                    <i className="fas fa-users-cog text-3xl"></i>
+                                </div>
+                                <span className="bg-orange-500/20 border border-orange-400/30 text-orange-100 text-[10px] font-black uppercase px-3 py-1 rounded-full backdrop-blur-md">
+                                    Private
+                                </span>
                             </div>
                             <div>
-                                <h2 className="text-4xl font-black text-white mb-2 tracking-tight">Custom Room</h2>
-                                <p className="text-orange-100 font-bold text-lg opacity-90">Private lobby for friends.</p>
+                                <h2 className="text-4xl font-black text-white mb-2 tracking-tight italic uppercase">Custom Lobby</h2>
+                                <p className="text-orange-100 font-medium text-sm leading-relaxed max-w-xs">
+                                    Create a private room for friends or join with a code. You control the rules.
+                                </p>
                             </div>
                         </div>
                      </button>
@@ -392,96 +444,155 @@ const LobbyPage: React.FC = () => {
         </div>
       )}
 
+      {/* --- PHASE 2: CONFIGURE & QUEUE --- */}
       {viewMode !== 'selection' && (
-          <div className="p-4 max-w-4xl mx-auto w-full animate__animated animate__fadeInRight">
-              <div className="sticky top-0 z-30 bg-white/70 dark:bg-black/60 backdrop-blur-xl -mx-4 px-4 py-4 mb-6 border-b border-white/20 dark:border-white/5 shadow-sm flex items-center gap-4 transition-colors">
-                <button onClick={goBack} className="text-gray-700 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
-                    <i className="fas fa-arrow-left fa-lg"></i>
+          <div className="p-4 max-w-3xl mx-auto w-full animate__animated animate__fadeInRight">
+              {/* Floating Header */}
+              <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl -mx-4 px-6 py-4 mb-8 border-b border-gray-200 dark:border-white/5 shadow-sm flex items-center gap-4 transition-colors rounded-b-3xl">
+                <button onClick={goBack} className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-somali-blue dark:hover:text-white transition-colors">
+                    <i className="fas fa-chevron-left"></i>
                 </button>
-                <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-                    {viewMode === 'auto' ? 'Quick Match' : 'Custom Room'}
-                </h1>
+                <div>
+                    <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase italic">
+                        {viewMode === 'auto' ? 'Ranked Match' : 'Private Lobby'}
+                    </h1>
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 tracking-widest uppercase">
+                        {isSearching ? 'Status: Scanning...' : 'Status: Configuration'}
+                    </p>
+                </div>
               </div>
 
-              {viewMode === 'auto' ? (
+              {/* QUICK MATCH INTERFACE */}
+              {viewMode === 'auto' && (
                   <>
-                    {!isSearching && <SelectionUI />}
-                    <Card className="text-center py-12 border-2 border-dashed border-gray-400 dark:border-gray-700 bg-white/50 dark:bg-black/40">
-                        <div className="w-24 h-24 bg-blue-100/50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm border border-blue-200 dark:border-blue-800">
-                            <i className={`fas fa-search text-4xl text-somali-blue dark:text-blue-300 ${isSearching ? 'animate-bounce' : ''}`}></i>
+                    {!isSearching ? (
+                        <div className="bg-white/60 dark:bg-gray-900/40 backdrop-blur-md p-6 rounded-[2rem] border border-white/40 dark:border-white/5 shadow-xl">
+                             <SelectionUI />
+                             <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+                                <Button 
+                                    fullWidth 
+                                    onClick={handleAutoMatch} 
+                                    disabled={!selectedChapter} 
+                                    className="h-16 text-lg uppercase tracking-widest shadow-blue-500/30 hover:scale-[1.02]"
+                                >
+                                    <i className="fas fa-radar mr-2 animate-pulse"></i> Find Match
+                                </Button>
+                             </div>
                         </div>
-                        <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">Find Opponent</h2>
-                        <p className="text-gray-600 dark:text-gray-400 mb-8 font-medium">{matchStatus || "Select a topic and find a match!"}</p>
-                        
-                        {isSearching ? (
-                            <Button fullWidth onClick={cancelSearch} variant="danger" className="shadow-red-500/20 max-w-xs mx-auto">
-                                Cancel Search
-                            </Button>
-                        ) : (
-                            <Button fullWidth onClick={handleAutoMatch} disabled={!selectedChapter} className="shadow-blue-500/20 max-w-xs mx-auto">
-                                Find Match
-                            </Button>
-                        )}
-                    </Card>
-                  </>
-              ) : (
-                  <div className="space-y-6">
-                      <Card className="text-center">
-                        <h3 className="font-bold mb-4 text-gray-900 dark:text-white text-lg">Host a Game</h3>
-                        
-                        {!hostedCode && <div className="mb-4 text-left"><SelectionUI /></div>}
-
-                        {hostedCode ? (
-                            <div className="bg-yellow-50/80 dark:bg-yellow-900/20 p-8 rounded-3xl border-2 border-yellow-400 border-dashed mb-4 relative backdrop-blur-sm animate__animated animate__zoomIn">
-                                <p className="text-xs uppercase text-yellow-700 dark:text-yellow-300 font-bold tracking-widest mb-3">Room Code</p>
-                                <div className="flex items-center justify-center gap-3 mb-4">
-                                    <p className="text-6xl font-mono tracking-widest text-black dark:text-white font-black drop-shadow-sm">{hostedCode}</p>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 animate__animated animate__fadeIn">
+                            {/* RADAR ANIMATION */}
+                            <div className="relative w-64 h-64 mb-10">
+                                <div className="absolute inset-0 bg-somali-blue/20 rounded-full animate-ping"></div>
+                                <div className="absolute inset-4 bg-somali-blue/10 rounded-full animate-ping delay-150"></div>
+                                <div className="absolute inset-0 border-2 border-somali-blue/30 rounded-full flex items-center justify-center">
+                                    <div className="w-48 h-1 bg-gradient-to-r from-transparent via-somali-blue to-transparent absolute animate-spin"></div>
                                 </div>
-                                <div className="flex justify-center">
-                                    <button onClick={handleCopyCode} className="px-4 py-2 bg-yellow-400/20 hover:bg-yellow-400/40 rounded-xl text-sm flex items-center gap-2 text-yellow-800 dark:text-yellow-200 font-bold transition-colors">
-                                       <i className="fas fa-copy"></i> Copy Code
-                                    </button>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                     <Avatar src={profile?.avatar} seed={user?.uid} size="lg" className="border-4 border-white dark:border-gray-900 shadow-2xl relative z-10" />
                                 </div>
-                                <div className="mt-6 flex justify-center items-center gap-3 text-gray-500 dark:text-gray-400 animate-pulse">
-                                    <div className="w-2.5 h-2.5 bg-gray-400 rounded-full"></div>
-                                    <span className="text-sm font-bold">Waiting for player to join...</span>
+                                <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 text-center w-64">
+                                     <div className="font-black text-xl text-gray-900 dark:text-white uppercase tracking-widest animate-pulse">{matchStatus}</div>
+                                     <div className="text-xs font-bold text-gray-500 mt-1">EST. WAIT: 5s</div>
                                 </div>
                             </div>
-                        ) : (
-                            <Button fullWidth onClick={createRoom} disabled={!selectedChapter}>
-                                <i className="fas fa-plus-circle mr-2"></i> Generate Code
+
+                            <Button onClick={cancelSearch} variant="danger" className="px-8 rounded-full shadow-red-500/20 backdrop-blur-md">
+                                Cancel Operation
                             </Button>
-                        )}
-                      </Card>
-                      
-                      <div className="relative flex py-2 items-center">
-                            <div className="flex-grow border-t border-gray-400 dark:border-gray-600 opacity-50"></div>
-                            <span className="flex-shrink-0 mx-4 text-gray-500 dark:text-gray-500 font-bold bg-white/50 dark:bg-gray-800/50 px-3 py-1 rounded-full backdrop-blur-sm">OR</span>
-                            <div className="flex-grow border-t border-gray-400 dark:border-gray-600 opacity-50"></div>
+                        </div>
+                    )}
+                  </>
+              )}
+
+              {/* CUSTOM LOBBY INTERFACE */}
+              {viewMode === 'custom' && (
+                  <div className="space-y-6">
+                      {/* TABS */}
+                      <div className="flex p-1 bg-gray-200 dark:bg-gray-800 rounded-xl mb-4">
+                          <button className={`flex-1 py-2 rounded-lg text-sm font-black uppercase tracking-wider transition-all ${!roomCode ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500'}`} onClick={() => setRoomCode('')}>
+                             Host Game
+                          </button>
+                          <button className={`flex-1 py-2 rounded-lg text-sm font-black uppercase tracking-wider transition-all ${roomCode || roomCode === '' && hostedCode === null ? 'text-gray-500' : ''}`} onClick={() => {}}>
+                             Join Game
+                          </button>
                       </div>
 
-                      <Card className="text-center">
-                        <h3 className="font-bold mb-6 text-gray-900 dark:text-white text-lg">Join a Game</h3>
-                        <div className="relative mb-6">
-                            <Input 
-                                placeholder="0000" 
-                                className="text-center text-4xl tracking-[1.5rem] font-mono h-24 font-black text-gray-900 dark:text-white !bg-gray-100 dark:!bg-black/30 border-2 !border-gray-300 dark:!border-gray-700 focus:!border-somali-blue dark:focus:!border-blue-500 rounded-3xl"
-                                maxLength={4}
-                                value={roomCode}
-                                onChange={(e) => setRoomCode(e.target.value)}
-                            />
-                            <button 
-                                onClick={handlePasteCode} 
-                                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-500 hover:text-somali-blue shadow-md transition-colors" 
-                                title="Paste Code"
-                            >
-                                <i className="fas fa-paste text-xl"></i>
-                            </button>
-                        </div>
-                        <Button fullWidth variant="secondary" onClick={joinRoom} disabled={roomCode.length !== 4} className="py-4 text-lg">
-                            Join Room
-                        </Button>
-                      </Card>
+                      {/* HOST VIEW */}
+                      <div className="bg-white/60 dark:bg-gray-900/40 backdrop-blur-md p-6 rounded-[2rem] border border-white/40 dark:border-white/5 shadow-xl">
+                        {!hostedCode ? (
+                            <>
+                                <SelectionUI />
+                                <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+                                    <Button fullWidth onClick={createRoom} disabled={!selectedChapter} className="h-14 text-lg shadow-yellow-500/20" variant="secondary">
+                                        <i className="fas fa-satellite-dish mr-2"></i> Create Uplink
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-center py-8 animate__animated animate__zoomIn">
+                                <div className="inline-block p-6 rounded-3xl bg-yellow-400/10 border-2 border-yellow-400 border-dashed mb-6 relative">
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase px-3 py-1 rounded-full">
+                                        Secure Channel
+                                    </div>
+                                    <div className="text-7xl font-mono font-black text-gray-900 dark:text-white tracking-[0.2em] drop-shadow-sm">
+                                        {hostedCode}
+                                    </div>
+                                </div>
+                                
+                                <p className="text-gray-500 dark:text-gray-400 font-bold animate-pulse mb-8">
+                                    <i className="fas fa-circle text-[8px] text-green-500 mr-2 align-middle"></i>
+                                    Waiting for player connection...
+                                </p>
+
+                                <div className="flex gap-4 justify-center">
+                                    <Button onClick={handleCopyCode} variant="glass" className="border-gray-300 dark:border-gray-600">
+                                        Copy Code
+                                    </Button>
+                                    <Button onClick={() => {remove(ref(db, `rooms/${hostedCode}`)); setHostedCode(null);}} variant="danger">
+                                        Abort
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                      </div>
+                      
+                      {/* JOIN VIEW (Divider) */}
+                      {!hostedCode && (
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
+                            </div>
+                            <div className="relative flex justify-center">
+                                <span className="bg-gray-50 dark:bg-gray-900 px-4 text-sm font-black text-gray-400 uppercase">OR JOIN</span>
+                            </div>
+                          </div>
+                      )}
+
+                      {!hostedCode && (
+                          <div className="bg-white/60 dark:bg-gray-900/40 backdrop-blur-md p-6 rounded-[2rem] border border-white/40 dark:border-white/5 shadow-xl text-center">
+                                <h3 className="text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Enter Access Code</h3>
+                                <div className="relative max-w-xs mx-auto mb-6">
+                                    <Input 
+                                        placeholder="----" 
+                                        className="text-center text-4xl tracking-[1rem] font-mono h-20 font-black text-gray-900 dark:text-white !bg-gray-100 dark:!bg-black/30 border-2 !border-gray-300 dark:!border-gray-700 focus:!border-somali-blue rounded-2xl"
+                                        maxLength={4}
+                                        value={roomCode}
+                                        onChange={(e) => setRoomCode(e.target.value)}
+                                    />
+                                    <button 
+                                        onClick={handlePasteCode} 
+                                        className="absolute -right-12 top-1/2 -translate-y-1/2 w-10 h-10 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-500 hover:text-somali-blue shadow-md transition-colors border border-gray-200 dark:border-gray-700" 
+                                        title="Paste Code"
+                                    >
+                                        <i className="fas fa-paste"></i>
+                                    </button>
+                                </div>
+                                <Button fullWidth variant="primary" onClick={joinRoom} disabled={roomCode.length !== 4} className="h-14 text-lg">
+                                    Connect to Room
+                                </Button>
+                          </div>
+                      )}
                   </div>
               )}
           </div>
