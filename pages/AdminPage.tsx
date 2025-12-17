@@ -427,7 +427,7 @@ const AdminPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <div className="flex justify-between items-center mb-2">
-                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Subject</label>
+                        <label className="text-sm font-bold text-gray-900 dark:text-gray-200">Subject</label>
                         <div className="flex gap-2">
                              {selectedSubject && (
                                 <button onClick={handleDeleteSubject} className="text-xs text-red-500 font-bold hover:text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">Delete</button>
@@ -439,7 +439,7 @@ const AdminPage: React.FC = () => {
                         <select 
                             value={selectedSubject} 
                             onChange={(e) => setSelectedSubject(e.target.value)}
-                            className="w-full p-3 bg-gray-100 dark:bg-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-xl appearance-none font-bold focus:ring-2 focus:ring-somali-blue"
+                            className="w-full p-3 bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-xl appearance-none font-bold focus:ring-2 focus:ring-somali-blue"
                         >
                             <option value="">Select Subject</option>
                             {subjects.map(s => (
@@ -452,7 +452,7 @@ const AdminPage: React.FC = () => {
 
                 <div className={`${!selectedSubject ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="flex justify-between items-center mb-2">
-                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Chapter</label>
+                        <label className="text-sm font-bold text-gray-900 dark:text-gray-200">Chapter</label>
                         <div className="flex gap-2">
                              {selectedChapter && (
                                 <button onClick={handleDeleteChapter} className="text-xs text-red-500 font-bold hover:text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">Delete</button>
@@ -464,7 +464,7 @@ const AdminPage: React.FC = () => {
                         <select 
                             value={selectedChapter} 
                             onChange={(e) => setSelectedChapter(e.target.value)}
-                            className="w-full p-3 bg-gray-100 dark:bg-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-xl appearance-none font-bold focus:ring-2 focus:ring-somali-blue"
+                            className="w-full p-3 bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-xl appearance-none font-bold focus:ring-2 focus:ring-somali-blue"
                             disabled={!selectedSubject || chapters.length === 0}
                         >
                             {chapters.length === 0 && <option value="">No chapters created</option>}
@@ -503,7 +503,7 @@ const AdminPage: React.FC = () => {
             <form onSubmit={handleAddQuestion}>
                 <Input label="Question" value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Question text..." />
                 <div className="mb-4">
-                <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Options</label>
+                <label className="block text-sm font-bold mb-2 text-gray-900 dark:text-gray-200">Options</label>
                 <div className="space-y-3">
                     {options.map((opt, idx) => (
                         <div key={idx} className="flex items-center gap-2">
