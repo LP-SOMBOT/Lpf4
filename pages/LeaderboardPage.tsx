@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ref, get } from 'firebase/database';
+import { ref, onValue, off } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { UserProfile } from '../types';
@@ -13,45 +13,45 @@ const LeaderboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-        try {
-            // 1. Check Cache first
-            const cachedData = localStorage.getItem('leaderboard_cache');
-            if (cachedData) {
-                setPlayers(JSON.parse(cachedData));
-                setLoading(false); 
-            }
-
-            // 2. Fetch fresh data
-            const usersRef = ref(db, 'users');
-            const snapshot = await get(usersRef);
-            
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                const list: UserProfile[] = Object.keys(data).map(key => ({
-                    uid: key,
-                    name: data[key].name || 'Unknown',
-                    email: data[key].email || '',
-                    points: typeof data[key].points === 'number' ? data[key].points : 0,
-                    avatar: data[key].avatar || '',
-                }));
-                
-                // Sort descending
-                list.sort((a, b) => b.points - a.points);
-                
-                const top20 = list.slice(0, 20);
-                setPlayers(top20);
-                
-                // Update Cache
-                localStorage.setItem('leaderboard_cache', JSON.stringify(top20));
-            }
-        } catch (e) {
-            console.error("Leaderboard error", e);
-        } finally {
+     // 1. Initial Load from Cache
+     const cachedData = localStorage.getItem('leaderboard_cache');
+     if (cachedData) {
+         try {
+            setPlayers(JSON.parse(cachedData));
             setLoading(false);
-        }
-    };
-    fetchLeaderboard();
+         } catch(e) {}
+     }
+
+     // 2. Subscribe to Live Updates
+     const usersRef = ref(db, 'users');
+     const handleUpdate = (snapshot: any) => {
+         if (snapshot.exists()) {
+             const data = snapshot.val();
+             const list: UserProfile[] = Object.keys(data).map(key => ({
+                 uid: key,
+                 name: data[key].name || 'Unknown',
+                 email: data[key].email || '',
+                 points: typeof data[key].points === 'number' ? data[key].points : 0,
+                 avatar: data[key].avatar || '',
+             }));
+             
+             // Sort descending
+             list.sort((a, b) => b.points - a.points);
+             
+             const top20 = list.slice(0, 20);
+             setPlayers(top20);
+             
+             // Update Cache
+             localStorage.setItem('leaderboard_cache', JSON.stringify(top20));
+         }
+         setLoading(false);
+     };
+
+     onValue(usersRef, handleUpdate);
+
+     return () => {
+         off(usersRef, 'value', handleUpdate);
+     };
   }, []);
 
   const getRankStyle = (index: number) => {

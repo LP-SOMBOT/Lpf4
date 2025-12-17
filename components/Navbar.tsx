@@ -12,7 +12,7 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
 
   const navItems = [
     { path: '/', icon: 'fa-home', label: 'Home' },
-    { path: '/lobby', icon: 'fa-bolt', label: 'Battle' },
+    { path: '/lobby', icon: 'fa-gamepad', label: 'Battle' },
     { path: '/leaderboard', icon: 'fa-trophy', label: 'Rank' },
     { path: '/about', icon: 'fa-info-circle', label: 'About' },
     { path: '/profile', icon: 'fa-user', label: 'Me' },

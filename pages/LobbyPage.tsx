@@ -291,7 +291,7 @@ const LobbyPage: React.FC = () => {
                             snap-start shrink-0 px-6 py-4 rounded-2xl whitespace-nowrap text-sm font-black transition-all duration-300 border-2
                             ${selectedSubject === s.id 
                                 ? 'bg-somali-blue text-white border-somali-blue shadow-[0_0_20px_rgba(65,137,221,0.4)] scale-105' 
-                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}
+                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-500'}
                         `}
                       >
                           {s.name.toUpperCase()}
@@ -315,7 +315,7 @@ const LobbyPage: React.FC = () => {
                                 relative cursor-pointer p-4 rounded-xl border-2 transition-all duration-200 group overflow-hidden
                                 ${selectedChapter === c.id 
                                     ? 'bg-gradient-to-br from-somali-blue/20 to-purple-500/20 border-somali-blue shadow-lg' 
-                                    : 'bg-white dark:bg-gray-800 border-transparent hover:border-gray-300 dark:hover:border-gray-600'}
+                                    : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-500'}
                             `}
                         >
                             <div className="flex items-center justify-between relative z-10">
@@ -325,7 +325,7 @@ const LobbyPage: React.FC = () => {
                                 {selectedChapter === c.id && <i className="fas fa-check-circle text-somali-blue text-xl animate__animated animate__zoomIn"></i>}
                             </div>
                             {/* Decorative Elements */}
-                            <div className={`absolute -right-4 -bottom-4 text-6xl opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity ${selectedChapter === c.id ? 'text-somali-blue' : 'text-gray-500'}`}>
+                            <div className={`absolute -right-4 -bottom-4 text-6xl opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity ${selectedChapter === c.id ? 'text-somali-blue' : 'text-gray-500 dark:text-gray-600'}`}>
                                 <i className="fas fa-crosshairs"></i>
                             </div>
                             {/* Special visual for ALL chapters */}
@@ -399,7 +399,7 @@ const LobbyPage: React.FC = () => {
                         <div className="relative z-10 p-8 h-full flex flex-col justify-between">
                             <div className="flex justify-between items-start">
                                 <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-inner group-hover:scale-110 transition-transform">
-                                    <i className="fas fa-bolt text-3xl"></i>
+                                    <i className="fas fa-gamepad text-3xl"></i>
                                 </div>
                                 <span className="bg-blue-500/20 border border-blue-400/30 text-blue-100 text-[10px] font-black uppercase px-3 py-1 rounded-full backdrop-blur-md">
                                     Popular

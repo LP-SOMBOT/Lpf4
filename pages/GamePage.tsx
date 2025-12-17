@@ -11,9 +11,7 @@ import { showConfirm } from '../services/alert';
 import confetti from 'canvas-confetti';
 
 // Simple seeded random number generator (Linear Congruential Generator)
-// Ensures both players generate the same "random" sequence if they use the same seed (matchId)
 const createSeededRandom = (seedStr: string) => {
-    // Hash the string to get a starting number
     let hash = 0;
     for (let i = 0; i < seedStr.length; i++) {
         hash = ((hash << 5) - hash) + seedStr.charCodeAt(i);
@@ -76,7 +74,13 @@ const GamePage: React.FC = () => {
       if (questions.length === 0 && data.subject) {
           let loadedQ: Question[] = [];
           
-          // Check if "All Chapters" is selected (Format: ALL_subjectId)
+          // CACHING LOGIC
+          const cacheKey = `questions_cache_${data.subject}`;
+          const cachedData = localStorage.getItem(cacheKey);
+          
+          // Try loading from cache first (but we still need to fetch logic if it's dynamic ALL_)
+          // For simplicity, we just cache the raw array of questions for a specific chapter/subject
+          
           if (data.subject.startsWith('ALL_')) {
               const subjectId = data.subject.replace('ALL_', '');
               const chaptersRef = ref(db, `chapters/${subjectId}`);
@@ -84,10 +88,8 @@ const GamePage: React.FC = () => {
               
               if (chapSnap.exists()) {
                   const chapters = Object.values(chapSnap.val()) as Chapter[];
-                  // Fetch all questions for all chapters concurrently
                   const promises = chapters.map(c => get(ref(db, `questions/${c.id}`)));
                   const snapshots = await Promise.all(promises);
-                  
                   snapshots.forEach(snap => {
                       if (snap.exists()) {
                           loadedQ.push(...(Object.values(snap.val()) as Question[]));
@@ -95,38 +97,42 @@ const GamePage: React.FC = () => {
                   });
               }
           } else {
-              // Specific Chapter
-              const qRef = ref(db, `questions/${data.subject}`);
-              const qSnap = await get(qRef);
-              if (qSnap.exists()) {
-                  loadedQ = Object.values(qSnap.val()) as Question[];
+              // Check Cache for specific chapter
+              if (cachedData) {
+                  try {
+                    loadedQ = JSON.parse(cachedData);
+                  } catch(e) {}
+              }
+
+              // Fetch fresh if cache empty or to update
+              if (loadedQ.length === 0) {
+                const qRef = ref(db, `questions/${data.subject}`);
+                const qSnap = await get(qRef);
+                if (qSnap.exists()) {
+                    loadedQ = Object.values(qSnap.val()) as Question[];
+                    // Save to cache
+                    localStorage.setItem(cacheKey, JSON.stringify(loadedQ));
+                }
               }
           }
 
           if (loadedQ.length > 0) {
-              // Seeded Randomization for Consistency
-              const rng = createSeededRandom(data.matchId); // Use matchId as seed
-
-              // 1. Shuffle Questions
+              const rng = createSeededRandom(data.matchId);
               let shuffledQ = shuffleArraySeeded(loadedQ, rng);
               
-              // 2. Shuffle Options for each question
               shuffledQ = shuffledQ.map(q => {
                   const optionsWithIndex = q.options.map((opt, idx) => ({ 
                       text: opt, 
                       isCorrect: idx === q.answer 
                   }));
-                  
                   const shuffledOptions = shuffleArraySeeded(optionsWithIndex, rng);
-                  
                   return {
                       ...q,
                       options: shuffledOptions.map(o => o.text),
-                      answer: shuffledOptions.findIndex(o => o.isCorrect) // Recalculate answer index
+                      answer: shuffledOptions.findIndex(o => o.isCorrect) 
                   };
               });
 
-              // 3. Apply Limit (Randomized in Lobby or User defined)
               const limit = data.questionLimit || 10;
               if (shuffledQ.length > limit) {
                   shuffledQ = shuffledQ.slice(0, limit);
@@ -343,7 +349,7 @@ const GamePage: React.FC = () => {
       {/* Main Game Area */}
       <div className="flex-1 flex flex-col items-center justify-center p-4 pt-28 pb-10 w-full max-w-3xl mx-auto z-10">
         {isGameOver ? (
-           <div className="text-center w-full animate__animated animate__zoomIn bg-white/70 dark:bg-gray-800/60 backdrop-blur-2xl p-10 rounded-[2.5rem] border border-white/60 dark:border-white/10 shadow-2xl">
+           <div className="text-center w-full animate__animated animate__zoomIn bg-white/70 dark:bg-gray-800/60 backdrop-blur-3xl p-8 md:p-12 rounded-[3rem] border border-white/60 dark:border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]">
                {match.winner === 'disconnect' ? (
                    <>
                        <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -358,27 +364,44 @@ const GamePage: React.FC = () => {
                    </>
                ) : (
                    <>
-                       <h2 className="text-5xl font-black mb-4 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-orange-600 drop-shadow-sm">
-                           {match.winner === user!.uid ? 'VICTORY!' : match.winner === 'draw' ? 'DRAW!' : 'DEFEAT'}
-                       </h2>
-                       <div className="text-8xl mb-8 filter drop-shadow-xl animate__animated animate__tada animate__delay-1s">
-                           {match.winner === user!.uid ? '🏆' : match.winner === 'draw' ? '🤝' : '💀'}
+                       <div className="mb-8">
+                           <h2 className="text-5xl md:text-7xl font-black mb-4 tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600 drop-shadow-sm uppercase italic">
+                               {match.winner === user!.uid ? 'Victory!' : match.winner === 'draw' ? 'Draw!' : 'Defeat'}
+                           </h2>
                        </div>
-                       <div className="flex justify-center gap-8 mb-8">
-                           <div className="flex flex-col items-center">
-                               <Avatar src={profile?.avatar} seed={user!.uid} size="md" className="border-4 border-white dark:border-gray-700 shadow-lg" />
-                               <span className="font-bold mt-2 text-gray-900 dark:text-white text-lg">{match.scores[user!.uid]}</span>
+                       
+                       <div className="flex justify-center items-end gap-6 md:gap-12 mb-10 relative">
+                           {/* Player */}
+                           <div className="flex flex-col items-center relative z-10">
+                               <div className="relative">
+                                  <Avatar src={profile?.avatar} seed={user!.uid} size="lg" className="w-24 h-24 md:w-32 md:h-32 border-4 border-white dark:border-gray-700 shadow-2xl" />
+                                  {match.winner === user!.uid && <div className="absolute -top-6 -right-6 text-5xl animate-bounce drop-shadow-md">👑</div>}
+                               </div>
+                               <span className="font-black mt-4 text-gray-900 dark:text-white text-xl md:text-2xl">{profile?.name || 'You'}</span>
+                               <span className="font-mono text-3xl font-bold text-somali-blue dark:text-blue-400">{match.scores[user!.uid]}</span>
                            </div>
-                           <div className="flex flex-col items-center opacity-70">
-                               <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="md" className="border-4 border-white dark:border-gray-700 shadow-lg grayscale" />
-                               <span className="font-bold mt-2 text-gray-900 dark:text-white text-lg">{match.scores[opponentProfile.uid]}</span>
+
+                           <div className="text-4xl font-black text-gray-300 dark:text-gray-600 mb-12 italic">VS</div>
+
+                           {/* Opponent */}
+                           <div className="flex flex-col items-center opacity-90 relative z-10">
+                               <div className="relative">
+                                  <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="lg" className="w-24 h-24 md:w-32 md:h-32 border-4 border-white dark:border-gray-700 shadow-2xl" />
+                                  {match.winner === opponentProfile.uid && <div className="absolute -top-6 -right-6 text-5xl animate-bounce drop-shadow-md">👑</div>}
+                               </div>
+                               <span className="font-black mt-4 text-gray-900 dark:text-white text-xl md:text-2xl">{opponentProfile.name}</span>
+                               <span className="font-mono text-3xl font-bold text-gray-600 dark:text-gray-400">{match.scores[opponentProfile.uid]}</span>
                            </div>
                        </div>
                    </>
                )}
-               <Button onClick={handleLeave} variant="primary" className="px-8 py-4 text-lg shadow-blue-500/30 hover:scale-105">
-                   Return to Lobby
-               </Button>
+               
+               <button 
+                  onClick={handleLeave} 
+                  className="px-8 py-4 text-xl font-black uppercase tracking-widest bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl shadow-xl shadow-blue-500/30 transform hover:scale-105 active:scale-95 transition-all w-full max-w-xs mx-auto flex items-center justify-center gap-3"
+               >
+                   <i className="fas fa-home"></i> Return to Lobby
+               </button>
            </div>
         ) : (
             <>

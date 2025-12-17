@@ -105,7 +105,7 @@ const HomePage: React.FC = () => {
               <div className="absolute right-0 top-0 w-32 h-32 bg-yellow-400/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
               <div className="flex items-center gap-5 relative z-10">
                 <div className="w-16 h-16 rounded-2xl bg-yellow-100 dark:bg-yellow-500/20 flex items-center justify-center text-yellow-600 dark:text-yellow-400 shadow-sm">
-                  <i className="fas fa-bolt text-3xl group-hover:scale-110 transition-transform"></i>
+                  <i className="fas fa-gamepad text-3xl group-hover:scale-110 transition-transform"></i>
                 </div>
                 <div>
                   <h3 className="font-black text-2xl text-gray-900 dark:text-white">Battle Mode</h3>
@@ -124,7 +124,7 @@ const HomePage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-black text-2xl text-gray-900 dark:text-white">Solo Training</h3>
-                  <p className="text-gray-700 dark:text-gray-300 text-sm font-bold">Practice without pressure</p>
+                  <p className="text-gray-700 dark:text-gray-300 text-sm font-bold">Practice by subject and chapter at your own pace</p>
                 </div>
               </div>
             </Card>

@@ -92,25 +92,36 @@ const SoloPage: React.FC = () => {
       playSound('click');
 
       let loadedQ: Question[] = [];
+      const cacheKey = `questions_cache_${selectedChapterId}`;
 
-      if (selectedChapterId.startsWith('ALL_')) {
-          // Fetch from ALL chapters
-          // Note: In real production with huge data, this might be heavy, but fine for text-based quizzes
-          // Since we already fetched chapters to display dropdown, we can iterate them (excluding the ALL option itself)
-          const realChapters = chapters.filter(c => !c.id.startsWith('ALL_'));
-          const promises = realChapters.map(c => get(ref(db, `questions/${c.id}`)));
-          const snapshots = await Promise.all(promises);
-          snapshots.forEach(snap => {
-              if (snap.exists()) {
-                  loadedQ.push(...(Object.values(snap.val()) as Question[]));
+      // Check Cache First (skip for ALL_ mode for more randomness, or could cache that too but risky size)
+      if (!selectedChapterId.startsWith('ALL_')) {
+          const cached = localStorage.getItem(cacheKey);
+          if(cached) {
+              try { loadedQ = JSON.parse(cached); } catch(e){}
+          }
+      }
+
+      if (loadedQ.length === 0) {
+          if (selectedChapterId.startsWith('ALL_')) {
+              // Fetch from ALL chapters
+              const realChapters = chapters.filter(c => !c.id.startsWith('ALL_'));
+              const promises = realChapters.map(c => get(ref(db, `questions/${c.id}`)));
+              const snapshots = await Promise.all(promises);
+              snapshots.forEach(snap => {
+                  if (snap.exists()) {
+                      loadedQ.push(...(Object.values(snap.val()) as Question[]));
+                  }
+              });
+          } else {
+              // Fetch specific chapter
+              const qRef = ref(db, `questions/${selectedChapterId}`);
+              const snapshot = await get(qRef);
+              if (snapshot.exists()) {
+                  loadedQ = Object.values(snapshot.val()) as Question[];
+                  // Update Cache
+                  localStorage.setItem(cacheKey, JSON.stringify(loadedQ));
               }
-          });
-      } else {
-          // Fetch specific chapter
-          const qRef = ref(db, `questions/${selectedChapterId}`);
-          const snapshot = await get(qRef);
-          if (snapshot.exists()) {
-              loadedQ = Object.values(snapshot.val()) as Question[];
           }
       }
 
