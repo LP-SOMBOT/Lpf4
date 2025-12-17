@@ -63,7 +63,7 @@ const LobbyPage: React.FC = () => {
             // Add "All Chapters" option at the beginning
             const allOption: Chapter = {
                 id: `ALL_${selectedSubject}`,
-                name: 'All Operations (Random)',
+                name: 'All Chapters (Random)',
                 subjectId: selectedSubject
             };
             setChapters([allOption, ...list]);
@@ -77,7 +77,7 @@ const LobbyPage: React.FC = () => {
   const handleAutoMatch = async () => {
     if (!user) return;
     if (!selectedChapter) {
-        showToast("Select a battlefield first", "error");
+        showToast("Select a chapter first", "error");
         return;
     }
 
@@ -165,7 +165,7 @@ const LobbyPage: React.FC = () => {
   const createRoom = async () => {
     if(!user) return;
     if (!selectedChapter) {
-        showToast("Select a topic to host", "error");
+        showToast("Select a chapter to host", "error");
         return;
     }
 
@@ -280,7 +280,7 @@ const LobbyPage: React.FC = () => {
           {/* Subject Bar - Horizontal Scroll */}
           <div className="mb-6">
               <label className="flex items-center text-xs font-black text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1 tracking-[0.2em]">
-                  <i className="fas fa-book-open mr-2"></i> Select Discipline
+                  <i className="fas fa-book-open mr-2"></i> Select Subject
               </label>
               <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar snap-x">
                   {subjects.map(s => (
@@ -303,7 +303,7 @@ const LobbyPage: React.FC = () => {
           {/* Chapter Grid - Tactical Cards */}
           <div className="mb-6">
               <label className="flex items-center text-xs font-black text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1 tracking-[0.2em]">
-                 <i className="fas fa-map-marker-alt mr-2"></i> Select Operation
+                 <i className="fas fa-map-marker-alt mr-2"></i> Select Chapter
               </label>
               {chapters.length > 0 ? (
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -340,7 +340,7 @@ const LobbyPage: React.FC = () => {
               ) : (
                   <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-800/50">
                       <i className="fas fa-ban text-gray-400 text-3xl mb-2"></i>
-                      <span className="text-gray-500 font-bold text-sm">{selectedSubject ? "No Operations Available" : "Select a Discipline First"}</span>
+                      <span className="text-gray-500 font-bold text-sm">{selectedSubject ? "No Chapters Available" : "Select a Subject First"}</span>
                   </div>
               )}
           </div>
