@@ -79,7 +79,19 @@ const LeaderboardPage: React.FC = () => {
       </div>
 
       {loading && players.length === 0 ? (
-        <div className="flex justify-center mt-20"><i className="fas fa-spinner fa-spin text-somali-blue text-2xl"></i></div>
+        <div className="space-y-3">
+             {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex items-center p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 animate-pulse">
+                    <div className="w-8 h-6 bg-gray-200 dark:bg-gray-700 rounded mr-3"></div>
+                    <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full mr-4"></div>
+                    <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                    </div>
+                    <div className="w-12 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+             ))}
+        </div>
       ) : (
         <div className="space-y-3">
             {players.length === 0 && <div className="text-center text-gray-500 mt-10">No players found.</div>}

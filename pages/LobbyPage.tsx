@@ -196,7 +196,7 @@ const LobbyPage: React.FC = () => {
     }
   };
 
-  const handleCopyCode = () => { if (hostedCode) { navigator.clipboard.writeText(hostedCode); showToast("Code copied", "success"); } };
+  const handleCopyCode = () => { if (hostedCode) { navigator.clipboard.writeText(hostedCode); showToast("Code copied to clipboard", "success"); } };
   const handlePasteCode = async () => { try { const text = await navigator.clipboard.readText(); if (text) { setRoomCode(text.trim().slice(0, 4)); showToast("Code pasted", "success"); } } catch (e) { showToast("Clipboard access denied", "error"); } };
 
   useEffect(() => {
@@ -347,29 +347,32 @@ const LobbyPage: React.FC = () => {
                         </div>
                      </button>
 
-                     {/* CUSTOM CARD */}
+                     {/* CUSTOM CARD - Improved UI */}
                      <button 
                         onClick={() => { playSound('click'); setViewMode('custom'); }}
-                        className="group relative h-72 rounded-[2rem] overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(249,115,22,0.3)] border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-left"
+                        className="group relative h-72 rounded-[2rem] overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(245,158,11,0.3)] border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-left"
                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-gray-900 opacity-100 group-hover:opacity-90 transition-opacity"></div>
-                        <div className="absolute -right-10 -top-10 text-9xl text-orange-500/10 dark:text-orange-500/5 group-hover:scale-110 transition-transform duration-500">
-                             <i className="fas fa-users-cog"></i>
+                        {/* Richer background gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-gray-900 dark:via-gray-800 dark:to-orange-900/20 opacity-100 group-hover:opacity-90 transition-opacity"></div>
+                        
+                        {/* Decorative Icon Background */}
+                        <div className="absolute -right-10 -top-10 text-9xl text-amber-500/10 dark:text-amber-500/5 group-hover:scale-110 transition-transform duration-500 rotate-12">
+                             <i className="fas fa-shield-alt"></i>
                         </div>
 
                         <div className="relative z-10 p-8 h-full flex flex-col justify-between">
                             <div className="flex justify-between items-start">
-                                <div className="w-16 h-16 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/40 group-hover:scale-110 transition-transform">
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/40 group-hover:scale-110 transition-transform">
                                     <i className="fas fa-key text-3xl"></i>
                                 </div>
-                                <span className="bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-300 text-[10px] font-black uppercase px-3 py-1 rounded-full border border-orange-200 dark:border-orange-700">
-                                    Private
+                                <span className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 text-[10px] font-black uppercase px-3 py-1 rounded-full border border-amber-200 dark:border-amber-700 shadow-sm">
+                                    <i className="fas fa-lock text-[9px] mr-1"></i> Private
                                 </span>
                             </div>
                             <div>
                                 <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 tracking-tight italic uppercase">Custom Lobby</h2>
                                 <p className="text-gray-600 dark:text-gray-300 font-medium text-sm leading-relaxed max-w-xs">
-                                    Create a private room for friends or join via code. You control the rules.
+                                    Create a secure room for friends or join via access code. You control the rules.
                                 </p>
                             </div>
                         </div>
