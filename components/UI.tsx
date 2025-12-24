@@ -1,42 +1,46 @@
 import React from 'react';
 
-// --- Glassmorphism Base Classes ---
-// Increased opacity for better text contrast in light mode
-const GLASS_CARD_LIGHT = "bg-white/80 backdrop-blur-xl border border-white/60 shadow-xl";
-const GLASS_CARD_DARK = "dark:bg-gray-900/70 dark:backdrop-blur-xl dark:border-white/10";
-
-// Inputs need to be distinct
-const GLASS_INPUT_LIGHT = "bg-white/60 backdrop-blur-sm border border-gray-300 focus:bg-white/90";
-const GLASS_INPUT_DARK = "dark:bg-black/30 dark:border-white/10 dark:focus:bg-black/50";
+// --- Base Styles ---
+const CARD_BASE = "bg-white dark:bg-slate-800 rounded-3xl border-2 border-slate-200 dark:border-slate-700 shadow-xl transition-all";
+const INPUT_BASE = "bg-slate-100 dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 rounded-xl focus:border-game-primary dark:focus:border-game-primary focus:ring-4 focus:ring-game-primary/20 transition-all font-bold";
 
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'outline' | 'glass';
+  variant?: 'primary' | 'secondary' | 'danger' | 'outline' | 'glass' | 'ghost';
   fullWidth?: boolean;
   isLoading?: boolean;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export const Button: React.FC<ButtonProps> = ({ 
-  children, variant = 'primary', fullWidth, isLoading, className = '', ...props 
+  children, variant = 'primary', fullWidth, isLoading, size = 'md', className = '', ...props 
 }) => {
-  const baseStyle = "py-3.5 px-6 rounded-2xl font-bold transition-all duration-300 active:scale-95 flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed tracking-wide shadow-lg hover:shadow-xl";
+  const sizeClasses = {
+    sm: "py-2 px-4 text-xs",
+    md: "py-3 px-6 text-sm",
+    lg: "py-4 px-8 text-base md:text-lg"
+  };
+
+  const baseStyle = `btn-3d relative font-black uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 overflow-hidden ${sizeClasses[size]} ${fullWidth ? 'w-full' : ''}`;
   
   const variants = {
-    // Primary: Vibrant gradient blue
-    primary: "bg-gradient-to-r from-somali-blue to-blue-600 text-white hover:brightness-110 shadow-blue-500/30 border border-white/20",
-    // Secondary: Glassy yellow/gold
-    secondary: "bg-gradient-to-r from-yellow-400 to-amber-500 text-white hover:brightness-110 shadow-yellow-500/30 border border-white/20",
-    // Danger: Glassy red
-    danger: "bg-gradient-to-r from-red-500 to-rose-600 text-white hover:brightness-110 shadow-red-500/30 border border-white/20",
-    // Outline: Glass border
-    outline: "bg-transparent border-2 border-somali-blue text-somali-blue hover:bg-somali-blue/10 dark:border-blue-400 dark:text-blue-400",
-    // Glass: Pure glass button
-    glass: "bg-white/20 hover:bg-white/30 text-gray-900 dark:text-white border border-white/30 backdrop-blur-md font-extrabold"
+    // Primary: Indigo/Game Primary
+    primary: "bg-game-primary text-white border-b-4 border-game-primaryDark hover:brightness-110",
+    // Secondary: Amber/Gold
+    secondary: "bg-game-accent text-white border-b-4 border-game-accentDark hover:brightness-110",
+    // Danger: Red
+    danger: "bg-game-danger text-white border-b-4 border-game-dangerDark hover:brightness-110",
+    // Outline: Transparent with border
+    outline: "bg-transparent border-2 border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-none transform-none active:translate-y-0",
+    // Glass: Semi-transparent
+    glass: "bg-white/20 backdrop-blur-md border border-white/40 text-white shadow-lg",
+    // Ghost: No background
+    ghost: "bg-transparent text-slate-500 hover:text-game-primary shadow-none box-shadow-none"
   };
 
   return (
     <button 
-      className={`${baseStyle} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
+      className={`${baseStyle} ${variants[variant]} ${className}`}
       {...props}
     >
       {isLoading && <i className="fas fa-spinner fa-spin animate-spin"></i>}
@@ -53,18 +57,16 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input: React.FC<InputProps> = ({ label, icon, rightElement, className = '', ...props }) => (
-  <div className="mb-5">
-    {label && <label className="block text-gray-800 dark:text-gray-200 text-sm font-bold mb-2 ml-1 transition-colors">{label}</label>}
+  <div className="mb-4">
+    {label && <label className="block text-slate-600 dark:text-slate-300 text-xs font-black uppercase tracking-widest mb-2 ml-1">{label}</label>}
     <div className="relative group">
       {icon && (
-        // Changed text-gray-500 to text-gray-700 for sharp visibility in light mode
-        <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-700 dark:text-gray-300 group-focus-within:text-somali-blue dark:group-focus-within:text-blue-400 transition-colors z-10">
+        <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-game-primary transition-colors z-10">
           <i className={`fas ${icon} text-lg`}></i>
         </span>
       )}
       <input 
-        // Changed placeholder color to gray-600 and text to gray-900
-        className={`w-full ${GLASS_INPUT_LIGHT} ${GLASS_INPUT_DARK} text-gray-900 dark:text-white rounded-2xl py-4 ${icon ? 'pl-12' : 'pl-4'} ${rightElement ? 'pr-12' : 'pr-4'} focus:outline-none focus:ring-2 focus:ring-somali-blue/50 dark:focus:ring-blue-500/50 transition-all placeholder-gray-600 dark:placeholder-gray-400 font-bold ${className}`}
+        className={`w-full ${INPUT_BASE} py-4 ${icon ? 'pl-12' : 'pl-4'} ${rightElement ? 'pr-12' : 'pr-4'} text-slate-900 dark:text-white placeholder-slate-400 outline-none ${className}`}
         {...props}
       />
       {rightElement && (
@@ -78,7 +80,7 @@ export const Input: React.FC<InputProps> = ({ label, icon, rightElement, classNa
 
 // --- Card ---
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`${GLASS_CARD_LIGHT} ${GLASS_CARD_DARK} rounded-3xl p-6 transition-all duration-300 ${className}`}>
+  <div className={`${CARD_BASE} p-6 ${className}`}>
     {children}
   </div>
 );
@@ -91,7 +93,8 @@ export const Avatar: React.FC<{
   className?: string; 
   pulse?: boolean; 
   onClick?: () => void;
-}> = ({ src, seed, size = 'md', className = '', pulse = false, onClick }) => {
+  border?: string;
+}> = ({ src, seed, size = 'md', className = '', pulse = false, onClick, border }) => {
   const sizes = {
     sm: "w-10 h-10",
     md: "w-16 h-16",
@@ -105,7 +108,8 @@ export const Avatar: React.FC<{
   return (
     <div 
       onClick={onClick}
-      className={`relative rounded-full bg-white/50 dark:bg-gray-700/50 backdrop-blur-sm border-2 border-white dark:border-white/10 overflow-hidden shadow-inner ${sizes[size]} ${className} ${pulse ? 'animate-pulse ring-4 ring-red-400' : ''}`}
+      className={`relative rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden ${sizes[size]} ${className} ${pulse ? 'animate-pulse ring-4 ring-game-danger' : ''} shadow-lg`}
+      style={{ border: border || '3px solid white' }}
     >
       <img src={imageUrl} alt="Avatar" className="w-full h-full object-cover" />
     </div>
@@ -116,16 +120,14 @@ export const Avatar: React.FC<{
 export const Modal: React.FC<{ isOpen: boolean; title?: string; children: React.ReactNode; onClose?: () => void }> = ({ isOpen, title, children, onClose }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 dark:bg-black/70 backdrop-blur-md animate__animated animate__fadeIn">
-      {/* Click outside to close */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate__animated animate__fadeIn">
       <div className="absolute inset-0" onClick={onClose}></div>
-      
-      <div className={`relative w-full max-w-sm overflow-hidden flex flex-col animate__animated animate__zoomIn max-h-[90vh] bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-white/50 dark:border-white/10 shadow-2xl rounded-3xl`}>
+      <div className={`relative w-full max-w-md bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl animate__animated animate__zoomIn border-4 border-white dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]`}>
         {title && (
-            <div className="bg-white/50 dark:bg-black/20 p-5 border-b border-gray-200 dark:border-white/10 text-center font-extrabold text-xl flex justify-between items-center text-gray-900 dark:text-white backdrop-blur-md">
-                <span>{title}</span>
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-5 border-b-2 border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                <span className="font-black text-xl text-slate-800 dark:text-white uppercase tracking-tight">{title}</span>
                 {onClose && (
-                    <button onClick={onClose} className="w-8 h-8 rounded-full bg-black/5 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center text-gray-600 dark:text-gray-300">
+                    <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center text-slate-500 dark:text-slate-400">
                         <i className="fas fa-times"></i>
                     </button>
                 )}

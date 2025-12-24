@@ -4,8 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="https://files.catbox.moe/qn40s6.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>LP-F4 | Somali Student Quiz Battle</title>
+    <title>LP-F4 | Battle Arena</title>
     
+    <!-- Google Fonts: Poppins for Game UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -14,46 +19,33 @@
         theme: {
           extend: {
             colors: {
-              glass: {
-                100: 'rgba(255, 255, 255, 0.1)',
-                200: 'rgba(255, 255, 255, 0.2)',
-                300: 'rgba(255, 255, 255, 0.3)',
-                400: 'rgba(255, 255, 255, 0.4)',
-                border: 'rgba(255, 255, 255, 0.2)',
-              },
-              somali: {
-                blue: '#4189DD',
-                white: '#FFFFFF',
-                dark: '#0f172a', 
+              game: {
+                primary: '#6366f1', // Indigo 500
+                primaryDark: '#4338ca', // Indigo 700
+                accent: '#f59e0b', // Amber 500
+                accentDark: '#b45309', // Amber 700
+                success: '#22c55e', // Green 500
+                successDark: '#15803d', // Green 700
+                danger: '#ef4444', // Red 500
+                dangerDark: '#b91c1c', // Red 700
+                surface: '#ffffff',
+                surfaceDark: '#1e293b', // Slate 800
+                bg: '#f8fafc', // Slate 50
+                bgDark: '#0f172a', // Slate 900
               }
             },
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['Poppins', 'sans-serif'],
             },
             animation: {
-              blob: "blob 20s infinite",
-              'fade-in': 'fadeIn 0.5s ease-out',
+              'bounce-slow': 'bounce 3s infinite',
+              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
               'float': 'float 6s ease-in-out infinite',
-              'shimmer': 'shimmer 2s linear infinite',
             },
             keyframes: {
-              blob: {
-                "0%": { transform: "translate(0px, 0px) scale(1)" },
-                "33%": { transform: "translate(30px, -50px) scale(1.1)" },
-                "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
-                "100%": { transform: "translate(0px, 0px) scale(1)" }
-              },
-              fadeIn: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              },
               float: {
                 '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(-20px)' },
-              },
-              shimmer: {
-                '0%': { backgroundPosition: '-1000px 0' },
-                '100%': { backgroundPosition: '1000px 0' }
+                '50%': { transform: 'translateY(-10px)' },
               }
             }
           }
@@ -74,176 +66,58 @@
       :root {
         color-scheme: light dark;
       }
-      html {
-        scroll-behavior: smooth;
-      }
       body {
-        @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300;
-        -webkit-tap-highlight-color: transparent;
-        font-feature-settings: "cv11", "ss01";
+        font-family: 'Poppins', sans-serif;
+        background-color: #f8fafc;
+        /* Subtle Grid Pattern */
+        background-image: radial-gradient(#e2e8f0 1.5px, transparent 1.5px);
+        background-size: 24px 24px;
+      }
+      .dark body {
+        background-color: #0f172a;
+        background-image: radial-gradient(#334155 1.5px, transparent 1.5px);
       }
       
-      /* Hide scrollbar for cleaner mobile UI */
+      /* Disable scrollbar for immersive feel */
       ::-webkit-scrollbar {
         width: 0px;
         background: transparent;
       }
       
-      /* Glassmorphism Global Utilities */
-      .glass-panel {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.5);
+      /* Game UI Utilities */
+      .game-panel {
+        background: rgba(255, 255, 255, 0.9);
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border-radius: 1.5rem;
       }
-      
-      .dark .glass-panel {
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+      .dark .game-panel {
+        background: rgba(30, 41, 59, 0.9);
+        border-color: #334155;
       }
 
-      /* --- Custom SweetAlert2 Glass Theme --- */
-      
-      /* Popup Body */
+      /* 3D Button Utility */
+      .btn-3d {
+        transition: all 0.1s;
+        box-shadow: 0px 4px 0px 0px rgba(0,0,0,0.2);
+      }
+      .btn-3d:active:not(:disabled) {
+        transform: translateY(4px);
+        box-shadow: 0px 0px 0px 0px rgba(0,0,0,0.2);
+      }
+      .btn-3d:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: translateY(2px);
+      }
+
+      /* SweetAlert Overrides for Game Look */
       .glass-swal-popup {
-        background: rgba(255, 255, 255, 0.85) !important;
-        backdrop-filter: blur(24px) !important;
-        -webkit-backdrop-filter: blur(24px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.5) !important;
         border-radius: 2rem !important;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
         padding: 2rem !important;
-        width: 90% !important;
-        max-width: 400px !important;
+        font-family: 'Poppins', sans-serif !important;
       }
-      
-      .dark .glass-swal-popup {
-        background: rgba(15, 23, 42, 0.85) !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
-      }
-
-      /* Title */
-      .glass-swal-title {
-        color: #111827 !important;
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 900 !important;
-        font-size: 1.5rem !important;
-        margin-bottom: 0.5rem !important;
-      }
-      .dark .glass-swal-title {
-        color: #f3f4f6 !important;
-      }
-
-      /* Content */
-      .glass-swal-content {
-        color: #4b5563 !important;
-        font-weight: 500 !important;
-        font-size: 1rem !important;
-      }
-      .dark .glass-swal-content {
-        color: #9ca3af !important;
-      }
-
-      /* Buttons */
-      .glass-swal-btn-confirm {
-        background: linear-gradient(to right, #4189DD, #2563EB) !important;
-        color: white !important;
-        font-weight: 800 !important;
-        padding: 12px 24px !important;
-        border-radius: 1rem !important;
-        border: none !important;
-        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3) !important;
-        transition: transform 0.2s !important;
-        margin: 0 5px !important;
-      }
-      .glass-swal-btn-confirm:active {
-        transform: scale(0.95) !important;
-      }
-      
-      .glass-swal-btn-cancel {
-        background: rgba(107, 114, 128, 0.1) !important;
-        color: #374151 !important;
-        font-weight: 700 !important;
-        padding: 12px 24px !important;
-        border-radius: 1rem !important;
-        border: none !important;
-        transition: background 0.2s !important;
-        margin: 0 5px !important;
-      }
-      .dark .glass-swal-btn-cancel {
-        background: rgba(255, 255, 255, 0.05) !important;
-        color: #d1d5db !important;
-      }
-      .glass-swal-btn-cancel:hover {
-        background: rgba(107, 114, 128, 0.2) !important;
-      }
-
-      /* Input */
-      .glass-swal-input {
-        background: rgba(0, 0, 0, 0.05) !important;
-        border: 1px solid rgba(0, 0, 0, 0.1) !important;
-        border-radius: 1rem !important;
-        color: #111827 !important;
-        font-weight: 700 !important;
-        padding: 12px !important;
-        text-align: center !important;
-      }
-      .glass-swal-input:focus {
-        box-shadow: 0 0 0 2px #4189DD !important;
-        outline: none !important;
-      }
-      .dark .glass-swal-input {
-        background: rgba(255, 255, 255, 0.05) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        color: white !important;
-      }
-      
-      /* --- CUSTOM ICONS OVERRIDE --- */
-      /* Remove standard SweetAlert circle borders when using custom HTML icons */
-      .glass-swal-icon-custom {
-        border: none !important;
-        background: transparent !important;
-        box-shadow: none !important;
-        margin-bottom: 1rem !important;
-      }
-      
-      .glass-swal-icon-toast {
-         border: none !important;
-         background: transparent !important;
-         box-shadow: none !important;
-         margin: 0 10px 0 0 !important;
-      }
-
-      /* Toast Specific */
-      .glass-swal-toast {
-        border-radius: 50px !important;
-        background: rgba(255, 255, 255, 0.95) !important; /* Higher opacity for light mode */
-        backdrop-filter: blur(16px) !important;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
-        padding: 10px 20px !important;
-        margin-top: 10px !important;
-        border: 1px solid rgba(0, 0, 0, 0.05) !important;
-      }
-      .dark .glass-swal-toast {
-        background: rgba(30, 41, 59, 0.95) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-      }
-      
-      /* UPDATED: Force dark text for toast title in light mode */
-      .glass-swal-toast-title {
-        font-size: 0.95rem !important;
-        margin: 0 !important;
-        color: #1f2937 !important; /* Gray-800 */
-        font-weight: 700 !important;
-      }
-      .dark .glass-swal-toast-title {
-        color: #ffffff !important;
-      }
-
-      .glass-swal-timer {
-        background: #4189DD !important;
-      }
-
     </style>
   <script type="importmap">
 {

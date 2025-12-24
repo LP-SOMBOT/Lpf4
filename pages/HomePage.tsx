@@ -11,11 +11,9 @@ const HomePage: React.FC = () => {
   const { profile, user } = useContext(UserContext);
   const navigate = useNavigate();
 
-  // Avatar Selection State
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [avatarSeeds, setAvatarSeeds] = useState<string[]>([]);
 
-  // Check if new user needs to select avatar
   useEffect(() => {
     const isNew = sessionStorage.getItem('showAvatarSelection');
     if (isNew) {
@@ -47,123 +45,120 @@ const HomePage: React.FC = () => {
     navigate(path);
   };
 
-  // Level Logic: 10 points per level
   const level = Math.floor((profile?.points || 0) / 10) + 1;
+  const nextLevel = (level * 10);
+  const progress = ((profile?.points || 0) % 10) / 10 * 100;
 
   return (
-    <div className="min-h-full flex flex-col pb-24 md:pb-6">
-      {/* Glass Header */}
-      <header className="p-4 relative z-10">
-        <div className="max-w-4xl mx-auto bg-white/70 dark:bg-black/40 backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-3xl p-6 shadow-xl transition-colors">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h1 className="text-gray-900 dark:text-white text-3xl font-black tracking-tight drop-shadow-sm">Hello, {profile?.name}!</h1>
-                    <p className="text-gray-700 dark:text-blue-100 text-sm font-bold opacity-90">Ready to conquer knowledge?</p>
-                </div>
-                <div onClick={() => handleNav('/profile')} className="relative group cursor-pointer">
-                    <div className="absolute inset-0 bg-white/20 rounded-full blur-md group-hover:blur-lg transition-all"></div>
-                    <Avatar src={profile?.avatar} seed={profile?.uid || 'guest'} size="md" className="relative border-2 border-white/50 shadow-lg group-hover:scale-105 transition-transform" />
-                </div>
-            </div>
-            
-            {/* Stats Summary */}
-            <div className="flex gap-4">
-                <div className="bg-white/60 dark:bg-white/10 p-4 rounded-2xl flex-1 text-gray-900 dark:text-white backdrop-blur-md border border-white/40 dark:border-white/10 shadow-sm">
-                    <div className="text-[10px] opacity-80 font-bold uppercase tracking-widest mb-1 text-gray-700 dark:text-gray-300">Level</div>
-                    <div className="text-4xl font-black text-gray-900 dark:text-white">{level}</div>
-                </div>
-                <div className="bg-white/60 dark:bg-white/10 p-4 rounded-2xl flex-1 text-gray-900 dark:text-white backdrop-blur-md border border-white/40 dark:border-white/10 shadow-sm">
-                    <div className="text-[10px] opacity-80 font-bold uppercase tracking-widest mb-1 text-gray-700 dark:text-gray-300">Points</div>
-                    <div className="text-4xl font-black text-gray-900 dark:text-white">{profile?.points || 0}</div>
-                </div>
-            </div>
-        </div>
-      </header>
-
-      {/* Main Menu Grid */}
-      <main className="flex-1 p-4 space-y-4 max-w-4xl mx-auto w-full">
-        
-        {/* Admin Button */}
-        {profile?.role === 'admin' && (
-          <div onClick={() => handleNav('/admin')} className="cursor-pointer group">
-              <Card className="!bg-gray-900/80 text-white transform group-hover:scale-[1.02] transition-transform border-l-4 border-gray-500">
-                 <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-gray-300 group-hover:rotate-90 transition-transform duration-500">
-                      <i className="fas fa-cogs text-2xl"></i>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-xl text-white">Admin Panel</h3>
-                      <p className="text-gray-300 text-sm font-medium">Manage Content</p>
-                    </div>
+    <div className="min-h-full flex flex-col pb-28 md:pb-6 max-w-5xl mx-auto w-full px-4 pt-6">
+      {/* Header Stat Bar */}
+      <div className="flex justify-between items-center mb-8">
+         <div className="flex items-center gap-4">
+             <div onClick={() => handleNav('/profile')} className="relative cursor-pointer group">
+                 <div className="absolute inset-0 bg-white rounded-full blur opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                 <Avatar src={profile?.avatar} seed={profile?.uid} size="md" className="border-4 border-white shadow-lg" />
+                 <div className="absolute -bottom-1 -right-1 bg-game-primary text-white text-[10px] font-black px-2 py-0.5 rounded-full border-2 border-white">
+                    LVL {level}
                  </div>
-              </Card>
+             </div>
+             <div>
+                 <h1 className="text-2xl font-black text-slate-800 dark:text-white leading-none mb-1">
+                     Hi, {profile?.name}
+                 </h1>
+                 <div className="w-32 h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden border border-slate-300 dark:border-slate-600 relative">
+                     <div className="h-full bg-game-success rounded-full" style={{ width: `${progress}%` }}></div>
+                     <span className="absolute inset-0 text-[8px] font-bold flex items-center justify-center text-slate-600 dark:text-slate-300">
+                        {profile?.points} / {nextLevel} PTS
+                     </span>
+                 </div>
+             </div>
+         </div>
+         
+         {/* Currency / Admin Icon */}
+         <div className="flex gap-2">
+            {profile?.role === 'admin' && (
+                <button onClick={() => handleNav('/admin')} className="w-12 h-12 rounded-2xl bg-slate-800 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
+                    <i className="fas fa-cogs"></i>
+                </button>
+            )}
+            <div className="px-4 py-2 rounded-2xl bg-white dark:bg-slate-800 shadow-sm border-2 border-slate-100 dark:border-slate-700 flex items-center gap-2">
+                <i className="fas fa-star text-game-accent text-xl animate-pulse-fast"></i>
+                <span className="font-black text-lg text-slate-800 dark:text-white">{profile?.points}</span>
+            </div>
+         </div>
+      </div>
+
+      {/* Hero / Featured Mode */}
+      <div className="mb-6 cursor-pointer group" onClick={() => handleNav('/lobby')}>
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-r from-game-primary to-purple-600 p-8 shadow-2xl shadow-indigo-500/40 transition-transform group-hover:scale-[1.02]">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+              <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="text-center md:text-left">
+                      <span className="bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider mb-3 inline-block backdrop-blur-sm border border-white/20">
+                          Recommended
+                      </span>
+                      <h2 className="text-4xl md:text-5xl font-black text-white mb-2 italic tracking-tight drop-shadow-md">
+                          BATTLE ARENA
+                      </h2>
+                      <p className="text-indigo-100 font-bold max-w-md">
+                          Challenge real opponents in real-time. Climb the ranks and prove your knowledge!
+                      </p>
+                  </div>
+                  <div className="w-24 h-24 md:w-32 md:h-32 bg-white rounded-full flex items-center justify-center shadow-2xl animate-bounce-slow text-game-primary text-5xl md:text-6xl border-4 border-indigo-200">
+                      <i className="fas fa-swords"></i>
+                  </div>
+              </div>
           </div>
-        )}
+      </div>
 
-        <div onClick={() => handleNav('/lobby')} className="cursor-pointer group">
-            <Card className="group-hover:scale-[1.02] transition-transform border-l-4 border-yellow-400 overflow-hidden relative">
-              <div className="absolute right-0 top-0 w-32 h-32 bg-yellow-400/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
-              <div className="flex items-center gap-5 relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-yellow-100 dark:bg-yellow-500/20 flex items-center justify-center text-yellow-600 dark:text-yellow-400 shadow-sm">
-                  <i className="fas fa-gamepad text-3xl group-hover:scale-110 transition-transform"></i>
-                </div>
-                <div>
-                  <h3 className="font-black text-2xl text-gray-900 dark:text-white">Battle Mode</h3>
-                  <p className="text-gray-700 dark:text-gray-300 text-sm font-bold">Play against real students</p>
-                </div>
+      {/* Secondary Modes Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-6">
+          <div onClick={() => handleNav('/solo')} className="cursor-pointer group">
+              <div className="h-48 rounded-[2rem] bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-6 flex flex-col justify-between shadow-xl transition-all group-hover:-translate-y-1 relative overflow-hidden">
+                   <div className="absolute top-0 right-0 p-4 opacity-10">
+                       <i className="fas fa-brain text-8xl transform rotate-12"></i>
+                   </div>
+                   <div className="w-14 h-14 rounded-2xl bg-green-100 dark:bg-green-900/30 text-green-500 flex items-center justify-center text-2xl mb-2">
+                       <i className="fas fa-dumbbell"></i>
+                   </div>
+                   <div>
+                       <h3 className="text-xl font-black text-slate-800 dark:text-white">Training</h3>
+                       <p className="text-xs font-bold text-slate-400">Solo Practice</p>
+                   </div>
               </div>
-            </Card>
-        </div>
-
-        <div onClick={() => handleNav('/solo')} className="cursor-pointer group">
-            <Card className="group-hover:scale-[1.02] transition-transform border-l-4 border-green-400 overflow-hidden relative">
-              <div className="absolute right-0 top-0 w-32 h-32 bg-green-400/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
-              <div className="flex items-center gap-5 relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-green-100 dark:bg-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 shadow-sm">
-                  <i className="fas fa-brain text-3xl group-hover:scale-110 transition-transform"></i>
-                </div>
-                <div>
-                  <h3 className="font-black text-2xl text-gray-900 dark:text-white">Solo Training</h3>
-                  <p className="text-gray-700 dark:text-gray-300 text-sm font-bold">Practice by subject and chapter at your own pace</p>
-                </div>
-              </div>
-            </Card>
-        </div>
-
-        <div onClick={() => handleNav('/leaderboard')} className="cursor-pointer group">
-            <Card className="group-hover:scale-[1.02] transition-transform border-l-4 border-purple-400 overflow-hidden relative">
-               <div className="absolute right-0 top-0 w-32 h-32 bg-purple-400/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
-               <div className="flex items-center gap-5 relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-sm">
-                  <i className="fas fa-trophy text-3xl group-hover:scale-110 transition-transform"></i>
-                </div>
-                <div>
-                  <h3 className="font-black text-2xl text-gray-900 dark:text-white">Leaderboard</h3>
-                  <p className="text-gray-700 dark:text-gray-300 text-sm font-bold">See top players</p>
-                </div>
-              </div>
-            </Card>
-        </div>
-      </main>
-
-      {/* Avatar Selection Modal for New Users */}
-      <Modal isOpen={showAvatarModal} title="Choose Your Look" onClose={() => setShowAvatarModal(false)}>
-          <div className="text-center mb-6 text-gray-800 dark:text-gray-200 text-sm font-medium">
-              Welcome! Pick an avatar to get started. You can change this later in your profile.
           </div>
+
+          <div onClick={() => handleNav('/leaderboard')} className="cursor-pointer group">
+              <div className="h-48 rounded-[2rem] bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-6 flex flex-col justify-between shadow-xl transition-all group-hover:-translate-y-1 relative overflow-hidden">
+                   <div className="absolute top-0 right-0 p-4 opacity-10">
+                       <i className="fas fa-trophy text-8xl transform -rotate-12"></i>
+                   </div>
+                   <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-500 flex items-center justify-center text-2xl mb-2">
+                       <i className="fas fa-crown"></i>
+                   </div>
+                   <div>
+                       <h3 className="text-xl font-black text-slate-800 dark:text-white">Rankings</h3>
+                       <p className="text-xs font-bold text-slate-400">Global Leaderboard</p>
+                   </div>
+              </div>
+          </div>
+      </div>
+
+      {/* Avatar Modal */}
+      <Modal isOpen={showAvatarModal} title="Choose Avatar" onClose={() => setShowAvatarModal(false)}>
           <div className="grid grid-cols-3 gap-4">
               {avatarSeeds.map((seed, idx) => (
                   <div 
                     key={idx} 
                     onClick={() => handleAvatarSelect(seed)}
-                    className="aspect-square rounded-full overflow-hidden border-2 border-transparent hover:border-somali-blue cursor-pointer transition-all hover:scale-110 bg-white dark:bg-white/10 shadow-sm"
+                    className="aspect-square rounded-full overflow-hidden border-4 border-transparent hover:border-game-primary cursor-pointer transition-all hover:scale-105 bg-slate-100"
                   >
                       <img src={generateAvatarUrl(seed)} alt="avatar" className="w-full h-full object-cover" />
                   </div>
               ))}
           </div>
           <Button fullWidth variant="secondary" className="mt-8" onClick={refreshAvatars}>
-             <i className="fas fa-sync mr-2"></i> Show More Options
+             <i className="fas fa-sync mr-2"></i> Randomize
           </Button>
       </Modal>
     </div>
