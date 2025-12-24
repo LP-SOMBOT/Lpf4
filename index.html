@@ -113,10 +113,86 @@
       }
 
       /* SweetAlert Overrides for Game Look */
+      div:where(.swal2-container) {
+        z-index: 9999 !important;
+      }
       .glass-swal-popup {
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
         border-radius: 2rem !important;
         padding: 2rem !important;
         font-family: 'Poppins', sans-serif !important;
+        color: #1e293b !important;
+      }
+      .dark .glass-swal-popup {
+        background: rgba(30, 41, 59, 0.95) !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+        color: #f8fafc !important;
+      }
+      
+      .glass-swal-title {
+        color: inherit !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        font-style: italic !important;
+      }
+      .glass-swal-content {
+        color: inherit !important;
+        font-weight: 500 !important;
+      }
+
+      /* Alert Buttons */
+      .glass-swal-btn-confirm {
+        background-color: #6366f1 !important;
+        color: white !important;
+        border-bottom: 4px solid #4338ca !important;
+        border-radius: 1rem !important;
+        padding: 0.75rem 2rem !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        margin: 0.5rem !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        transition: transform 0.1s !important;
+      }
+      .glass-swal-btn-confirm:active {
+        transform: translateY(2px) !important;
+        border-bottom-width: 0px !important;
+        margin-top: 0.75rem !important; /* Visual compensation */
+      }
+
+      .glass-swal-btn-cancel {
+        background-color: #ef4444 !important;
+        color: white !important;
+        border-bottom: 4px solid #b91c1c !important;
+        border-radius: 1rem !important;
+        padding: 0.75rem 2rem !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        margin: 0.5rem !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+      }
+
+      .glass-swal-input {
+        background-color: #f1f5f9 !important;
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 1rem !important;
+        color: #0f172a !important;
+        font-weight: bold !important;
+        padding: 1rem !important;
+        text-align: center !important;
+        font-size: 1.25rem !important;
+      }
+      .glass-swal-input:focus {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+      }
+      .dark .glass-swal-input {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #ffffff !important;
       }
     </style>
   <script type="importmap">

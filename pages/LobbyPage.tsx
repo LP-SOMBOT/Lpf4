@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { Button, Input, Avatar, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
-import { showToast } from '../services/alert';
+import { showToast, showAlert } from '../services/alert';
 import { MATCH_TIMEOUT_MS } from '../constants';
 import { Subject, Chapter } from '../types';
 
@@ -95,6 +95,8 @@ const LobbyPage: React.FC = () => {
     setHostedCode(code);
     await set(ref(db, `rooms/${code}`), { host: user.uid, sid: selectedSubject, lid: selectedChapter, questionLimit: quizLimit, createdAt: Date.now() });
     onValue(ref(db, `rooms/${code}`), (snap) => { if (!snap.exists()) setHostedCode(null); });
+    playSound('click');
+    showToast("Room Created!", "success");
   };
 
   const joinRoom = async () => {
@@ -114,6 +116,14 @@ const LobbyPage: React.FC = () => {
       await set(ref(db, `users/${rData.host}/activeMatch`), matchId);
       await set(ref(db, `users/${user.uid}/activeMatch`), matchId);
     } else showToast("Invalid Code", "error");
+  };
+
+  const copyRoomCode = () => {
+      if (hostedCode) {
+          navigator.clipboard.writeText(hostedCode);
+          playSound('click');
+          showToast('Code Copied!', 'success');
+      }
   };
 
   useEffect(() => () => {
@@ -210,7 +220,7 @@ const LobbyPage: React.FC = () => {
                                             value={roomCode} 
                                             onChange={e => setRoomCode(e.target.value)} 
                                             placeholder="ENTER CODE" 
-                                            className="w-full md:flex-1 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-center font-black uppercase text-xl dark:text-white" 
+                                            className="w-full md:flex-1 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-center font-black uppercase text-xl text-slate-900 dark:text-white" 
                                             maxLength={4} 
                                         />
                                         <Button fullWidth onClick={joinRoom} disabled={roomCode.length !== 4} className="md:w-auto">JOIN</Button>
@@ -218,7 +228,7 @@ const LobbyPage: React.FC = () => {
                                     <div className="border-t border-slate-200 dark:border-slate-700 my-4 flex items-center justify-center">
                                         <span className="bg-slate-50 dark:bg-slate-900 px-3 text-xs font-bold text-slate-400">OR</span>
                                     </div>
-                                    <Button fullWidth variant="secondary" onClick={createRoom} disabled={!selectedChapter}>CREATE HOST</Button>
+                                    <Button fullWidth variant="secondary" onClick={createRoom} disabled={!selectedChapter}>CREATE ROOM</Button>
                                 </Card>
                             </div>
                         )}
@@ -227,11 +237,28 @@ const LobbyPage: React.FC = () => {
               )}
 
               {hostedCode && (
-                  <div className="text-center py-10">
-                      <div className="text-6xl font-black text-game-accent mb-4 tracking-widest">{hostedCode}</div>
-                      <p className="text-slate-500 font-bold mb-8 animate-pulse">Waiting for player...</p>
-                      <Button variant="danger" onClick={() => {remove(ref(db, `rooms/${hostedCode}`)); setHostedCode(null);}}>ABORT HOST</Button>
-                  </div>
+                  <Card className="text-center py-10 animate__animated animate__zoomIn border-4 border-game-accent">
+                      <h3 className="text-xl font-black text-slate-500 dark:text-slate-400 mb-4 uppercase">Room Code</h3>
+                      <div 
+                        onClick={copyRoomCode}
+                        className="bg-slate-100 dark:bg-slate-900 p-6 rounded-3xl mb-6 relative cursor-pointer group hover:bg-slate-200 dark:hover:bg-black transition-colors border-4 border-dashed border-slate-300 dark:border-slate-700"
+                      >
+                         <div className="text-6xl font-black text-game-primary tracking-[0.2em]">{hostedCode}</div>
+                         <div className="absolute top-2 right-2 text-slate-400 group-hover:text-game-primary transition-colors">
+                             <i className="fas fa-copy text-xl"></i>
+                         </div>
+                         <div className="absolute bottom-2 w-full left-0 text-[10px] text-slate-400 font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">Tap to Copy</div>
+                      </div>
+                      
+                      <div className="flex items-center justify-center gap-2 mb-8">
+                         <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                         <p className="text-slate-500 dark:text-slate-300 font-bold">Waiting for opponent to join...</p>
+                      </div>
+                      
+                      <Button variant="danger" fullWidth onClick={() => {remove(ref(db, `rooms/${hostedCode}`)); setHostedCode(null);}}>
+                          ABORT ROOM
+                      </Button>
+                  </Card>
               )}
           </div>
       )}
