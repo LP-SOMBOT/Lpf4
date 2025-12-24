@@ -220,7 +220,7 @@ const LobbyPage: React.FC = () => {
                                             value={roomCode} 
                                             onChange={e => setRoomCode(e.target.value)} 
                                             placeholder="ENTER CODE" 
-                                            className="w-full md:flex-1 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-center font-black uppercase text-xl text-slate-900 dark:text-white" 
+                                            className="w-full md:flex-1 bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-xl px-4 py-3 text-center font-black uppercase text-xl text-slate-900 dark:text-white placeholder-slate-400 focus:border-game-primary focus:ring-4 focus:ring-game-primary/20 outline-none transition-all" 
                                             maxLength={4} 
                                         />
                                         <Button fullWidth onClick={joinRoom} disabled={roomCode.length !== 4} className="md:w-auto">JOIN</Button>

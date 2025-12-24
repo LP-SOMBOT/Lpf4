@@ -52,7 +52,7 @@ const HomePage: React.FC = () => {
   return (
     <div className="min-h-full flex flex-col pb-28 md:pb-6 max-w-5xl mx-auto w-full px-4 pt-6">
       {/* Header Stat Bar */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
          <div className="flex items-center gap-4">
              <div onClick={() => handleNav('/profile')} className="relative cursor-pointer group">
                  <div className="absolute inset-0 bg-white rounded-full blur opacity-50 group-hover:opacity-100 transition-opacity"></div>
@@ -88,45 +88,46 @@ const HomePage: React.FC = () => {
          </div>
       </div>
 
-      {/* Hero / Featured Mode */}
-      <div className="mb-8 cursor-pointer group" onClick={() => handleNav('/lobby')}>
-          <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-game-primary via-indigo-600 to-purple-700 p-1 shadow-2xl shadow-indigo-500/30 transition-transform group-hover:scale-[1.01]">
-              <div className="bg-white/5 dark:bg-black/20 rounded-[1.8rem] p-6 md:p-8 relative overflow-hidden backdrop-blur-sm">
+      {/* Hero / Featured Mode - REDUCED SIZE */}
+      <div className="mb-6 cursor-pointer group" onClick={() => handleNav('/lobby')}>
+          <div className="relative overflow-hidden rounded-[1.8rem] bg-gradient-to-br from-game-primary via-indigo-600 to-purple-700 p-1 shadow-2xl shadow-indigo-500/30 transition-transform group-hover:scale-[1.01]">
+              <div className="bg-white/5 dark:bg-black/20 rounded-[1.6rem] p-5 md:p-6 relative overflow-hidden backdrop-blur-sm">
                   {/* Decorative Background Elements */}
                   <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16 blur-3xl animate-pulse"></div>
                   <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500 opacity-20 rounded-full -ml-10 -mb-10 blur-3xl"></div>
                   <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
 
-                  <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-4">
                       <div className="text-center md:text-left flex-1">
-                          <div className="flex items-center justify-center md:justify-start gap-2 mb-3">
-                              <span className="bg-game-accent/20 text-game-accent border border-game-accent/50 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-md">
+                          <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                              <span className="bg-game-accent/20 text-game-accent border border-game-accent/50 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-md">
                                   <i className="fas fa-fire mr-1"></i> Hot
                               </span>
-                              <span className="bg-white/10 text-white border border-white/20 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                              <span className="bg-white/10 text-white border border-white/20 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
                                   Multiplayer
                               </span>
                           </div>
-                          <h2 className="text-4xl md:text-6xl font-black text-white mb-2 italic tracking-tight drop-shadow-md">
-                              BATTLE <br/> ARENA
+                          {/* Changed Text and Reduced Size */}
+                          <h2 className="text-3xl md:text-5xl font-black text-white mb-2 italic tracking-tight drop-shadow-md leading-none">
+                              BATTLE <br/> QUIZ
                           </h2>
-                          <p className="text-indigo-100 font-bold max-w-md text-sm md:text-base leading-relaxed mb-6">
-                              Face off against real students. Test your knowledge in real-time PvP and climb the global ranks!
+                          <p className="text-indigo-100 font-bold max-w-sm text-xs md:text-sm leading-relaxed mb-4">
+                              Face off against real students in real-time PvP.
                           </p>
-                          <button className="bg-white text-game-primary px-8 py-3 rounded-xl font-black uppercase tracking-widest shadow-lg hover:bg-indigo-50 transition-colors transform group-hover:translate-y-[-2px] active:translate-y-[1px]">
+                          <button className="bg-white text-game-primary px-6 py-2 rounded-xl font-black uppercase tracking-widest shadow-lg hover:bg-indigo-50 transition-colors transform group-hover:translate-y-[-2px] active:translate-y-[1px] text-xs md:text-sm">
                               Play Now <i className="fas fa-arrow-right ml-2"></i>
                           </button>
                       </div>
                       
-                      {/* Visual Graphic */}
-                      <div className="relative w-40 h-40 md:w-56 md:h-56 shrink-0">
-                           <div className="absolute inset-0 bg-indigo-500 rounded-full blur-[50px] opacity-40 animate-pulse"></div>
-                           <div className="relative w-full h-full bg-gradient-to-tr from-white to-indigo-100 rounded-full flex items-center justify-center shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border-[6px] border-white/20">
-                               <i className="fas fa-gamepad text-6xl md:text-8xl text-transparent bg-clip-text bg-gradient-to-br from-game-primary to-purple-600 transform -rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
+                      {/* Visual Graphic - Scaled Down */}
+                      <div className="relative w-32 h-32 md:w-48 md:h-48 shrink-0">
+                           <div className="absolute inset-0 bg-indigo-500 rounded-full blur-[40px] opacity-40 animate-pulse"></div>
+                           <div className="relative w-full h-full bg-gradient-to-tr from-white to-indigo-100 rounded-full flex items-center justify-center shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border-[5px] border-white/20">
+                               <i className="fas fa-gamepad text-5xl md:text-7xl text-transparent bg-clip-text bg-gradient-to-br from-game-primary to-purple-600 transform -rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
                            </div>
                            
                            {/* Floating Badge */}
-                           <div className="absolute -bottom-4 -right-4 bg-game-danger text-white w-16 h-16 rounded-full flex items-center justify-center font-black border-4 border-white/20 shadow-lg animate-bounce-slow">
+                           <div className="absolute -bottom-2 -right-2 bg-game-danger text-white w-12 h-12 rounded-full flex items-center justify-center font-black border-4 border-white/20 shadow-lg animate-bounce-slow text-xs">
                                VS
                            </div>
                       </div>
@@ -138,11 +139,11 @@ const HomePage: React.FC = () => {
       {/* Secondary Modes Grid */}
       <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-6">
           <div onClick={() => handleNav('/solo')} className="cursor-pointer group">
-              <div className="h-44 rounded-[2rem] bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-5 flex flex-col justify-between shadow-lg hover:shadow-xl transition-all group-hover:-translate-y-1 relative overflow-hidden">
+              <div className="h-40 rounded-[2rem] bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-5 flex flex-col justify-between shadow-lg hover:shadow-xl transition-all group-hover:-translate-y-1 relative overflow-hidden">
                    <div className="absolute top-0 right-0 p-4 opacity-[0.05] dark:opacity-[0.05]">
                        <i className="fas fa-brain text-8xl transform rotate-12"></i>
                    </div>
-                   <div className="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center text-2xl mb-2 shadow-sm">
+                   <div className="w-10 h-10 rounded-2xl bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center text-xl mb-2 shadow-sm">
                        <i className="fas fa-dumbbell"></i>
                    </div>
                    <div>
@@ -156,11 +157,11 @@ const HomePage: React.FC = () => {
           </div>
 
           <div onClick={() => handleNav('/leaderboard')} className="cursor-pointer group">
-              <div className="h-44 rounded-[2rem] bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-5 flex flex-col justify-between shadow-lg hover:shadow-xl transition-all group-hover:-translate-y-1 relative overflow-hidden">
+              <div className="h-40 rounded-[2rem] bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-5 flex flex-col justify-between shadow-lg hover:shadow-xl transition-all group-hover:-translate-y-1 relative overflow-hidden">
                    <div className="absolute top-0 right-0 p-4 opacity-[0.05] dark:opacity-[0.05]">
                        <i className="fas fa-trophy text-8xl transform -rotate-12"></i>
                    </div>
-                   <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl mb-2 shadow-sm">
+                   <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl mb-2 shadow-sm">
                        <i className="fas fa-crown"></i>
                    </div>
                    <div>

@@ -116,21 +116,23 @@
       div:where(.swal2-container) {
         z-index: 9999 !important;
       }
+      
+      /* Base Popup Style (Light Mode Default) */
       .glass-swal-popup {
-        background: rgba(255, 255, 255, 0.95) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        background: #ffffff !important; /* Fully Opaque White */
+        border: 2px solid #cbd5e1 !important;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
         border-radius: 2rem !important;
         padding: 2rem !important;
         font-family: 'Poppins', sans-serif !important;
-        color: #1e293b !important;
+        color: #000000 !important; /* Pure Black Text for Visibility */
       }
+      
+      /* Dark Mode Override */
       .dark .glass-swal-popup {
-        background: rgba(30, 41, 59, 0.95) !important;
-        border-color: rgba(255, 255, 255, 0.1) !important;
-        color: #f8fafc !important;
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        color: #ffffff !important; /* Pure White Text */
       }
       
       .glass-swal-title {
@@ -139,9 +141,11 @@
         text-transform: uppercase !important;
         font-style: italic !important;
       }
+      
       .glass-swal-content {
         color: inherit !important;
-        font-weight: 500 !important;
+        font-weight: 600 !important;
+        opacity: 1 !important; /* No Transparency */
       }
 
       /* Alert Buttons */
@@ -175,24 +179,25 @@
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
       }
 
+      /* Input Fields in Alerts */
       .glass-swal-input {
         background-color: #f1f5f9 !important;
-        border: 2px solid #e2e8f0 !important;
+        border: 2px solid #cbd5e1 !important;
         border-radius: 1rem !important;
-        color: #0f172a !important;
+        color: #000000 !important; /* Dark text */
         font-weight: bold !important;
         padding: 1rem !important;
         text-align: center !important;
         font-size: 1.25rem !important;
       }
+      .dark .glass-swal-input {
+        background-color: #0f172a !important;
+        border-color: #334155 !important;
+        color: #ffffff !important; /* Light text */
+      }
       .glass-swal-input:focus {
         border-color: #6366f1 !important;
         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
-      }
-      .dark .glass-swal-input {
-        background-color: #1e293b !important;
-        border-color: #334155 !important;
-        color: #ffffff !important;
       }
     </style>
   <script type="importmap">
