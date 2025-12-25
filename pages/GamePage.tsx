@@ -7,7 +7,7 @@ import { POINTS_PER_QUESTION } from '../constants';
 import { MatchState, Question, Chapter } from '../types';
 import { Avatar, Button, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
-import { showToast } from '../services/alert';
+import { showToast, showConfirm } from '../services/alert';
 import confetti from 'canvas-confetti';
 
 const createSeededRandom = (seedStr: string) => {
@@ -43,11 +43,9 @@ const GamePage: React.FC = () => {
   
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState<{correct: boolean, answer: number} | null>(null);
-  const [pointsAwardedForDisconnect, setPointsAwardedForDisconnect] = useState(false);
   
   // Animation State
   const [showIntro, setShowIntro] = useState(false);
-  const [afkTimer, setAfkTimer] = useState<number | null>(null);
   
   const processingRef = useRef(false);
 
@@ -152,67 +150,6 @@ const GamePage: React.FC = () => {
     };
   }, [matchId, user, navigate]); 
 
-  // ----- AFK TIMER LOGIC -----
-  useEffect(() => {
-      if (!match || match.status === 'completed' || !user) {
-          if (afkTimer !== null) setAfkTimer(null);
-          return;
-      }
-      
-      const oppUid = Object.keys(match.players).find(uid => uid !== user.uid);
-      if (!oppUid) return;
-
-      const opponentData = match.players[oppUid];
-      
-      // If opponent is offline
-      if (opponentData?.status === 'offline') {
-          // If we haven't started timer logic yet
-          if (afkTimer === null) {
-              setAfkTimer(15);
-          }
-      } else {
-          // Opponent is back online - RESET IMMEDIATELY
-          if (afkTimer !== null) {
-              setAfkTimer(null);
-              showToast("Opponent Reconnected", "success");
-          }
-      }
-  }, [match, user, afkTimer]);
-
-  // Countdown Effect
-  useEffect(() => {
-      if (afkTimer === null || afkTimer <= 0) return;
-      
-      const interval = setInterval(() => {
-          setAfkTimer(prev => {
-              if (prev === null) return null;
-              if (prev <= 1) {
-                  // Time is up! Claim win.
-                  handleWinByAFK();
-                  return 0;
-              }
-              return prev - 1;
-          });
-      }, 1000);
-
-      return () => clearInterval(interval);
-  }, [afkTimer]);
-
-  const handleWinByAFK = async () => {
-      if (!match || !user) return;
-      
-      // I win because opponent AFK
-      await update(ref(db, `matches/${matchId}`), {
-          status: 'completed',
-          winner: user.uid
-      });
-      // Award points
-      const curPts = (await get(ref(db, `users/${user.uid}/points`))).val() || 0;
-      await update(ref(db, `users/${user.uid}`), { points: curPts + 20, activeMatch: null }); // Bonus for win
-      setAfkTimer(0);
-  };
-  // ---------------------------
-
   // Handle Intro Timeout
   useEffect(() => {
       if (showIntro && match && opponentProfile) {
@@ -310,6 +247,36 @@ const GamePage: React.FC = () => {
       navigate('/');
   };
 
+  const handleSurrender = async () => {
+      if (!match || !user || !opponentProfile) return;
+      
+      const confirmed = await showConfirm(
+          "Exit Match?", 
+          "If you exit now, you will lose the match and forfeit points.", 
+          "Exit", "Stay", "warning"
+      );
+
+      if (!confirmed) return;
+
+      // Award points to opponent (Win bonus)
+      const oppPts = (await get(ref(db, `users/${opponentProfile.uid}/points`))).val() || 0;
+      await update(ref(db, `users/${opponentProfile.uid}`), { 
+          points: oppPts + 20, // Win bonus
+          activeMatch: null 
+      });
+
+      // Mark match completed, opponent wins
+      await update(ref(db, `matches/${matchId}`), {
+          status: 'completed',
+          winner: opponentProfile.uid
+      });
+
+      // Cleanup self and leave
+      await set(ref(db, `users/${user.uid}/activeMatch`), null);
+      navigate('/');
+      showToast("Match Forfeited", "info");
+  };
+
   if (!match || !opponentProfile || (!currentQuestion && !isGameOver && !showIntro)) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white font-black text-2xl animate-pulse">CONNECTING...</div>;
   }
@@ -367,16 +334,20 @@ const GamePage: React.FC = () => {
           </div>
       )}
 
-      {/* AFK WARNING */}
-      {afkTimer !== null && afkTimer > 0 && !isGameOver && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-xl animate-pulse border-2 border-white">
-              <i className="fas fa-exclamation-triangle mr-2"></i>
-              Opponent AFK! Auto-win in {afkTimer}s
+      {/* Exit Button (Replaces AFK) */}
+      {!isGameOver && (
+          <div className="absolute top-4 left-4 z-40">
+              <button 
+                onClick={handleSurrender}
+                className="bg-white/10 backdrop-blur-md text-white/70 hover:text-red-400 hover:bg-white/20 px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider border border-white/10 transition-all flex items-center gap-2"
+              >
+                  <i className="fas fa-sign-out-alt"></i> Exit Match
+              </button>
           </div>
       )}
 
       {/* HUD */}
-      <div className="pt-4 px-4 pb-2 z-20">
+      <div className="pt-16 md:pt-4 px-4 pb-2 z-20">
          <div className="max-w-4xl mx-auto bg-white/95 dark:bg-slate-800/95 backdrop-blur rounded-[2rem] shadow-xl p-3 flex justify-between items-center border-b-4 border-slate-200 dark:border-slate-700">
             {/* Me */}
             <div className={`flex items-center gap-3 transition-transform ${isMyTurn && !isGameOver ? 'scale-105' : 'scale-100 opacity-80'}`}>
