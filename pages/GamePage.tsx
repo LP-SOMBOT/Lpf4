@@ -195,38 +195,49 @@ const GamePage: React.FC = () => {
       
       {/* VERSUS INTRO ANIMATION */}
       {showIntro && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 overflow-hidden">
-              {/* Left Side (Player) */}
-              <div className="absolute inset-y-0 left-0 w-1/2 bg-indigo-600 flex flex-col items-center justify-center animate__animated animate__slideInLeft">
-                  <div className="relative z-10 scale-150">
+          <div className="fixed inset-0 z-50 flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
+              {/* Player 1 (Top / Left) */}
+              <div className="relative w-full h-1/2 md:w-1/2 md:h-full bg-indigo-600 flex flex-col items-center justify-center animate__animated animate__slideInLeft shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10">
+                  <div className="relative z-10 scale-90 md:scale-150 mb-2 md:mb-0">
                      <Avatar src={profile?.avatar} seed={user!.uid} size="xl" className="border-4 border-white shadow-2xl" />
                   </div>
-                  <h2 className="mt-8 text-3xl font-black text-white uppercase italic tracking-widest drop-shadow-lg">{profile?.name}</h2>
+                  <h2 className="mt-4 md:mt-8 text-2xl md:text-4xl font-black text-white uppercase italic tracking-widest drop-shadow-lg text-center px-2 break-words max-w-full">
+                      {profile?.name}
+                  </h2>
               </div>
 
-              {/* Right Side (Opponent) */}
-              <div className="absolute inset-y-0 right-0 w-1/2 bg-red-600 flex flex-col items-center justify-center animate__animated animate__slideInRight">
-                  <div className="relative z-10 scale-150">
+              {/* Player 2 (Bottom / Right) */}
+              <div className="relative w-full h-1/2 md:w-1/2 md:h-full bg-red-600 flex flex-col items-center justify-center animate__animated animate__slideInRight shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10">
+                  <div className="relative z-10 scale-90 md:scale-150 mb-2 md:mb-0">
                      <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="xl" className="border-4 border-white shadow-2xl" />
                   </div>
-                  <h2 className="mt-8 text-3xl font-black text-white uppercase italic tracking-widest drop-shadow-lg">{opponentProfile.name}</h2>
+                  <h2 className="mt-4 md:mt-8 text-2xl md:text-4xl font-black text-white uppercase italic tracking-widest drop-shadow-lg text-center px-2 break-words max-w-full">
+                      {opponentProfile.name}
+                  </h2>
               </div>
 
               {/* Center Effects */}
-              <div className="absolute z-20 flex flex-col items-center justify-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none">
                   <div className="relative animate-clash">
-                      <h1 className="text-[120px] font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-[0_0_25px_rgba(234,179,8,0.8)] leading-none stroke-black" style={{ WebkitTextStroke: '4px black' }}>
+                      <h1 
+                        className="text-[80px] md:text-[140px] font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-[0_0_25px_rgba(234,179,8,0.8)] leading-none"
+                        style={{ 
+                            WebkitTextStroke: '2px black',
+                            filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))' 
+                        }}
+                      >
                           VS
                       </h1>
                   </div>
-                  <div className="mt-8 text-2xl font-black text-white uppercase tracking-[0.5em] animate__animated animate__fadeInUp animate__delay-1s">
+                  <div className="mt-2 md:mt-8 text-lg md:text-2xl font-black text-white uppercase tracking-[0.5em] animate__animated animate__fadeInUp animate__delay-1s bg-black/50 px-4 py-1 rounded-full backdrop-blur-sm border border-white/10">
                       Get Ready
                   </div>
               </div>
               
-              {/* Lightning / Energy Effects (CSS gradients) */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none"></div>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-2 bg-white rotate-45 blur-md opacity-50 animate-pulse"></div>
+              {/* Lightning / Energy Effects */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none z-20"></div>
+              {/* Diagonal Slash Effect */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-2 bg-white/50 rotate-45 blur-lg animate-pulse z-20"></div>
           </div>
       )}
 
