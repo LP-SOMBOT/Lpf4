@@ -8,6 +8,7 @@ export interface UserProfile {
   gender?: 'male' | 'female';
   activeMatch?: string | null;
   role?: 'user' | 'admin';
+  banned?: boolean;
 }
 
 export interface Subject {
@@ -42,6 +43,9 @@ export interface MatchState {
     [uid: string]: {
       name: string;
       avatar: string;
+      level?: number;
+      status?: 'online' | 'offline';
+      lastSeen?: number;
     }
   };
   winner?: string | null; // 'draw', 'disconnect', or uid

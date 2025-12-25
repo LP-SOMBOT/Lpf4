@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { ref, set } from 'firebase/database';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
+import { ref, set, get } from 'firebase/database';
 import { auth, db } from '../firebase';
 import { playSound } from '../services/audioService';
 import { generateAvatarUrl } from '../constants';
@@ -45,7 +45,17 @@ const AuthPage: React.FC = () => {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCred = await signInWithEmailAndPassword(auth, email, password);
+        // Check if banned
+        const userRef = ref(db, `users/${userCred.user.uid}`);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+            const userData = snapshot.val();
+            if (userData.banned) {
+                await signOut(auth);
+                throw { code: 'custom/banned' };
+            }
+        }
       } else {
         if (!name.trim()) {
             throw { code: 'custom/missing-name' };
@@ -64,7 +74,8 @@ const AuthPage: React.FC = () => {
           points: 0,
           avatar: avatarUrl,
           gender: gender,
-          activeMatch: null
+          activeMatch: null,
+          banned: false
         });
         
         await updateProfile(user, { displayName: name });
@@ -74,7 +85,10 @@ const AuthPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err.code);
-      const msg = err.code === 'custom/missing-name' ? 'Please enter your name.' : getErrorMessage(err.code || '');
+      let msg = getErrorMessage(err.code || '');
+      if (err.code === 'custom/missing-name') msg = 'Please enter your name.';
+      if (err.code === 'custom/banned') msg = 'Your account has been suspended by an administrator.';
+      
       showAlert('Authentication Error', msg, 'error');
     } finally {
       setLoading(false);

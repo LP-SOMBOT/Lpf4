@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, update, onDisconnect, get, set, remove } from 'firebase/database';
+import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { POINTS_PER_QUESTION } from '../constants';
 import { MatchState, Question, Chapter } from '../types';
 import { Avatar, Button, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
-import { showConfirm } from '../services/alert';
+import { showToast } from '../services/alert';
 import confetti from 'canvas-confetti';
 
 const createSeededRandom = (seedStr: string) => {
@@ -38,7 +38,7 @@ const GamePage: React.FC = () => {
   const navigate = useNavigate();
 
   const [match, setMatch] = useState<MatchState | null>(null);
-  const [opponentProfile, setOpponentProfile] = useState<{name: string, avatar: string, uid: string} | null>(null);
+  const [opponentProfile, setOpponentProfile] = useState<{name: string, avatar: string, uid: string, level?: number} | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -47,13 +47,32 @@ const GamePage: React.FC = () => {
   
   // Animation State
   const [showIntro, setShowIntro] = useState(false);
+  const [afkTimer, setAfkTimer] = useState<number | null>(null);
   
   const processingRef = useRef(false);
 
   useEffect(() => {
     if (!matchId || !user) return;
     const matchRef = ref(db, `matches/${matchId}`);
-    onDisconnect(matchRef).update({ status: 'completed', winner: 'disconnect' });
+
+    // ----- PRESENCE SYSTEM -----
+    // Instead of ending match immediately on disconnect, we mark status as offline.
+    const myStatusRef = ref(db, `matches/${matchId}/players/${user.uid}`);
+    
+    // Set my status to online and level immediately
+    const myLevel = Math.floor((profile?.points || 0) / 10) + 1;
+    update(myStatusRef, { 
+        status: 'online',
+        lastSeen: serverTimestamp(),
+        level: myLevel 
+    });
+
+    // On disconnect, mark offline and timestamp
+    onDisconnect(myStatusRef).update({ 
+        status: 'offline',
+        lastSeen: serverTimestamp()
+    });
+    // ---------------------------
 
     const unsubscribe = onValue(matchRef, async (snapshot) => {
       const data = snapshot.val();
@@ -64,6 +83,7 @@ const GamePage: React.FC = () => {
       }
       setMatch(data);
 
+      // Question Loading Logic
       if (questions.length === 0 && data.subject) {
           let loadedQ: Question[] = [];
           const cacheKey = `questions_cache_${data.subject}`;
@@ -97,36 +117,106 @@ const GamePage: React.FC = () => {
           }
       }
 
+      // Opponent Setup
       if (!opponentProfile) {
         const oppUid = Object.keys(data.scores).find(uid => uid !== user.uid);
         if (oppUid) {
              const oppSnap = await get(ref(db, `users/${oppUid}`));
              if (oppSnap.exists()) {
-                 setOpponentProfile({ uid: oppUid, ...oppSnap.val() });
-                 // Only show intro if it's the very start of the match
+                 const oppData = oppSnap.val();
+                 const oppLevel = Math.floor((oppData.points || 0) / 10) + 1;
+                 setOpponentProfile({ uid: oppUid, ...oppData, level: oppLevel });
+                 
+                 // Show Intro only if start
                  if (data.currentQ === 0) {
                      setShowIntro(true);
-                     playSound('click'); // Or a better dramatic sound if available
+                     playSound('click'); 
                  }
              }
         }
       }
 
+      // Check Winner
       if (data.status === 'completed' && data.winner) {
-          if (data.winner === user.uid) { playSound('win'); confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); }
+          if (data.winner === user.uid) { 
+              playSound('win'); 
+              confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); 
+          }
           else if (data.winner !== 'draw') playSound('wrong'); 
       }
     });
 
-    return () => { unsubscribe(); onDisconnect(matchRef).cancel(); };
+    return () => { 
+        unsubscribe(); 
+        onDisconnect(myStatusRef).cancel();
+    };
   }, [matchId, user, navigate]); 
+
+  // ----- AFK TIMER LOGIC -----
+  useEffect(() => {
+      if (!match || match.status === 'completed' || !user) {
+          setAfkTimer(null);
+          return;
+      }
+      
+      const oppUid = Object.keys(match.players).find(uid => uid !== user.uid);
+      if (!oppUid) return;
+
+      const opponentData = match.players[oppUid];
+      
+      // If opponent is offline
+      if (opponentData?.status === 'offline') {
+          // If we haven't started timer logic yet
+          if (afkTimer === null) {
+              setAfkTimer(15);
+          }
+      } else {
+          // Opponent is back online
+          setAfkTimer(null);
+      }
+  }, [match, user, afkTimer]);
+
+  // Countdown Effect
+  useEffect(() => {
+      if (afkTimer === null || afkTimer <= 0) return;
+      
+      const interval = setInterval(() => {
+          setAfkTimer(prev => {
+              if (prev === null) return null;
+              if (prev <= 1) {
+                  // Time is up! Claim win.
+                  handleWinByAFK();
+                  return 0;
+              }
+              return prev - 1;
+          });
+      }, 1000);
+
+      return () => clearInterval(interval);
+  }, [afkTimer]);
+
+  const handleWinByAFK = async () => {
+      if (!match || !user) return;
+      const oppUid = Object.keys(match.scores).find(uid => uid !== user.uid);
+      
+      // I win because opponent AFK
+      await update(ref(db, `matches/${matchId}`), {
+          status: 'completed',
+          winner: user.uid
+      });
+      // Award points
+      const curPts = (await get(ref(db, `users/${user.uid}/points`))).val() || 0;
+      await update(ref(db, `users/${user.uid}`), { points: curPts + 20, activeMatch: null }); // Bonus for win
+      setAfkTimer(0);
+  };
+  // ---------------------------
 
   // Handle Intro Timeout
   useEffect(() => {
       if (showIntro && match && opponentProfile) {
           const timer = setTimeout(() => {
               setShowIntro(false);
-          }, 3500); // 3.5 seconds duration
+          }, 3500); 
           return () => clearTimeout(timer);
       }
   }, [showIntro, match, opponentProfile]);
@@ -134,13 +224,6 @@ const GamePage: React.FC = () => {
   const currentQuestion = match && questions.length > 0 ? questions[match.currentQ] : null;
   const isMyTurn = match?.turn === user?.uid;
   const isGameOver = match?.status === 'completed';
-
-  useEffect(() => {
-      if (isGameOver && match?.winner === 'disconnect' && !pointsAwardedForDisconnect && match.mode === 'auto' && questions.length > 0 && user) {
-          setPointsAwardedForDisconnect(true);
-          get(ref(db, `users/${user.uid}/points`)).then(s => update(ref(db, `users/${user.uid}`), { points: (s.val() || 0) + Math.floor(questions.length * POINTS_PER_QUESTION / 2) }));
-      }
-  }, [isGameOver, match, questions, user, pointsAwardedForDisconnect]);
 
   const handleOptionClick = async (index: number) => {
     if (!match || !user || !isMyTurn || selectedOption !== null || processingRef.current || !currentQuestion) return;
@@ -190,9 +273,14 @@ const GamePage: React.FC = () => {
     return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white font-black text-2xl animate-pulse">CONNECTING...</div>;
   }
 
+  const myLevel = Math.floor((profile?.points || 0) / 10) + 1;
+
   return (
-    <div className="min-h-screen relative flex flex-col font-sans bg-slate-100 dark:bg-slate-900 overflow-hidden">
-      
+    <div className="min-h-screen relative flex flex-col font-sans bg-slate-900 overflow-hidden transition-colors">
+       {/* Background - Restored Blue/Grey Vibe */}
+       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800 z-0"></div>
+       <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] z-0 pointer-events-none"></div>
+
       {/* VERSUS INTRO ANIMATION */}
       {showIntro && (
           <div className="fixed inset-0 z-50 flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
@@ -200,6 +288,7 @@ const GamePage: React.FC = () => {
               <div className="relative w-full h-1/2 md:w-1/2 md:h-full bg-indigo-600 flex flex-col items-center justify-center animate__animated animate__slideInLeft shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10">
                   <div className="relative z-10 scale-90 md:scale-150 mb-2 md:mb-0">
                      <Avatar src={profile?.avatar} seed={user!.uid} size="xl" className="border-4 border-white shadow-2xl" />
+                     <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-slate-900 font-black px-2 py-0.5 rounded-full border-2 border-white text-sm">LVL {myLevel}</div>
                   </div>
                   <h2 className="mt-4 md:mt-8 text-2xl md:text-4xl font-black text-white uppercase italic tracking-widest drop-shadow-lg text-center px-2 break-words max-w-full">
                       {profile?.name}
@@ -210,6 +299,7 @@ const GamePage: React.FC = () => {
               <div className="relative w-full h-1/2 md:w-1/2 md:h-full bg-red-600 flex flex-col items-center justify-center animate__animated animate__slideInRight shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10">
                   <div className="relative z-10 scale-90 md:scale-150 mb-2 md:mb-0">
                      <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="xl" className="border-4 border-white shadow-2xl" />
+                     <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-slate-900 font-black px-2 py-0.5 rounded-full border-2 border-white text-sm">LVL {opponentProfile.level}</div>
                   </div>
                   <h2 className="mt-4 md:mt-8 text-2xl md:text-4xl font-black text-white uppercase italic tracking-widest drop-shadow-lg text-center px-2 break-words max-w-full">
                       {opponentProfile.name}
@@ -233,20 +323,26 @@ const GamePage: React.FC = () => {
                       Get Ready
                   </div>
               </div>
-              
-              {/* Lightning / Energy Effects */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none z-20"></div>
-              {/* Diagonal Slash Effect */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-2 bg-white/50 rotate-45 blur-lg animate-pulse z-20"></div>
+          </div>
+      )}
+
+      {/* AFK WARNING */}
+      {afkTimer !== null && afkTimer > 0 && !isGameOver && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-xl animate-pulse border-2 border-white">
+              <i className="fas fa-exclamation-triangle mr-2"></i>
+              Opponent AFK! Auto-win in {afkTimer}s
           </div>
       )}
 
       {/* HUD */}
       <div className="pt-4 px-4 pb-2 z-20">
-         <div className="max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-[2rem] shadow-xl p-3 flex justify-between items-center border-b-4 border-slate-200 dark:border-slate-700">
+         <div className="max-w-4xl mx-auto bg-white/95 dark:bg-slate-800/95 backdrop-blur rounded-[2rem] shadow-xl p-3 flex justify-between items-center border-b-4 border-slate-200 dark:border-slate-700">
             {/* Me */}
             <div className={`flex items-center gap-3 transition-transform ${isMyTurn && !isGameOver ? 'scale-105' : 'scale-100 opacity-80'}`}>
-                 <Avatar src={profile?.avatar} seed={user!.uid} size="sm" border={isMyTurn ? '3px solid #6366f1' : '3px solid transparent'} />
+                 <div className="relative">
+                     <Avatar src={profile?.avatar} seed={user!.uid} size="sm" border={isMyTurn ? '3px solid #6366f1' : '3px solid transparent'} />
+                     <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-[8px] px-1 rounded font-bold border border-white">LVL {myLevel}</div>
+                 </div>
                  <div>
                      <div className="text-[10px] font-black uppercase text-slate-400">You</div>
                      <div className="text-2xl font-black text-game-primary leading-none">{match.scores[user!.uid]}</div>
@@ -260,7 +356,10 @@ const GamePage: React.FC = () => {
 
             {/* Opponent */}
             <div className={`flex items-center gap-3 flex-row-reverse text-right transition-transform ${!isMyTurn && !isGameOver ? 'scale-105' : 'scale-100 opacity-80'}`}>
-                 <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="sm" border={!isMyTurn ? '3px solid #ef4444' : '3px solid transparent'} />
+                 <div className="relative">
+                    <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="sm" border={!isMyTurn ? '3px solid #ef4444' : '3px solid transparent'} />
+                    <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-[8px] px-1 rounded font-bold border border-white">LVL {opponentProfile.level}</div>
+                 </div>
                  <div>
                      <div className="text-[10px] font-black uppercase text-slate-400 truncate w-16">{opponentProfile.name}</div>
                      <div className="text-2xl font-black text-game-danger leading-none">{match.scores[opponentProfile.uid]}</div>
@@ -271,7 +370,7 @@ const GamePage: React.FC = () => {
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 w-full max-w-3xl mx-auto z-10">
         {isGameOver ? (
-           <Card className="text-center w-full animate__animated animate__zoomIn !p-10 border-t-8 border-game-primary">
+           <Card className="text-center w-full animate__animated animate__zoomIn !p-8 md:!p-10 border-t-8 border-game-primary dark:border-game-primaryDark">
                {match.winner === user!.uid ? (
                    <>
                        <div className="text-6xl mb-4">🏆</div>
@@ -292,14 +391,21 @@ const GamePage: React.FC = () => {
                    </>
                )}
                
-               <div className="flex justify-center gap-12 mb-10">
-                   <div className="text-center">
-                       <Avatar src={profile?.avatar} size="lg" className="mx-auto mb-2" />
-                       <div className="font-black text-xl">{match.scores[user!.uid]}</div>
+               <div className="flex justify-center gap-4 md:gap-12 mb-10">
+                   <div className="text-center bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800">
+                       <Avatar src={profile?.avatar} size="lg" className="mx-auto mb-2 shadow-md" />
+                       <div className="font-bold text-slate-800 dark:text-white truncate max-w-[100px]">{profile?.name}</div>
+                       <div className="text-xs font-bold text-slate-400 mb-2">LVL {myLevel}</div>
+                       <div className="font-black text-2xl text-game-primary">{match.scores[user!.uid]}</div>
                    </div>
-                   <div className="text-center opacity-75">
-                       <Avatar src={opponentProfile.avatar} size="lg" className="mx-auto mb-2 grayscale" />
-                       <div className="font-black text-xl">{match.scores[opponentProfile.uid]}</div>
+                   
+                   <div className="flex items-center text-slate-300 font-black text-2xl italic">VS</div>
+
+                   <div className="text-center bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl border border-red-100 dark:border-red-800 opacity-90">
+                       <Avatar src={opponentProfile.avatar} size="lg" className="mx-auto mb-2 grayscale shadow-md" />
+                       <div className="font-bold text-slate-800 dark:text-white truncate max-w-[100px]">{opponentProfile.name}</div>
+                       <div className="text-xs font-bold text-slate-400 mb-2">LVL {opponentProfile.level}</div>
+                       <div className="font-black text-2xl text-game-danger">{match.scores[opponentProfile.uid]}</div>
                    </div>
                </div>
 
@@ -307,43 +413,71 @@ const GamePage: React.FC = () => {
            </Card>
         ) : (
             <>
-                <div className="w-full bg-white dark:bg-slate-800 rounded-[2rem] p-8 shadow-[0_10px_0_rgba(0,0,0,0.1)] mb-6 text-center border-2 border-slate-100 dark:border-slate-700 min-h-[160px] flex items-center justify-center">
-                    <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed">
+                <div className="w-full bg-white dark:bg-slate-800 rounded-[2rem] p-6 md:p-8 shadow-[0_10px_0_rgba(0,0,0,0.1)] mb-6 text-center border-2 border-slate-100 dark:border-slate-700 min-h-[160px] flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-game-primary via-purple-500 to-game-danger"></div>
+                    <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed z-10">
                         {currentQuestion && currentQuestion.question}
                     </h2>
                 </div>
 
+                {/* REDESIGNED OPTION CARDS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                     {currentQuestion && currentQuestion.options.map((opt, idx) => {
-                        let btnStyle = "bg-white dark:bg-slate-800 border-b-4 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700";
-                        if (selectedOption === idx) btnStyle = "bg-game-primary text-white border-b-4 border-game-primaryDark";
-                        if (showFeedback) {
-                            if (idx === showFeedback.answer) btnStyle = "bg-game-success text-white border-b-4 border-game-successDark";
-                            else if (idx === selectedOption) btnStyle = "bg-game-danger text-white border-b-4 border-game-dangerDark";
-                            else btnStyle = "opacity-40 grayscale";
+                        // Determine visual state
+                        let isActive = selectedOption === idx;
+                        let isCorrect = showFeedback?.answer === idx;
+                        let isWrong = isActive && showFeedback && !isCorrect;
+                        let isDimmed = showFeedback && !isActive && !isCorrect;
+
+                        let bgClass = "bg-white dark:bg-slate-800 border-b-4 border-slate-300 dark:border-slate-700";
+                        let textClass = "text-slate-700 dark:text-slate-200";
+
+                        if (isActive) {
+                             bgClass = "bg-game-primary border-b-4 border-game-primaryDark translate-y-[2px]";
+                             textClass = "text-white";
                         }
                         
+                        if (showFeedback) {
+                            if (idx === showFeedback.answer) {
+                                bgClass = "bg-green-500 border-b-4 border-green-700 animate__animated animate__pulse";
+                                textClass = "text-white";
+                            } else if (isActive) {
+                                bgClass = "bg-red-500 border-b-4 border-red-700 animate__animated animate__shakeX";
+                                textClass = "text-white";
+                            } else {
+                                bgClass = "bg-slate-100 dark:bg-slate-800 opacity-50 border-transparent grayscale";
+                            }
+                        }
+
                         return (
                             <button
                                 key={idx}
                                 disabled={!isMyTurn || selectedOption !== null}
                                 onClick={() => handleOptionClick(idx)}
                                 className={`
-                                    relative p-4 rounded-2xl font-bold text-lg text-left transition-all active:translate-y-1 active:border-b-0 active:mb-[4px] shadow-sm
-                                    ${btnStyle} ${!isMyTurn ? 'cursor-not-allowed opacity-70' : ''}
+                                    relative p-5 rounded-2xl text-left transition-all duration-150 active:scale-[0.98]
+                                    ${bgClass} ${!isMyTurn ? 'cursor-not-allowed opacity-70' : ''}
+                                    shadow-lg hover:brightness-105 min-h-[80px] flex items-center
                                 `}
                             >
-                                <span className="mr-3 opacity-60 font-black">{String.fromCharCode(65 + idx)}</span>
-                                {opt}
+                                <div className={`
+                                    w-8 h-8 rounded-lg flex items-center justify-center font-black mr-4 text-sm shrink-0
+                                    ${isActive || (showFeedback && idx === showFeedback.answer) ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}
+                                `}>
+                                    {String.fromCharCode(65 + idx)}
+                                </div>
+                                <span className={`font-bold text-lg leading-tight ${textClass}`}>
+                                    {opt}
+                                </span>
                             </button>
                         );
                     })}
                 </div>
 
                 {!isMyTurn && (
-                    <div className="mt-8 flex items-center gap-3 bg-white/80 dark:bg-slate-800/80 px-6 py-3 rounded-full shadow-lg backdrop-blur animate-pulse">
+                    <div className="mt-8 flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-3 rounded-full shadow-lg border border-white/20 animate-pulse">
                         <div className="w-3 h-3 bg-game-danger rounded-full"></div>
-                        <span className="font-bold text-slate-600 dark:text-slate-300 text-sm uppercase">Opponent Thinking...</span>
+                        <span className="font-bold text-white text-sm uppercase tracking-wider">Opponent Thinking...</span>
                     </div>
                 )}
             </>
