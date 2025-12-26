@@ -248,7 +248,7 @@ const SuperAdminPage: React.FC = () => {
                         placeholder="Security PIN" 
                         value={pin} 
                         onChange={e => setPin(e.target.value)}
-                        className="text-center text-2xl tracking-[0.5em] font-mono h-14"
+                        className="text-center text-2xl tracking-[0.5em] font-mono h-14 text-gray-900 dark:text-white"
                         autoFocus
                       />
                       <Button fullWidth variant="danger" className="mt-4 shadow-red-500/30">Unlock System</Button>
@@ -291,7 +291,7 @@ const SuperAdminPage: React.FC = () => {
                             <i className="fas fa-robot text-xl"></i>
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold dark:text-white">AI Assistant</h3>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">AI Assistant</h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Global Switch for Gemini AI</p>
                         </div>
                     </div>
@@ -379,7 +379,7 @@ const SuperAdminPage: React.FC = () => {
                             <select 
                                 value={selectedSubject} 
                                 onChange={(e) => setSelectedSubject(e.target.value)}
-                                className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-2xl font-bold dark:text-white appearance-none cursor-pointer"
+                                className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-2xl font-bold text-gray-900 dark:text-white appearance-none cursor-pointer"
                             >
                                 <option value="">Select Subject</option>
                                 {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -390,7 +390,7 @@ const SuperAdminPage: React.FC = () => {
                             <select 
                                 value={selectedChapter} 
                                 onChange={(e) => setSelectedChapter(e.target.value)}
-                                className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-2xl font-bold dark:text-white appearance-none cursor-pointer disabled:opacity-50"
+                                className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-2xl font-bold text-gray-900 dark:text-white appearance-none cursor-pointer disabled:opacity-50"
                                 disabled={!selectedSubject}
                             >
                                 <option value="">Select Chapter</option>
@@ -404,7 +404,7 @@ const SuperAdminPage: React.FC = () => {
                     {selectedChapter && (
                         <Card className="!bg-white dark:!bg-gray-800 border-0 shadow-lg">
                             <div className="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-gray-700 pb-4">
-                                <h2 className="font-bold text-lg dark:text-white">
+                                <h2 className="font-bold text-lg text-gray-900 dark:text-white">
                                     <i className="fas fa-list-ul mr-2 text-game-primary"></i> 
                                     Questions ({questions.length})
                                 </h2>
@@ -457,7 +457,7 @@ const SuperAdminPage: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    <h2 className="text-2xl font-black mt-4 dark:text-white">{selectedUser.name}</h2>
+                    <h2 className="text-2xl font-black mt-4 text-gray-900 dark:text-white">{selectedUser.name}</h2>
                     <p className="text-gray-600 dark:text-gray-300 font-bold">{selectedUser.email}</p>
                     <div className="grid grid-cols-2 gap-4 w-full mt-6">
                         <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-xl text-center">
@@ -493,13 +493,13 @@ const SuperAdminPage: React.FC = () => {
                     />
                     
                     <div>
-                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">Options</label>
+                        <label className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wide block mb-2">Options</label>
                         <div className="space-y-2">
                             {editingQuestion.options.map((opt, idx) => (
                                 <div key={idx} className="flex gap-2 items-center">
                                     <div 
                                         onClick={() => setEditingQuestion({...editingQuestion, answer: idx})}
-                                        className={`w-8 h-8 rounded flex items-center justify-center font-bold cursor-pointer border-2 ${idx === editingQuestion.answer ? 'bg-green-500 border-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 border-transparent text-gray-500'}`}
+                                        className={`w-8 h-8 rounded flex items-center justify-center font-bold cursor-pointer border-2 ${idx === editingQuestion.answer ? 'bg-green-500 border-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 border-transparent text-gray-500 dark:text-gray-400'}`}
                                     >
                                         {String.fromCharCode(65+idx)}
                                     </div>
@@ -510,7 +510,7 @@ const SuperAdminPage: React.FC = () => {
                                             newOpts[idx] = e.target.value;
                                             setEditingQuestion({...editingQuestion, options: newOpts});
                                         }}
-                                        className="flex-1 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white font-medium focus:outline-none focus:border-game-primary"
+                                        className="flex-1 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-medium focus:outline-none focus:border-game-primary"
                                     />
                                 </div>
                             ))}
