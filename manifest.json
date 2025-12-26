@@ -1,0 +1,18 @@
+{
+  "short_name": "LP-F4",
+  "name": "LP-F4 Battle Arena",
+  "icons": [
+    {
+      "src": "https://files.catbox.moe/qn40s6.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "orientation": "portrait",
+  "scope": "/",
+  "description": "The ultimate multiplayer quiz arena for Somali students."
+}
