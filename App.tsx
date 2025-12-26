@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { ref, onValue } from 'firebase/database';
 import { auth, db } from './firebase';
 import { UserProfile } from './types';
 import { Navbar } from './components/Navbar';
 import { LPAssistant } from './components/LPAssistant';
 import { UserContext, ThemeContext } from './contexts';
+import { showAlert } from './services/alert';
 
 // Pages
 import AuthPage from './pages/AuthPage';
@@ -83,6 +84,20 @@ const AppContent: React.FC = () => {
         const userRef = ref(db, `users/${currentUser.uid}`);
         onValue(userRef, (snapshot) => {
           const data = snapshot.val();
+          
+          // --- REAL-TIME BAN ENFORCEMENT ---
+          if (data && data.banned) {
+            signOut(auth).then(() => {
+               setUser(null);
+               setProfile(null);
+               localStorage.removeItem('userProfile'); // Clear Profile Cache
+               navigate('/auth');
+               showAlert('⛔ ACCESS DENIED', 'Your account has been permanently suspended by an administrator.', 'error');
+            });
+            return;
+          }
+          // ---------------------------------
+
           if (data) {
             const updatedProfile = { uid: currentUser.uid, ...data };
             setProfile(updatedProfile);
