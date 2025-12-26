@@ -477,7 +477,7 @@ const GamePage: React.FC = () => {
                          <div className="absolute inset-0 z-20 bg-slate-900/10 backdrop-blur-[2px] rounded-3xl flex items-center justify-center animate__animated animate__fadeIn">
                              <div className="bg-slate-900/80 text-white px-6 py-3 rounded-full font-black uppercase tracking-widest shadow-2xl flex items-center gap-3 border border-white/20">
                                  <i className="fas fa-hourglass-half animate-spin-slow"></i>
-                                 Opponent's Turn
+                                 {opponentProfile.name}'s Turn
                              </div>
                          </div>
                     )}
