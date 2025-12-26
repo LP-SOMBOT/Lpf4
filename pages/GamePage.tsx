@@ -46,6 +46,8 @@ const GamePage: React.FC = () => {
   
   // Animation State
   const [showIntro, setShowIntro] = useState(false);
+  const [showTurnAlert, setShowTurnAlert] = useState(false);
+  const prevTurnRef = useRef<string | null>(null);
   
   const processingRef = useRef(false);
 
@@ -159,6 +161,20 @@ const GamePage: React.FC = () => {
           return () => clearTimeout(timer);
       }
   }, [showIntro, match, opponentProfile]);
+
+  // Handle Turn Notifications
+  useEffect(() => {
+      if (!match || !user) return;
+      
+      // If turn changed and it is now MY turn
+      if (prevTurnRef.current && prevTurnRef.current !== match.turn && match.turn === user.uid) {
+          setShowTurnAlert(true);
+          playSound('click'); // Subtle cue
+          const timer = setTimeout(() => setShowTurnAlert(false), 1500);
+          return () => clearTimeout(timer);
+      }
+      prevTurnRef.current = match.turn;
+  }, [match?.turn, user?.uid]);
 
   const currentQuestion = match && questions.length > 0 ? questions[match.currentQ] : null;
   const isMyTurn = match?.turn === user?.uid;
@@ -334,6 +350,16 @@ const GamePage: React.FC = () => {
           </div>
       )}
 
+      {/* TURN ALERT SPLASH */}
+      {showTurnAlert && !isGameOver && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+             <div className="bg-game-primary/90 text-white px-8 py-4 rounded-3xl shadow-2xl animate__animated animate__zoomInDown flex flex-col items-center">
+                <i className="fas fa-bolt text-5xl mb-2 animate-bounce"></i>
+                <h2 className="text-4xl font-black italic uppercase tracking-widest">Your Turn!</h2>
+             </div>
+          </div>
+      )}
+
       {/* Exit Button (Replaces AFK) */}
       {!isGameOver && (
           <div className="absolute top-4 left-4 z-40">
@@ -350,13 +376,16 @@ const GamePage: React.FC = () => {
       <div className="pt-16 md:pt-4 px-4 pb-2 z-20">
          <div className="max-w-4xl mx-auto bg-white/95 dark:bg-slate-800/95 backdrop-blur rounded-[2rem] shadow-xl p-3 flex justify-between items-center border-b-4 border-slate-200 dark:border-slate-700">
             {/* Me */}
-            <div className={`flex items-center gap-3 transition-transform ${isMyTurn && !isGameOver ? 'scale-105' : 'scale-100 opacity-80'}`}>
+            <div className={`flex items-center gap-3 transition-all duration-300 ${isMyTurn && !isGameOver ? 'scale-105 opacity-100' : 'scale-95 opacity-60'}`}>
                  <div className="relative">
-                     <Avatar src={profile?.avatar} seed={user!.uid} size="sm" border={isMyTurn ? '3px solid #6366f1' : '3px solid transparent'} />
+                     <Avatar src={profile?.avatar} seed={user!.uid} size="sm" border={isMyTurn ? '3px solid #6366f1' : '3px solid transparent'} className={isMyTurn ? 'shadow-lg shadow-indigo-500/50' : ''} />
                      <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-[8px] px-1 rounded font-bold border border-white">LVL {myLevel}</div>
                  </div>
                  <div>
-                     <div className="text-[10px] font-black uppercase text-slate-400">You</div>
+                     <div className="flex items-center gap-1">
+                        <div className="text-[10px] font-black uppercase text-slate-400">You</div>
+                        {isMyTurn && !isGameOver && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>}
+                     </div>
                      <div className="text-2xl font-black text-game-primary leading-none">{match.scores[user!.uid]}</div>
                  </div>
             </div>
@@ -367,13 +396,16 @@ const GamePage: React.FC = () => {
             </div>
 
             {/* Opponent */}
-            <div className={`flex items-center gap-3 flex-row-reverse text-right transition-transform ${!isMyTurn && !isGameOver ? 'scale-105' : 'scale-100 opacity-80'}`}>
+            <div className={`flex items-center gap-3 flex-row-reverse text-right transition-all duration-300 ${!isMyTurn && !isGameOver ? 'scale-105 opacity-100' : 'scale-95 opacity-60'}`}>
                  <div className="relative">
-                    <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="sm" border={!isMyTurn ? '3px solid #ef4444' : '3px solid transparent'} />
+                    <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="sm" border={!isMyTurn ? '3px solid #ef4444' : '3px solid transparent'} className={!isMyTurn ? 'shadow-lg shadow-red-500/50' : ''}/>
                     <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-[8px] px-1 rounded font-bold border border-white">LVL {opponentProfile.level}</div>
                  </div>
                  <div>
-                     <div className="text-[10px] font-black uppercase text-slate-400 truncate w-16">{opponentProfile.name}</div>
+                     <div className="flex items-center gap-1 justify-end">
+                         {!isMyTurn && !isGameOver && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
+                         <div className="text-[10px] font-black uppercase text-slate-400 truncate w-16">{opponentProfile.name}</div>
+                     </div>
                      <div className="text-2xl font-black text-game-danger leading-none">{match.scores[opponentProfile.uid]}</div>
                  </div>
             </div>
@@ -425,73 +457,82 @@ const GamePage: React.FC = () => {
            </Card>
         ) : (
             <>
-                <div className="w-full bg-white dark:bg-slate-800 rounded-[2rem] p-6 md:p-8 shadow-[0_10px_0_rgba(0,0,0,0.1)] mb-6 text-center border-2 border-slate-100 dark:border-slate-700 min-h-[160px] flex items-center justify-center relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-game-primary via-purple-500 to-game-danger"></div>
+                <div className={`
+                    w-full rounded-[2rem] p-6 md:p-8 shadow-[0_10px_0_rgba(0,0,0,0.1)] mb-6 text-center border-2 
+                    min-h-[160px] flex items-center justify-center relative overflow-hidden transition-all duration-500
+                    ${isMyTurn 
+                        ? 'bg-white dark:bg-slate-800 border-game-primary/50 shadow-game-primary/20' 
+                        : 'bg-gray-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-90 grayscale-[0.5]'}
+                `}>
+                    {isMyTurn && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-game-primary via-purple-500 to-game-danger animate-pulse"></div>}
                     <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed z-10">
                         {currentQuestion && currentQuestion.question}
                     </h2>
                 </div>
 
                 {/* REDESIGNED OPTION CARDS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                    {currentQuestion && currentQuestion.options.map((opt, idx) => {
-                        // Determine visual state
-                        let isActive = selectedOption === idx;
-                        let isCorrect = showFeedback?.answer === idx;
-                        let isWrong = isActive && showFeedback && !isCorrect;
-                        let isDimmed = showFeedback && !isActive && !isCorrect;
+                <div className="relative w-full">
+                    {/* Locked Overlay for Opponent's Turn */}
+                    {!isMyTurn && (
+                         <div className="absolute inset-0 z-20 bg-slate-900/10 backdrop-blur-[2px] rounded-3xl flex items-center justify-center animate__animated animate__fadeIn">
+                             <div className="bg-slate-900/80 text-white px-6 py-3 rounded-full font-black uppercase tracking-widest shadow-2xl flex items-center gap-3 border border-white/20">
+                                 <i className="fas fa-hourglass-half animate-spin-slow"></i>
+                                 Opponent's Turn
+                             </div>
+                         </div>
+                    )}
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                        {currentQuestion && currentQuestion.options.map((opt, idx) => {
+                            // Determine visual state
+                            let isActive = selectedOption === idx;
+                            let isCorrect = showFeedback?.answer === idx;
 
-                        let bgClass = "bg-white dark:bg-slate-800 border-b-4 border-slate-300 dark:border-slate-700";
-                        let textClass = "text-slate-700 dark:text-slate-200";
+                            let bgClass = "bg-white dark:bg-slate-800 border-b-4 border-slate-300 dark:border-slate-700";
+                            let textClass = "text-slate-700 dark:text-slate-200";
 
-                        if (isActive) {
-                             bgClass = "bg-game-primary border-b-4 border-game-primaryDark translate-y-[2px]";
-                             textClass = "text-white";
-                        }
-                        
-                        if (showFeedback) {
-                            if (idx === showFeedback.answer) {
-                                bgClass = "bg-green-500 border-b-4 border-green-700 animate__animated animate__pulse";
+                            if (isActive) {
+                                bgClass = "bg-game-primary border-b-4 border-game-primaryDark translate-y-[2px]";
                                 textClass = "text-white";
-                            } else if (isActive) {
-                                bgClass = "bg-red-500 border-b-4 border-red-700 animate__animated animate__shakeX";
-                                textClass = "text-white";
-                            } else {
-                                bgClass = "bg-slate-100 dark:bg-slate-800 opacity-50 border-transparent grayscale";
                             }
-                        }
+                            
+                            if (showFeedback) {
+                                if (idx === showFeedback.answer) {
+                                    bgClass = "bg-green-500 border-b-4 border-green-700 animate__animated animate__pulse";
+                                    textClass = "text-white";
+                                } else if (isActive) {
+                                    bgClass = "bg-red-500 border-b-4 border-red-700 animate__animated animate__shakeX";
+                                    textClass = "text-white";
+                                } else {
+                                    bgClass = "bg-slate-100 dark:bg-slate-800 opacity-50 border-transparent grayscale";
+                                }
+                            }
 
-                        return (
-                            <button
-                                key={idx}
-                                disabled={!isMyTurn || selectedOption !== null}
-                                onClick={() => handleOptionClick(idx)}
-                                className={`
-                                    relative p-5 rounded-2xl text-left transition-all duration-150 active:scale-[0.98]
-                                    ${bgClass} ${!isMyTurn ? 'cursor-not-allowed opacity-70' : ''}
-                                    shadow-lg hover:brightness-105 min-h-[80px] flex items-center
-                                `}
-                            >
-                                <div className={`
-                                    w-8 h-8 rounded-lg flex items-center justify-center font-black mr-4 text-sm shrink-0
-                                    ${isActive || (showFeedback && idx === showFeedback.answer) ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}
-                                `}>
-                                    {String.fromCharCode(65 + idx)}
-                                </div>
-                                <span className={`font-bold text-lg leading-tight ${textClass}`}>
-                                    {opt}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {!isMyTurn && (
-                    <div className="mt-8 flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-3 rounded-full shadow-lg border border-white/20 animate-pulse">
-                        <div className="w-3 h-3 bg-game-danger rounded-full"></div>
-                        <span className="font-bold text-white text-sm uppercase tracking-wider">Opponent Thinking...</span>
+                            return (
+                                <button
+                                    key={idx}
+                                    disabled={!isMyTurn || selectedOption !== null}
+                                    onClick={() => handleOptionClick(idx)}
+                                    className={`
+                                        relative p-5 rounded-2xl text-left transition-all duration-150 active:scale-[0.98]
+                                        ${bgClass} ${!isMyTurn ? 'cursor-not-allowed' : ''}
+                                        shadow-lg hover:brightness-105 min-h-[80px] flex items-center
+                                    `}
+                                >
+                                    <div className={`
+                                        w-8 h-8 rounded-lg flex items-center justify-center font-black mr-4 text-sm shrink-0
+                                        ${isActive || (showFeedback && idx === showFeedback.answer) ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}
+                                    `}>
+                                        {String.fromCharCode(65 + idx)}
+                                    </div>
+                                    <span className={`font-bold text-lg leading-tight ${textClass}`}>
+                                        {opt}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
-                )}
+                </div>
             </>
         )}
       </div>
