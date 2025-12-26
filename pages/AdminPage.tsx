@@ -517,7 +517,7 @@ const AdminPage: React.FC = () => {
                                 </div>
                                 <div className="flex-1 relative">
                                     <input 
-                                        className={`w-full p-3 bg-slate-50 dark:bg-slate-900 dark:text-white border-2 rounded-xl transition-all font-medium focus:outline-none ${idx === correctAnswer ? 'border-green-500 dark:border-green-600 ring-2 ring-green-500/20' : 'border-slate-200 dark:border-slate-700 focus:border-game-primary'}`}
+                                        className={`w-full p-3 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-2 rounded-xl transition-all font-medium focus:outline-none ${idx === correctAnswer ? 'border-green-500 dark:border-green-600 ring-2 ring-green-500/20' : 'border-slate-200 dark:border-slate-700 focus:border-game-primary'}`}
                                         value={opt}
                                         onChange={(e) => handleOptionChange(idx, e.target.value)}
                                         placeholder={`Option ${idx + 1}`}
@@ -614,7 +614,7 @@ const AdminPage: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     {q.options.map((opt, i) => (
-                        <div key={i} className={`p-2 rounded-lg border flex items-center gap-2 ${i === q.answer ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400 font-bold' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                        <div key={i} className={`p-2 rounded-lg border flex items-center gap-2 ${i === q.answer ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400 font-bold' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300'}`}>
                            <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] ${i === q.answer ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>{String.fromCharCode(65 + i)}</span> 
                            {opt}
                         </div>
