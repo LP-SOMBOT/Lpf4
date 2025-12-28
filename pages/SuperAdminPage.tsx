@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ref, update, onValue, off, set, remove, get } from 'firebase/database';
 import { db } from '../firebase';
-import { UserProfile, Subject, Chapter, Question } from '../types';
+import { UserProfile, Subject, Chapter, Question, MatchState } from '../types';
 import { Button, Card, Input, Modal, Avatar } from '../components/UI';
 import { showAlert, showToast, showConfirm } from '../services/alert';
 
@@ -9,7 +9,7 @@ const SuperAdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'quizzes'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'quizzes' | 'matches'>('users');
   
   // --- USER MANAGEMENT STATE ---
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -23,6 +23,9 @@ const SuperAdminPage: React.FC = () => {
   
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedChapter, setSelectedChapter] = useState<string>('');
+  
+  // --- MATCH MANAGEMENT STATE ---
+  const [matches, setMatches] = useState<MatchState[]>([]);
   
   // Editing Question
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -75,6 +78,25 @@ const SuperAdminPage: React.FC = () => {
           };
           onValue(subRef, handleSub);
           return () => off(subRef);
+      }
+  }, [isAuthenticated, activeTab]);
+
+  // FETCH MATCHES (Only when tab is matches)
+  useEffect(() => {
+      if (isAuthenticated && activeTab === 'matches') {
+          const matchesRef = ref(db, 'matches');
+          const handleMatches = (snap: any) => {
+              if (snap.exists()) {
+                  const data = snap.val();
+                  // Map and sort by newest first (assuming keys usually correlate with time or we can check createdAt)
+                  const list: MatchState[] = Object.keys(data).map(key => ({ ...data[key], matchId: key }));
+                  setMatches(list.reverse());
+              } else {
+                  setMatches([]);
+              }
+          };
+          onValue(matchesRef, handleMatches);
+          return () => off(matchesRef);
       }
   }, [isAuthenticated, activeTab]);
 
@@ -240,6 +262,41 @@ const SuperAdminPage: React.FC = () => {
       }
   };
 
+  // --- MATCH ACTIONS ---
+
+  const handleDestroyMatch = async (matchId: string) => {
+      const confirmed = await showConfirm(
+          "Destroy Match?", 
+          "This will immediately terminate the game session for all participants.", 
+          "Destroy", 
+          "Cancel", 
+          "danger"
+      );
+      
+      if (!confirmed) return;
+
+      try {
+          const match = matches.find(m => m.matchId === matchId);
+          const updates: any = {};
+          
+          // Delete Match
+          updates[`matches/${matchId}`] = null;
+          
+          // Clear activeMatch for players to ensure they aren't stuck
+          if (match && match.players) {
+              Object.keys(match.players).forEach(uid => {
+                  updates[`users/${uid}/activeMatch`] = null;
+              });
+          }
+          
+          await update(ref(db), updates);
+          showToast("Match Terminated", "success");
+      } catch (e) {
+          console.error(e);
+          showAlert("Error", "Failed to destroy match", "error");
+      }
+  };
+
   // --- RENDER ---
 
   if (!isAuthenticated) {
@@ -278,18 +335,24 @@ const SuperAdminPage: React.FC = () => {
                     <h1 className="text-3xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Super Admin</h1>
                     <p className="text-gray-500 dark:text-gray-400 font-bold text-sm">System Control Center</p>
                 </div>
-                <div className="flex bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm">
+                <div className="flex bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm overflow-x-auto">
                     <button 
                         onClick={() => setActiveTab('users')} 
-                        className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'users' ? 'bg-game-primary text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                        className={`px-6 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-game-primary text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                     >
                         <i className="fas fa-users mr-2"></i> Users
                     </button>
                     <button 
                         onClick={() => setActiveTab('quizzes')} 
-                        className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'quizzes' ? 'bg-game-primary text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                        className={`px-6 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'quizzes' ? 'bg-game-primary text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                     >
                         <i className="fas fa-book-open mr-2"></i> Quizzes
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('matches')} 
+                        className={`px-6 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'matches' ? 'bg-game-primary text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                        <i className="fas fa-gamepad mr-2"></i> Live Games
                     </button>
                 </div>
             </div>
@@ -450,6 +513,71 @@ const SuperAdminPage: React.FC = () => {
                                 </div>
                             )}
                         </Card>
+                    )}
+                </div>
+            )}
+
+            {/* --- MATCH MANAGEMENT TAB --- */}
+            {activeTab === 'matches' && (
+                <div className="animate__animated animate__fadeIn space-y-6">
+                    {matches.length === 0 ? (
+                        <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                             <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400 dark:text-gray-500 text-3xl">
+                                <i className="fas fa-gamepad"></i>
+                             </div>
+                             <h3 className="text-xl font-bold text-gray-500 dark:text-gray-400">No Active Matches</h3>
+                             <p className="text-sm text-gray-400 dark:text-gray-500">The arena is currently quiet.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4">
+                             {matches.map(m => {
+                                 const pIds = Object.keys(m.players || {});
+                                 const p1 = m.players?.[pIds[0]];
+                                 const p2 = m.players?.[pIds[1]];
+                                 
+                                 return (
+                                    <div key={m.matchId} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-6">
+                                        <div className="flex items-center gap-6 flex-1 w-full justify-center md:justify-start">
+                                             {/* Player 1 */}
+                                             <div className="flex flex-col items-center">
+                                                 <Avatar src={p1?.avatar} size="md" className="mb-2" />
+                                                 <div className="font-bold text-sm text-gray-900 dark:text-white truncate max-w-[100px]">{p1?.name || 'Unknown'}</div>
+                                                 <div className="text-xl font-black text-game-primary">{m.scores?.[pIds[0]] || 0}</div>
+                                             </div>
+                                             
+                                             <div className="text-center">
+                                                 <div className="text-2xl font-black text-gray-300 dark:text-gray-600 italic">VS</div>
+                                                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500">
+                                                     Q {m.currentQ + 1}
+                                                 </span>
+                                             </div>
+                                             
+                                             {/* Player 2 */}
+                                             <div className="flex flex-col items-center">
+                                                 <Avatar src={p2?.avatar} size="md" className="mb-2" />
+                                                 <div className="font-bold text-sm text-gray-900 dark:text-white truncate max-w-[100px]">{p2?.name || 'Unknown'}</div>
+                                                 <div className="text-xl font-black text-red-500">{m.scores?.[pIds[1]] || 0}</div>
+                                             </div>
+                                        </div>
+
+                                        <div className="flex flex-col items-end gap-2 w-full md:w-auto border-t md:border-t-0 border-gray-100 dark:border-gray-700 pt-4 md:pt-0">
+                                            <div className="flex gap-2 text-xs font-bold text-gray-500 dark:text-gray-400">
+                                                <span className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded uppercase">{m.mode}</span>
+                                                <span className={`px-2 py-1 rounded uppercase ${m.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100'}`}>{m.status}</span>
+                                            </div>
+                                            <Button 
+                                                size="sm" 
+                                                variant="danger" 
+                                                onClick={() => handleDestroyMatch(m.matchId)}
+                                                className="w-full md:w-auto"
+                                            >
+                                                <i className="fas fa-ban mr-2"></i> Terminate
+                                            </Button>
+                                        </div>
+                                    </div>
+                                 );
+                             })}
+                        </div>
                     )}
                 </div>
             )}
