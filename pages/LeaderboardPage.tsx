@@ -33,6 +33,7 @@ const LeaderboardPage: React.FC = () => {
                  email: data[key].email || '',
                  points: typeof data[key].points === 'number' ? data[key].points : 0,
                  avatar: data[key].avatar || '',
+                 isVerified: data[key].isVerified
              }));
              
              // Sort descending
@@ -70,11 +71,11 @@ const LeaderboardPage: React.FC = () => {
 
   return (
     <div className="min-h-full p-4 flex flex-col pb-24 max-w-4xl mx-auto w-full">
-       <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+       <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-100 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
         <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-game-primary dark:hover:text-blue-400 transition-colors">
             <i className="fas fa-arrow-left fa-lg"></i>
         </button>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase italic">Top Students</h1>
+        <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Top Students</h1>
       </div>
 
       {loading && players.length === 0 ? (
@@ -112,6 +113,7 @@ const LeaderboardPage: React.FC = () => {
                         <div className="flex-1 min-w-0 pr-2">
                             <div className="font-bold text-sm md:text-base text-slate-900 dark:text-white truncate flex items-center gap-2">
                                 {p.name}
+                                {p.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
                                 {isMe && <span className="bg-game-primary text-white text-[9px] px-1.5 py-0.5 rounded-md font-black tracking-wide">ME</span>}
                             </div>
                             <div className="text-[10px] md:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">

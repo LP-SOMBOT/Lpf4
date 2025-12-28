@@ -4,13 +4,18 @@ import { ref, set, get } from 'firebase/database';
 import { auth, db } from '../firebase';
 import { playSound } from '../services/audioService';
 import { generateAvatarUrl } from '../constants';
-import { Button, Input, Card } from '../components/UI';
-import { showAlert } from '../services/alert';
+import { Button, Input, Modal } from '../components/UI';
+import { showAlert, showToast } from '../services/alert';
 
 const AuthPage: React.FC = () => {
   // UI State
   const [view, setView] = useState<'welcome' | 'login' | 'register'>('welcome');
   
+  // Guest Modal State
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestUsername, setGuestUsername] = useState('');
+
   // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,28 +57,43 @@ const AuthPage: React.FC = () => {
       }
   };
 
-  const handleGuestLogin = async () => {
-      setLoading(true);
+  // Step 1: Clicked "Play as Guest"
+  const handleGuestClick = () => {
       playSound('click');
+      // Check if we have a saved guest session or profile mapping
+      // Note: Firebase auth persists session, but we want to know if we need to setup a profile
+      const cachedGuest = localStorage.getItem('is_guest_setup');
+      
+      if (cachedGuest === 'true') {
+          performGuestLogin();
+      } else {
+          setShowGuestModal(true);
+      }
+  };
+
+  // Step 2: Actually sign in (either after modal or auto)
+  const performGuestLogin = async (customName?: string, customUsername?: string) => {
+      setLoading(true);
       try {
           // 1. Sign In
           const userCred = await signInAnonymously(auth);
           const user = userCred.user;
           
-          // 2. Check if profile already exists (if re-logging in anonymously)
+          // 2. Check if profile exists in DB
           const userRef = ref(db, `users/${user.uid}`);
           const snapshot = await get(userRef);
           
           if (!snapshot.exists()) {
               // 3. Create Profile
               const seed = Math.random().toString(36).substring(7);
-              const timestampSuffix = Date.now().toString().slice(-4);
-              const guestName = `Guest_${timestampSuffix}`;
-              const guestUsername = `guest_${seed}_${timestampSuffix}`;
+              
+              // Use provided name/username or fallbacks (should be provided by modal)
+              const finalName = customName || `Guest_${seed.substring(0,4)}`;
+              const finalUsername = customUsername || `guest_${seed}`;
               
               await set(userRef, {
-                name: guestName,
-                username: guestUsername,
+                name: finalName,
+                username: finalUsername,
                 points: 0,
                 avatar: generateAvatarUrl(seed),
                 gender: 'male',
@@ -84,14 +104,33 @@ const AuthPage: React.FC = () => {
                 createdAt: Date.now()
               });
 
-              await updateProfile(user, { displayName: guestName });
+              await updateProfile(user, { displayName: finalName });
+              localStorage.setItem('is_guest_setup', 'true');
+          } else {
+              // Profile exists, mark local storage just in case
+              localStorage.setItem('is_guest_setup', 'true');
           }
           // App.tsx listener will handle redirection
       } catch (e: any) {
           console.error(e);
           showAlert('Login Error', 'Could not sign in as guest. Please try again.', 'error');
-          setLoading(false); // Only stop loading on error, otherwise allow unmount/redirect
+          setLoading(false);
       }
+  };
+
+  const handleGuestSubmit = async () => {
+      if (!guestName.trim()) { showToast("Enter your name", "error"); return; }
+      if (!guestUsername.trim()) { showToast("Enter a username", "error"); return; }
+      
+      const cleanUser = guestUsername.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (cleanUser.length < 3) { showToast("Username too short", "error"); return; }
+      
+      // Check username
+      const taken = await checkUsernameExists(cleanUser);
+      if (taken) { showToast("Username taken", "error"); return; }
+
+      setShowGuestModal(false);
+      performGuestLogin(guestName, cleanUser);
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -184,7 +223,7 @@ const AuthPage: React.FC = () => {
                      <Button 
                         fullWidth 
                         size="lg" 
-                        onClick={handleGuestLogin} 
+                        onClick={handleGuestClick} 
                         isLoading={loading}
                         className="py-5 text-xl shadow-lg shadow-indigo-500/30 mb-8 relative overflow-hidden group"
                      >
@@ -324,6 +363,29 @@ const AuthPage: React.FC = () => {
                  </div>
              </div>
          )}
+
+         {/* Guest Registration Modal */}
+         <Modal isOpen={showGuestModal} title="Guest Profile" onClose={() => setShowGuestModal(false)}>
+             <div className="space-y-4">
+                 <p className="text-sm text-slate-500 text-center mb-4">Set up your profile to start playing.</p>
+                 <Input 
+                    icon="fa-user" 
+                    placeholder="Full Name" 
+                    value={guestName} 
+                    onChange={e => setGuestName(e.target.value)} 
+                    autoFocus
+                 />
+                 <Input 
+                    icon="fa-at" 
+                    placeholder="Username" 
+                    value={guestUsername} 
+                    onChange={e => setGuestUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} 
+                 />
+                 <Button fullWidth onClick={handleGuestSubmit} isLoading={loading} className="mt-2">
+                     Let's Go!
+                 </Button>
+             </div>
+         </Modal>
 
       </div>
     </div>

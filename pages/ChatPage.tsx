@@ -42,14 +42,22 @@ const ChatPage: React.FC = () => {
       const derivedChatId = `${participants[0]}_${participants[1]}`;
       setChatId(derivedChatId);
 
-      // Listen for Messages
+      // 1. Load from Cache first
+      const cachedMsgs = localStorage.getItem(`chat_${derivedChatId}`);
+      if (cachedMsgs) {
+          try {
+              setMessages(JSON.parse(cachedMsgs));
+          } catch(e) {}
+      }
+
+      // 2. Listen for Live Messages
       const msgsRef = ref(db, `chats/${derivedChatId}/messages`);
       const unsub = onValue(msgsRef, (snap) => {
           if (snap.exists()) {
               const data = snap.val();
               const list = Object.keys(data).map(k => ({ id: k, ...data[k] })).sort((a,b) => a.timestamp - b.timestamp);
               setMessages(list);
-              // Save to localStorage for simple offline history (optional enhancement)
+              // Save to localStorage
               localStorage.setItem(`chat_${derivedChatId}`, JSON.stringify(list));
               playSound('click'); // Incoming msg sound
           }
@@ -159,43 +167,58 @@ const ChatPage: React.FC = () => {
 
   const acceptInvite = (code: string) => {
       playSound('click');
-      // Navigate to Lobby with auto-join code
-      // LobbyPage will handle the join logic and redirect to game
       navigate('/lobby', { state: { autoJoinCode: code } });
+  };
+
+  const formatTime = (timestamp: number) => {
+      if (!timestamp) return '';
+      return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   if (!targetUser) return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 text-slate-500 dark:text-white font-bold">Loading Chat...</div>;
 
   return (
-    <div className="fixed inset-0 bg-gray-50 dark:bg-slate-900 flex flex-col z-50">
+    <div className="fixed inset-0 flex flex-col z-50 bg-slate-100 dark:bg-slate-900 transition-colors">
+        
+        {/* Dynamic Background Pattern */}
+        <div className="absolute inset-0 opacity-10 pointer-events-none z-0" 
+             style={{ 
+                 backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%236366f1' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` 
+             }}
+        ></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/50 dark:to-black/50 pointer-events-none z-0"></div>
+
         {/* Header */}
-        <div className="bg-white dark:bg-slate-800 p-4 shadow-sm flex items-center justify-between border-b border-gray-200 dark:border-slate-700">
+        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md p-4 shadow-sm flex items-center justify-between border-b border-gray-200 dark:border-slate-700 relative z-20">
             <div className="flex items-center gap-3">
-                <button onClick={() => navigate(-1)} className="text-gray-500 dark:text-gray-300 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"><i className="fas fa-arrow-left"></i></button>
+                <button onClick={() => navigate(-1)} className="text-gray-500 dark:text-gray-300 w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"><i className="fas fa-arrow-left"></i></button>
                 <div className="relative">
                     <Avatar src={targetUser.avatar} seed={targetUser.uid} size="sm" isVerified={targetUser.isVerified} isOnline={targetUser.isOnline} />
                 </div>
                 <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-sm">{targetUser.name}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">@{targetUser.username}</div>
+                    <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1">
+                        {targetUser.name}
+                        {targetUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">@{targetUser.username}</div>
                 </div>
             </div>
             <button 
                 onClick={openMatchSetup}
-                className="bg-game-primary text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform"
+                className="bg-game-primary text-white px-4 py-2 rounded-xl text-xs font-bold uppercase shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform hover:bg-indigo-600"
             >
                 <i className="fas fa-gamepad mr-2"></i> Play
             </button>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-100 dark:bg-slate-900/50">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24 relative z-10 custom-scrollbar">
             {messages.map((msg) => {
                 const isMe = msg.sender === user?.uid;
                 return (
-                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate__animated animate__fadeInUp`}>
+                    <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate__animated animate__fadeInUp`}>
                         {msg.type === 'invite' ? (
-                             <div className={`max-w-[85%] p-4 rounded-2xl ${isMe ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 border-2 border-game-primary'} shadow-md`}>
+                             <div className={`max-w-[85%] p-4 rounded-3xl ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border-2 border-game-primary rounded-bl-sm'} shadow-lg`}>
                                  <div className={`font-black uppercase text-[10px] mb-2 ${isMe ? 'text-indigo-200' : 'text-game-primary'} tracking-widest`}>Battle Challenge</div>
                                  <div className="text-center py-2">
                                      <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg">
@@ -210,14 +233,16 @@ const ChatPage: React.FC = () => {
                                          <div className="text-xs bg-black/20 px-3 py-1 rounded-full inline-block">Waiting for opponent...</div>
                                      )}
                                  </div>
+                                 <div className={`text-[10px] text-right mt-2 ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>{formatTime(msg.timestamp)}</div>
                              </div>
                         ) : (
-                             <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-sm ${
+                             <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-md ${
                                  isMe 
                                  ? 'bg-game-primary text-white rounded-br-none' 
                                  : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-bl-none border border-slate-200 dark:border-slate-700'
                              }`}>
                                  {msg.text}
+                                 <div className={`text-[9px] text-right mt-1 font-medium ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>{formatTime(msg.timestamp)}</div>
                              </div>
                         )}
                     </div>
@@ -226,22 +251,24 @@ const ChatPage: React.FC = () => {
             <div ref={messagesEndRef}></div>
         </div>
 
-        {/* Input */}
-        <form onSubmit={(e) => sendMessage(e, 'text')} className="p-3 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 flex gap-2">
-            <input 
-                className="flex-1 bg-gray-100 dark:bg-slate-900 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-game-primary transition-all font-medium placeholder-slate-400"
-                placeholder="Type a message..."
-                value={inputText}
-                onChange={e => setInputText(e.target.value)}
-            />
-            <button 
-                type="submit" 
-                disabled={!inputText.trim()}
-                className="w-12 h-12 bg-game-primary text-white rounded-xl flex items-center justify-center disabled:opacity-50 shadow-md hover:bg-indigo-600 transition-colors"
-            >
-                <i className="fas fa-paper-plane"></i>
-            </button>
-        </form>
+        {/* Responsive Fixed Input */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-gray-200 dark:border-slate-800 p-4 z-50 md:max-w-screen-md lg:max-w-none mx-auto">
+            <form onSubmit={(e) => sendMessage(e, 'text')} className="flex gap-2 max-w-4xl mx-auto">
+                <input 
+                    className="flex-1 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-game-primary focus:ring-4 focus:ring-game-primary/10 transition-all font-medium placeholder-slate-400"
+                    placeholder="Type a message..."
+                    value={inputText}
+                    onChange={e => setInputText(e.target.value)}
+                />
+                <button 
+                    type="submit" 
+                    disabled={!inputText.trim()}
+                    className="w-14 h-auto rounded-2xl bg-game-primary text-white flex items-center justify-center disabled:opacity-50 shadow-lg shadow-indigo-500/30 hover:bg-indigo-600 transition-colors transform active:scale-95"
+                >
+                    <i className="fas fa-paper-plane text-lg"></i>
+                </button>
+            </form>
+        </div>
 
         {/* Game Setup Modal */}
         <Modal isOpen={showGameSetup} title="Start Battle" onClose={() => setShowGameSetup(false)}>

@@ -23,6 +23,15 @@ const SocialPage: React.FC = () => {
   // Load Data
   useEffect(() => {
       if (!user) return;
+      
+      // 1. Load cached friends first
+      const cachedFriends = localStorage.getItem('friends_cache');
+      if (cachedFriends) {
+          try {
+              setFriends(JSON.parse(cachedFriends));
+          } catch(e) {}
+      }
+
       const usersRef = ref(db, 'users');
       
       const handleData = (snap: any) => {
@@ -44,6 +53,9 @@ const SocialPage: React.FC = () => {
               if (data[fUid]) friendList.push({ uid: fUid, ...data[fUid] });
           });
           setFriends(friendList);
+          
+          // Cache Friends
+          localStorage.setItem('friends_cache', JSON.stringify(friendList));
 
           // Process All Users (for Explore)
           const all: UserProfile[] = Object.keys(data).map(k => ({ uid: k, ...data[k] }));
@@ -106,13 +118,13 @@ const SocialPage: React.FC = () => {
 
   return (
     <div className="min-h-full p-4 flex flex-col pb-24 max-w-4xl mx-auto w-full">
-       {/* Header */}
-       <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center justify-between transition-colors">
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Students</h1>
-            <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl">
-                <button onClick={() => setActiveTab('friends')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'friends' ? 'bg-white shadow text-game-primary' : 'text-slate-500'}`}>Friends</button>
-                <button onClick={() => setActiveTab('explore')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'explore' ? 'bg-white shadow text-game-primary' : 'text-slate-500'}`}>Explore</button>
-                <button onClick={() => setActiveTab('requests')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white shadow text-game-primary' : 'text-slate-500'}`}>
+       {/* Header - Softer Colors */}
+       <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-100 dark:border-gray-700/50 shadow-sm flex items-center justify-between transition-colors">
+            <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight">Students</h1>
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <button onClick={() => setActiveTab('friends')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'friends' ? 'bg-white shadow text-game-primary' : 'text-slate-500 hover:text-slate-700'}`}>Friends</button>
+                <button onClick={() => setActiveTab('explore')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'explore' ? 'bg-white shadow text-game-primary' : 'text-slate-500 hover:text-slate-700'}`}>Explore</button>
+                <button onClick={() => setActiveTab('requests')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'requests' ? 'bg-white shadow text-game-primary' : 'text-slate-500 hover:text-slate-700'}`}>
                     Requests {requests.length > 0 && <span className="ml-1 bg-red-500 text-white px-1.5 rounded-full text-[10px]">{requests.length}</span>}
                 </button>
             </div>

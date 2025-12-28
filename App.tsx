@@ -17,7 +17,7 @@ import GamePage from './pages/GamePage';
 import SoloPage from './pages/SoloPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import ProfilePage from './pages/ProfilePage';
-import AdminPage from './pages/AdminPage';
+import { AdminPage } from './pages/AdminPage';
 import AboutPage from './pages/AboutPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import DownloadPage from './pages/DownloadPage'; 
@@ -150,19 +150,19 @@ const AppContent: React.FC = () => {
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
       <ThemeContext.Provider value={{ theme, setTheme }}>
-        {/* Global Background Elements */}
-        <div className="fixed inset-0 -z-10 overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-500">
+        {/* Global Background Elements (Restored Game Vibe) */}
+        <div className="fixed inset-0 -z-10 overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
            
            {/* Vibrant Gradient Mesh */}
-           <div className="absolute top-0 left-0 w-full h-full opacity-60 dark:opacity-30">
-               <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-400 rounded-full mix-blend-multiply filter blur-[120px] animate-blob"></div>
-               <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-400 rounded-full mix-blend-multiply filter blur-[120px] animate-blob animation-delay-2000"></div>
-               <div className="absolute bottom-[-20%] left-[20%] w-[600px] h-[600px] bg-pink-400 rounded-full mix-blend-multiply filter blur-[120px] animate-blob animation-delay-4000"></div>
-               <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] bg-yellow-400 rounded-full mix-blend-multiply filter blur-[100px] animate-blob animation-delay-5000"></div>
+           <div className="absolute top-0 left-0 w-full h-full opacity-60 dark:opacity-40">
+               <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-400 dark:bg-purple-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[120px] animate-blob"></div>
+               <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-400 dark:bg-indigo-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
+               <div className="absolute bottom-[-20%] left-[20%] w-[600px] h-[600px] bg-pink-400 dark:bg-pink-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
+               <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] bg-yellow-400 dark:bg-yellow-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[100px] animate-blob animation-delay-5000"></div>
            </div>
            
            {/* Noise Texture Overlay for authentic glass feel */}
-           <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}></div>
+           <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}></div>
         </div>
 
         <div className="w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden relative z-10">

@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { read, utils, writeFile } from 'xlsx';
 import { showAlert, showConfirm } from '../services/alert';
 
-const AdminPage: React.FC = () => {
+export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
   
   // Selection State
@@ -413,12 +413,12 @@ const AdminPage: React.FC = () => {
   return (
     <div className="min-h-screen p-4 pb-20 transition-colors max-w-4xl mx-auto w-full">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center justify-between transition-colors">
+      <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/95 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-100 dark:border-gray-700/50 shadow-sm flex items-center justify-between transition-colors">
         <div className="flex items-center gap-3">
             <button onClick={() => navigate('/')} className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-game-primary dark:hover:text-blue-400 transition-colors shadow-sm">
                 <i className="fas fa-arrow-left"></i>
             </button>
-            <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Admin Panel</h1>
+            <h1 className="text-xl md:text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Admin Panel</h1>
         </div>
       </div>
 
@@ -625,9 +625,8 @@ const AdminPage: React.FC = () => {
             )}
           </div>
         </Card>
-      </div>
 
-      <Modal isOpen={!!modalType} title={`Create ${modalType === 'subject' ? 'Subject' : 'Chapter'}`}>
+        <Modal isOpen={!!modalType} title={`Create ${modalType === 'subject' ? 'Subject' : 'Chapter'}`}>
           <div className="space-y-4 pt-2">
               <Input label="Name" value={newItemName} onChange={(e) => { setNewItemName(e.target.value); if (!newItemId) setNewItemId(e.target.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')); }} autoFocus placeholder="e.g. Mathematics" />
               <Input label="ID (Auto-generated)" value={newItemId} onChange={(e) => setNewItemId(e.target.value)} placeholder="e.g. mathematics" className="font-mono text-sm" />
@@ -640,5 +639,3 @@ const AdminPage: React.FC = () => {
     </div>
   );
 };
-
-export default AdminPage;

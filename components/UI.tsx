@@ -117,17 +117,10 @@ export const Avatar: React.FC<{
           <img src={imageUrl} alt="Avatar" className="w-full h-full object-cover" />
         </div>
         
-        {/* Verification Badge */}
-        {isVerified && (
-            <div className="absolute bottom-0 right-0 bg-white dark:bg-slate-800 rounded-full p-[2px]">
-                <div className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] border-2 border-white dark:border-slate-800" title="Verified Student">
-                    <i className="fas fa-check"></i>
-                </div>
-            </div>
-        )}
+        {/* Verification Badge REMOVED as per request - it will be displayed next to name in text */}
         
-        {/* Online Status (Only show if not verified to avoid clutter, or position differently) */}
-        {isOnline && !isVerified && (
+        {/* Online Status */}
+        {isOnline && (
              <div className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
         )}
     </div>
