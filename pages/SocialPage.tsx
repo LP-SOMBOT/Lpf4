@@ -196,14 +196,22 @@ const SocialPage: React.FC = () => {
 
   // Filter Users
   // SAFE FILTER: Checks for undefined name/username to prevent crash
+  // UPDATED SORT: 1. Online, 2. Verified, 3. Alphabetical
   const filteredExplore = allUsers.filter(u => 
       (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
       (u.username && (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()))
   ).sort((a, b) => {
-      // 1. Verified users first
-      if (a.isVerified && !b.isVerified) return -1;
-      if (!a.isVerified && b.isVerified) return 1;
-      // 2. Then alphabetical
+      // 1. Online status first
+      const aOnline = a.isOnline ? 1 : 0;
+      const bOnline = b.isOnline ? 1 : 0;
+      if (aOnline !== bOnline) return bOnline - aOnline;
+
+      // 2. Verified users next
+      const aVerified = a.isVerified ? 1 : 0;
+      const bVerified = b.isVerified ? 1 : 0;
+      if (aVerified !== bVerified) return bVerified - aVerified;
+      
+      // 3. Then alphabetical
       return (a.name || '').localeCompare(b.name || '');
   });
 
