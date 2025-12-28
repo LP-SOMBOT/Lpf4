@@ -188,12 +188,12 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col justify-center items-center p-4 relative overflow-hidden bg-gray-50 dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen w-full flex flex-col justify-center items-center p-4 relative overflow-hidden bg-orange-50 dark:bg-slate-900 transition-colors">
       {/* Dynamic Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-game-primary/20 rounded-full blur-[120px] animate-blob"></div>
-        <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] bg-purple-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
-        <div className="absolute inset-0 opacity-[0.4]" style={{ backgroundImage: 'radial-gradient(rgba(148, 163, 184, 0.3) 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
+        <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] bg-red-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
+        <div className="absolute inset-0 opacity-[0.4]" style={{ backgroundImage: 'radial-gradient(rgba(251, 146, 60, 0.3) 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
       </div>
 
       {/* Main Content */}
@@ -202,13 +202,13 @@ const AuthPage: React.FC = () => {
          {/* Branding */}
          <div className={`text-center mb-8 transition-all duration-500 ${view !== 'welcome' ? 'scale-75 mb-4' : ''}`}>
              <div className="w-24 h-24 mx-auto mb-4 relative group">
-                <div className="absolute inset-0 bg-gradient-to-tr from-game-primary to-purple-500 rounded-3xl rotate-6 blur-lg opacity-60 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="absolute inset-0 bg-gradient-to-tr from-game-primary to-red-500 rounded-3xl rotate-6 blur-lg opacity-60 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="relative w-full h-full bg-white dark:bg-slate-800 rounded-3xl border border-white/50 dark:border-slate-600 flex items-center justify-center shadow-xl overflow-hidden">
                     <img src="https://files.catbox.moe/qn40s6.png" className="w-20 h-20 object-contain" alt="Logo" />
                 </div>
              </div>
              <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                LP-<span className="text-transparent bg-clip-text bg-gradient-to-r from-game-primary to-purple-500">F4</span>
+                LP-<span className="text-transparent bg-clip-text bg-gradient-to-r from-game-primary to-red-500">F4</span>
              </h1>
              <p className="text-slate-500 dark:text-slate-400 font-bold tracking-widest text-xs uppercase mt-2">Quiz competition for class F4</p>
          </div>
@@ -225,7 +225,7 @@ const AuthPage: React.FC = () => {
                         size="lg" 
                         onClick={handleGuestClick} 
                         isLoading={loading}
-                        className="py-5 text-xl shadow-lg shadow-indigo-500/30 mb-8 relative overflow-hidden group"
+                        className="py-5 text-xl shadow-lg shadow-orange-500/30 mb-8 relative overflow-hidden group"
                      >
                         <span className="relative z-10 flex items-center justify-center gap-3">
                             <i className="fas fa-gamepad text-2xl"></i> Play as Guest
@@ -248,9 +248,9 @@ const AuthPage: React.FC = () => {
                         </button>
                         <button 
                             onClick={() => setView('register')}
-                            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-500 hover:bg-white dark:hover:bg-slate-800 transition-all group"
+                            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-700 hover:border-game-accent dark:hover:border-game-accent hover:bg-white dark:hover:bg-slate-800 transition-all group"
                         >
-                            <i className="fas fa-user-plus text-xl mb-2 text-slate-400 group-hover:text-purple-500 transition-colors"></i>
+                            <i className="fas fa-user-plus text-xl mb-2 text-slate-400 group-hover:text-game-accent transition-colors"></i>
                             <span className="font-bold text-slate-600 dark:text-slate-300 text-sm">Register</span>
                         </button>
                      </div>
@@ -328,8 +328,8 @@ const AuthPage: React.FC = () => {
                         />
 
                         <Input 
-                            type="password"
-                            icon="fa-lock"
+                            type="password" 
+                            icon="fa-lock" 
                             placeholder="Password"
                             value={password}
                             onChange={e => setPassword(e.target.value)}

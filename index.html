@@ -21,17 +21,17 @@
           extend: {
             colors: {
               game: {
-                primary: '#6366f1', // Indigo 500
-                primaryDark: '#4338ca', // Indigo 700
-                accent: '#f59e0b', // Amber 500
-                accentDark: '#b45309', // Amber 700
+                primary: '#f97316', // Orange 500
+                primaryDark: '#ea580c', // Orange 600
+                accent: '#6366f1', // Indigo 500
+                accentDark: '#4338ca', // Indigo 700
                 success: '#22c55e', // Green 500
                 successDark: '#15803d', // Green 700
                 danger: '#ef4444', // Red 500
                 dangerDark: '#b91c1c', // Red 700
                 surface: '#ffffff',
                 surfaceDark: '#1e293b', // Slate 800
-                bg: '#f8fafc', // Slate 50
+                bg: '#fff7ed', // Orange 50
                 bgDark: '#0f172a', // Slate 900
               }
             },
@@ -69,9 +69,9 @@
       }
       body {
         font-family: 'Poppins', sans-serif;
-        background-color: #f8fafc;
+        background-color: #fff7ed; /* Orange 50 */
         /* Subtle Grid Pattern */
-        background-image: radial-gradient(#e2e8f0 1.5px, transparent 1.5px);
+        background-image: radial-gradient(#fdba74 1.5px, transparent 1.5px);
         background-size: 24px 24px;
         overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
       }
@@ -89,7 +89,7 @@
       /* Game UI Utilities */
       .game-panel {
         background: rgba(255, 255, 255, 0.9);
-        border: 2px solid #e2e8f0;
+        border: 2px solid #fdba74; /* Orange 200 */
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         border-radius: 1.5rem;
       }
@@ -122,7 +122,7 @@
       /* Base Popup Style (Light Mode Default) */
       .glass-swal-popup, .glass-swal-toast {
         background: #ffffff !important; /* Fully Opaque White */
-        border: 2px solid #cbd5e1 !important;
+        border: 2px solid #fdba74 !important;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
         border-radius: 2rem !important;
         padding: 2rem !important;
@@ -153,9 +153,9 @@
 
       /* Alert Buttons */
       .glass-swal-btn-confirm {
-        background-color: #6366f1 !important;
+        background-color: #f97316 !important;
         color: white !important;
-        border-bottom: 4px solid #4338ca !important;
+        border-bottom: 4px solid #ea580c !important;
         border-radius: 1rem !important;
         padding: 0.75rem 2rem !important;
         font-weight: 900 !important;
@@ -184,8 +184,8 @@
 
       /* Input Fields in Alerts */
       .glass-swal-input, .swal2-input {
-        background-color: #f1f5f9 !important;
-        border: 2px solid #cbd5e1 !important;
+        background-color: #fff7ed !important;
+        border: 2px solid #fdba74 !important;
         border-radius: 1rem !important;
         color: #000000 !important; /* Dark text */
         font-weight: bold !important;

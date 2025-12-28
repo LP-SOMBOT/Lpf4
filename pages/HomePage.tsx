@@ -94,20 +94,20 @@ const HomePage: React.FC = () => {
 
       {/* Hero / Featured Mode - REDUCED SIZE FOR MOBILE */}
       <div className="mb-6 cursor-pointer group" onClick={() => handleNav('/lobby')}>
-          <div className="relative overflow-hidden rounded-[1.8rem] bg-gradient-to-br from-game-primary via-indigo-600 to-purple-700 p-1 shadow-2xl shadow-indigo-500/30 transition-transform group-hover:scale-[1.01]">
+          <div className="relative overflow-hidden rounded-[1.8rem] bg-gradient-to-br from-game-primary via-orange-600 to-red-600 p-1 shadow-2xl shadow-orange-500/30 transition-transform group-hover:scale-[1.01]">
               <div className="bg-white/5 dark:bg-black/20 rounded-[1.6rem] p-4 md:p-6 relative overflow-hidden backdrop-blur-sm h-[160px] md:h-auto flex items-center">
                   {/* Decorative Background Elements */}
                   <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16 blur-3xl animate-pulse"></div>
-                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500 opacity-20 rounded-full -ml-10 -mb-10 blur-3xl"></div>
+                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-red-500 opacity-20 rounded-full -ml-10 -mb-10 blur-3xl"></div>
                   <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
 
                   <div className="relative z-10 flex flex-row items-center justify-between gap-4 w-full">
                       <div className="text-left flex-1 pl-2">
                           <div className="flex items-center justify-start gap-2 mb-2">
-                              <span className="bg-game-accent/20 text-game-accent border border-game-accent/50 text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-md">
-                                  <i className="fas fa-fire mr-1"></i> Hot
+                              <span className="bg-white/20 text-white border border-white/50 text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-md">
+                                  <i className="fas fa-fire mr-1 text-yellow-300"></i> Hot
                               </span>
-                              <span className="bg-white/10 text-white border border-white/20 text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              <span className="bg-black/20 text-white border border-white/20 text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
                                   Multiplayer
                               </span>
                           </div>
@@ -115,19 +115,19 @@ const HomePage: React.FC = () => {
                           <h2 className="text-2xl md:text-5xl font-black text-white mb-1 md:mb-2 italic tracking-tight drop-shadow-md leading-none">
                               BATTLE <br/> QUIZ
                           </h2>
-                          <p className="text-indigo-100 font-bold max-w-sm text-[10px] md:text-sm leading-relaxed mb-3 md:mb-4 hidden md:block">
+                          <p className="text-orange-50 font-bold max-w-sm text-[10px] md:text-sm leading-relaxed mb-3 md:mb-4 hidden md:block">
                               Face off against real students in real-time PvP.
                           </p>
-                          <button className="bg-white text-game-primary px-4 py-1.5 md:px-6 md:py-2 rounded-xl font-black uppercase tracking-widest shadow-lg hover:bg-indigo-50 transition-colors transform group-hover:translate-y-[-2px] active:translate-y-[1px] text-[10px] md:text-sm mt-2 md:mt-0">
+                          <button className="bg-white text-game-primary px-4 py-1.5 md:px-6 md:py-2 rounded-xl font-black uppercase tracking-widest shadow-lg hover:bg-orange-50 transition-colors transform group-hover:translate-y-[-2px] active:translate-y-[1px] text-[10px] md:text-sm mt-2 md:mt-0">
                               Play Now <i className="fas fa-arrow-right ml-2"></i>
                           </button>
                       </div>
                       
                       {/* Visual Graphic - Scaled Down */}
                       <div className="relative w-24 h-24 md:w-48 md:h-48 shrink-0 mr-2 md:mr-0">
-                           <div className="absolute inset-0 bg-indigo-500 rounded-full blur-[40px] opacity-40 animate-pulse"></div>
-                           <div className="relative w-full h-full bg-gradient-to-tr from-white to-indigo-100 rounded-full flex items-center justify-center shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border-[3px] md:border-[5px] border-white/20">
-                               <i className="fas fa-gamepad text-4xl md:text-7xl text-transparent bg-clip-text bg-gradient-to-br from-game-primary to-purple-600 transform -rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
+                           <div className="absolute inset-0 bg-orange-500 rounded-full blur-[40px] opacity-40 animate-pulse"></div>
+                           <div className="relative w-full h-full bg-gradient-to-tr from-white to-orange-100 rounded-full flex items-center justify-center shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border-[3px] md:border-[5px] border-white/20">
+                               <i className="fas fa-gamepad text-4xl md:text-7xl text-transparent bg-clip-text bg-gradient-to-br from-game-primary to-red-600 transform -rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
                            </div>
                            
                            {/* Floating Badge */}

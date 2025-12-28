@@ -17,12 +17,12 @@ const DownloadPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gray-50 dark:bg-slate-900 transition-colors flex flex-col font-sans pt-24">
+    <div className="min-h-screen relative overflow-hidden bg-orange-50 dark:bg-slate-900 transition-colors flex flex-col font-sans pt-24">
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-500/10 dark:bg-indigo-500/20 rounded-full blur-[120px] animate-blob"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-500/10 dark:bg-purple-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
-        <div className="absolute top-[40%] left-[40%] w-[30%] h-[30%] bg-pink-500/10 dark:bg-pink-500/20 rounded-full blur-[100px] animate-blob animation-delay-4000"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-orange-500/10 dark:bg-orange-500/20 rounded-full blur-[120px] animate-blob"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-red-500/10 dark:bg-red-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
+        <div className="absolute top-[40%] left-[40%] w-[30%] h-[30%] bg-yellow-500/10 dark:bg-yellow-500/20 rounded-full blur-[100px] animate-blob animation-delay-4000"></div>
         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}></div>
       </div>
 
@@ -54,7 +54,7 @@ const DownloadPage: React.FC = () => {
             
             <h1 className="text-5xl md:text-8xl font-black mb-6 text-slate-900 dark:text-white tracking-tight leading-tight drop-shadow-sm">
                 Learn. Battle. <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-game-primary to-purple-600">Conquer.</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-game-primary to-red-600">Conquer.</span>
             </h1>
             
             <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-12 max-w-3xl mx-auto leading-relaxed font-medium">
@@ -86,7 +86,7 @@ const DownloadPage: React.FC = () => {
          {/* Features Grid */}
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full animate__animated animate__fadeInUp delay-200 px-4">
              <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-8 rounded-3xl border border-white/50 dark:border-slate-700 shadow-xl text-left group hover:-translate-y-2 transition-transform duration-300">
-                 <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/50 rounded-2xl flex items-center justify-center text-game-primary dark:text-indigo-400 mb-6 group-hover:scale-110 transition-transform shadow-inner">
+                 <div className="w-14 h-14 bg-orange-100 dark:bg-orange-900/50 rounded-2xl flex items-center justify-center text-game-primary dark:text-orange-400 mb-6 group-hover:scale-110 transition-transform shadow-inner">
                      <i className="fas fa-bolt text-2xl"></i>
                  </div>
                  <h3 className="font-black text-xl mb-3 text-slate-900 dark:text-white">Faster Performance</h3>
@@ -114,7 +114,7 @@ const DownloadPage: React.FC = () => {
       {/* Footer */}
       <footer className="p-8 text-center border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-10">
           <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">
-              &copy; 2024 LP-F4 Team. <span className="opacity-50">v2.5.0-beta</span>
+              &copy; 2024 LP-F4 Educational Platform. All rights reserved.
           </p>
       </footer>
     </div>

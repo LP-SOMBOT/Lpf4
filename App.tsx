@@ -129,15 +129,15 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-orange-50 dark:bg-gray-900 transition-colors">
         <div className="absolute inset-0 bg-white/40 dark:bg-black/40 backdrop-blur-xl z-0"></div>
         <div className="relative z-10 w-24 h-24 mb-4">
-             <div className="absolute inset-0 bg-somali-blue opacity-20 rounded-full animate-ping"></div>
+             <div className="absolute inset-0 bg-orange-500 opacity-20 rounded-full animate-ping"></div>
              <div className="relative w-full h-full bg-white/20 backdrop-blur-md border border-white/50 rounded-full flex items-center justify-center shadow-xl z-10">
                  <img src="https://files.catbox.moe/qn40s6.png" alt="Logo" className="w-12 h-12" />
              </div>
         </div>
-        <h1 className="relative z-10 text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600 mb-2 animate-pulse">
+        <h1 className="relative z-10 text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600 mb-2 animate-pulse">
             LP-F4
         </h1>
       </div>
@@ -152,20 +152,20 @@ const AppContent: React.FC = () => {
       <ThemeContext.Provider value={{ theme, setTheme }}>
         {/* Global Background Elements - Reimplemented for consistency */}
         <div className="fixed inset-0 -z-10 pointer-events-none">
-            {/* Light Mode Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:hidden"></div>
+            {/* Light Mode Gradient - Orange/Warm */}
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-50 via-white to-red-50 dark:hidden"></div>
             
             {/* Dark Mode Background */}
             <div className="absolute inset-0 bg-slate-950 hidden dark:block">
-                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-slate-950"></div>
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-orange-900/10 via-slate-950 to-slate-950"></div>
             </div>
 
             {/* Subtle Noise Texture */}
             <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/noise.png")' }}></div>
             
             {/* Floating Orbs (Subtle) */}
-            <div className="absolute top-[-10%] right-[-10%] w-[50vh] h-[50vh] bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-[100px] animate-blob"></div>
-            <div className="absolute bottom-[-10%] left-[-10%] w-[50vh] h-[50vh] bg-purple-400/20 dark:bg-purple-600/10 rounded-full blur-[100px] animate-blob animation-delay-4000"></div>
+            <div className="absolute top-[-10%] right-[-10%] w-[50vh] h-[50vh] bg-orange-400/20 dark:bg-orange-600/10 rounded-full blur-[100px] animate-blob"></div>
+            <div className="absolute bottom-[-10%] left-[-10%] w-[50vh] h-[50vh] bg-red-400/20 dark:bg-red-600/10 rounded-full blur-[100px] animate-blob animation-delay-4000"></div>
         </div>
 
         <div className="w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden relative z-10">

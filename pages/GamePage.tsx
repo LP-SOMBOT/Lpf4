@@ -119,17 +119,6 @@ const GamePage: React.FC = () => {
                 snaps.forEach(s => s.exists() && loadedQ.push(...Object.values(s.val()) as Question[]));
             } else {
                 // Fetch chapter to find subjectId, then fetch subject name
-                // Or just use chapter name logic from lobby. 
-                // For simplicity, let's fetch the chapter details to get the Subject ID, then Subject Name.
-                // Actually, lobby passes chapterID as subject.
-                
-                // Let's try to get chapter details first
-                // Reverse engineering chapter ID to find Subject might be hard if flat list, but we can try structure
-                // Assuming chapter ID structure: subjectId_chapterId or similar, or just fetch all subjects and find chapter
-                
-                // Simpler: Just display whatever name is associated with the chapter ID or fetch it.
-                // Let's do a best effort.
-                
                 if (cachedData) try { loadedQ = JSON.parse(cachedData); } catch(e) {}
                 if (loadedQ.length === 0) {
                     const snap = await get(ref(db, `questions/${match.subject}`));
@@ -138,14 +127,6 @@ const GamePage: React.FC = () => {
                         try { localStorage.setItem(cacheKey, JSON.stringify(loadedQ)); } catch(e) {}
                     }
                 }
-                
-                // Try to fetch subject name via Chapter
-                // Search chapters to find this ID
-                const subRef = ref(db, 'chapters');
-                // This is expensive if we scan all. But usually we have context.
-                // Let's just set a generic name or try to parse from ID if possible.
-                // Or update match creation to include Subject Name.
-                // For now, let's leave it blank or "Topic".
             }
 
             if (loadedQ.length > 0) {
@@ -209,7 +190,7 @@ const GamePage: React.FC = () => {
       if (prevTurnRef.current && prevTurnRef.current !== match.turn && match.turn === user.uid) {
           setShowTurnAlert(true);
           playSound('click');
-          const timer = setTimeout(() => setShowTurnAlert(false), 1500);
+          const timer = setTimeout(() => setShowTurnAlert(false), 1500); 
           return () => clearTimeout(timer);
       }
       prevTurnRef.current = match.turn;
@@ -336,7 +317,7 @@ const GamePage: React.FC = () => {
 
       {showIntro && (
           <div className="fixed inset-0 z-[60] flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
-              <div className="relative w-full h-1/2 md:w-1/2 md:h-full bg-indigo-600 flex flex-col items-center justify-center animate__animated animate__slideInLeft shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10">
+              <div className="relative w-full h-1/2 md:w-1/2 md:h-full bg-orange-600 flex flex-col items-center justify-center animate__animated animate__slideInLeft shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10">
                   <div className="relative z-10 scale-90 md:scale-150 mb-2 md:mb-0">
                      <Avatar src={profile?.avatar} seed={user!.uid} size="xl" className="border-4 border-white shadow-2xl" isVerified={profile?.isVerified} />
                      <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-slate-900 font-black px-2 py-0.5 rounded-full border-2 border-white text-sm">LVL {myLevel}</div>
@@ -380,7 +361,7 @@ const GamePage: React.FC = () => {
          <div className="max-w-4xl mx-auto flex justify-between items-center">
             <div className={`flex items-center gap-3 transition-all duration-300 ${isMyTurn && !isGameOver ? 'scale-105 opacity-100' : 'scale-95 opacity-60'}`}>
                  <div className="relative">
-                     <Avatar src={profile?.avatar} seed={user!.uid} size="sm" border={isMyTurn ? '3px solid #6366f1' : '3px solid transparent'} className={isMyTurn ? 'shadow-lg shadow-indigo-500/50' : ''} isVerified={profile?.isVerified} />
+                     <Avatar src={profile?.avatar} seed={user!.uid} size="sm" border={isMyTurn ? '3px solid #f97316' : '3px solid transparent'} className={isMyTurn ? 'shadow-lg shadow-orange-500/50' : ''} isVerified={profile?.isVerified} />
                      <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-[8px] px-1 rounded font-bold border border-white">LVL {myLevel}</div>
                  </div>
                  <div>
@@ -428,7 +409,7 @@ const GamePage: React.FC = () => {
                    </>
                )}
                <div className="flex justify-center gap-4 md:gap-12 mb-10">
-                   <div className="text-center bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800">
+                   <div className="text-center bg-orange-50 dark:bg-orange-900/20 p-4 rounded-2xl border border-orange-100 dark:border-orange-800">
                        <Avatar src={profile?.avatar} size="lg" className="mx-auto mb-2 shadow-md" isVerified={profile?.isVerified} />
                        <div className="font-bold text-slate-800 dark:text-white truncate max-w-[100px]">{profile?.name}</div>
                        <div className="font-black text-2xl text-game-primary">{match.scores[user!.uid]}</div>
@@ -445,7 +426,7 @@ const GamePage: React.FC = () => {
         ) : (
             <>
                 <div className={`w-full rounded-[2rem] p-6 md:p-8 shadow-[0_10px_0_rgba(0,0,0,0.1)] mb-6 text-center border-2 min-h-[160px] flex items-center justify-center flex-col relative overflow-hidden transition-all duration-500 ${isMyTurn ? 'bg-white dark:bg-slate-800 border-game-primary/50 shadow-game-primary/20' : 'bg-gray-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-90 grayscale-[0.5]'}`}>
-                    {isMyTurn && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-game-primary via-purple-500 to-game-danger animate-pulse"></div>}
+                    {isMyTurn && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-game-primary via-red-500 to-game-danger animate-pulse"></div>}
                     {subjectName && <span className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-[0.2em]">{subjectName}</span>}
                     <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed z-10">{currentQuestion && currentQuestion.question}</h2>
                 </div>
