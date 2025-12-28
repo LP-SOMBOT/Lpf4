@@ -21,31 +21,46 @@ const SocialPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [friends, setFriends] = useState<UserProfile[]>([]);
-  const [requests, setRequests] = useState<{uid: string, user: UserProfile}[]>([]);
-  const [chatMetadata, setChatMetadata] = useState<Record<string, ChatMeta>>({});
   
+  // Initialize Friends from Cache
+  const [friends, setFriends] = useState<UserProfile[]>(() => {
+      try {
+          const cached = localStorage.getItem('friends_cache');
+          return cached ? JSON.parse(cached) : [];
+      } catch { return []; }
+  });
+
+  // Initialize Chat Metadata from Cache
+  const [chatMetadata, setChatMetadata] = useState<Record<string, ChatMeta>>(() => {
+      try {
+          const cached = localStorage.getItem('chat_meta_cache');
+          return cached ? JSON.parse(cached) : {};
+      } catch { return {}; }
+  });
+
+  const [requests, setRequests] = useState<{uid: string, user: UserProfile}[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(friends.length === 0);
   
   // Track previous unread total for sound notifications
   const totalUnreadRef = useRef(0);
 
-  // Load Data
+  // Persist Chat Metadata
+  useEffect(() => {
+      localStorage.setItem('chat_meta_cache', JSON.stringify(chatMetadata));
+  }, [chatMetadata]);
+
+  // Load Users Data
   useEffect(() => {
       if (!user) return;
       
-      // 1. Load cached friends first
-      const cachedFriends = localStorage.getItem('friends_cache');
-      if (cachedFriends) {
-          try {
-              setFriends(JSON.parse(cachedFriends));
-          } catch(e) {}
-      }
-
       const usersRef = ref(db, 'users');
       
       const handleData = (snap: any) => {
-          if (!snap.exists()) return;
+          if (!snap.exists()) {
+              setLoading(false);
+              return;
+          }
           const data = snap.val();
           
           // Process Requests
@@ -71,6 +86,8 @@ const SocialPage: React.FC = () => {
           const all: UserProfile[] = Object.keys(data).map(k => ({ uid: k, ...data[k] }));
           // Filter out self and already friends
           setAllUsers(all.filter(u => u.uid !== user.uid && !myFriends[u.uid]));
+          
+          setLoading(false);
       };
 
       onValue(usersRef, handleData);
@@ -219,7 +236,18 @@ const SocialPage: React.FC = () => {
        {/* FRIENDS TAB (Like WhatsApp) */}
        {activeTab === 'friends' && (
            <div className="space-y-3 animate__animated animate__fadeIn">
-               {sortedFriends.length === 0 ? (
+               {loading && sortedFriends.length === 0 ? (
+                   // LOADING SKELETON
+                   [...Array(5)].map((_, i) => (
+                       <div key={i} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-3 animate-pulse">
+                           <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                           <div className="flex-1 space-y-3">
+                               <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
+                               <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div>
+                           </div>
+                       </div>
+                   ))
+               ) : sortedFriends.length === 0 ? (
                    <div className="text-center py-10 text-slate-400">
                        <i className="fas fa-comment-slash text-4xl mb-3 opacity-50"></i>
                        <p className="font-bold">No chats yet.</p>
