@@ -31,7 +31,8 @@ const ProfilePage: React.FC = () => {
     if (profile) {
       setEditName(profile.name);
       setCurrentAvatarUrl(profile.avatar);
-      if (!profile.username) setShowUsernamePrompt(true);
+      // Only prompt for username if NOT guest and username is missing
+      if (!profile.username && !profile.isGuest) setShowUsernamePrompt(true);
     }
   }, [profile]);
 
@@ -245,15 +246,38 @@ const ProfilePage: React.FC = () => {
           </div>
       </Modal>
 
-      <Card className="mb-6 relative overflow-hidden">
-        <div className="flex justify-between items-end mb-2 relative z-10">
-            <span className="font-bold text-gray-900 dark:text-white">Level {level}</span>
-            <span className="text-game-primary dark:text-blue-400 font-bold">{profile.points} Total Points</span>
+      {/* Live Level Progress Card */}
+      <Card className="mb-6 relative overflow-hidden bg-gradient-to-br from-white to-orange-50 dark:from-slate-800 dark:to-slate-800/50">
+        <div className="flex justify-between items-end mb-4 relative z-10">
+            <div>
+                <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Current Rank</span>
+                <span className="font-black text-2xl text-gray-900 dark:text-white">Level {level}</span>
+            </div>
+            <div className="text-right">
+                 <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Total Score</span>
+                 <span className="font-black text-2xl text-game-primary dark:text-orange-400">{profile.points} XP</span>
+            </div>
         </div>
-        <div className="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-4 overflow-hidden relative z-10 border border-gray-400 dark:border-gray-600">
-             <div className="bg-game-primary h-4 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+        
+        {/* Redesigned Progress Bar */}
+        <div className="relative w-full h-8 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner border border-slate-300 dark:border-slate-600 group">
+            <div 
+                className="absolute top-0 left-0 h-full bg-gradient-to-r from-game-primary to-orange-400 transition-all duration-1000 ease-out relative"
+                style={{ width: `${progressPercent}%` }}
+            >
+                {/* Animated Shine Effect */}
+                <div className="absolute inset-0 bg-white/30 w-full h-full animate-[shimmer_2s_infinite] skew-x-12"></div>
+            </div>
+            
+            {/* Text Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-300 mix-blend-difference uppercase tracking-widest z-10">
+                {pointsInCurrentLevel} / 10 XP
+            </div>
         </div>
-        <div className="text-right text-xs text-gray-700 dark:text-gray-300 mt-2 relative z-10 font-bold">{pointsToNext} pts to Level {level + 1}</div>
+        
+        <div className="text-right text-[10px] text-gray-500 dark:text-gray-400 mt-2 relative z-10 font-bold">
+            {pointsToNext} XP needed for Level {level + 1}
+        </div>
       </Card>
 
       {/* Settings Section */}

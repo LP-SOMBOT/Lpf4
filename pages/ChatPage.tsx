@@ -107,15 +107,23 @@ const ChatPage: React.FC = () => {
       if ((!inputText.trim() && type === 'text') || !user || !chatId) return;
 
       const tempId = `temp_${Date.now()}`;
+      
+      // Construct Message Object ensuring NO UNDEFINED values are passed
       const msgData: any = {
           sender: user.uid,
           text: type === 'invite' ? 'CHALLENGE_INVITE' : inputText.trim(),
           type,
           inviteCode: inviteCode || null,
           subjectName: subjectName || null,
-          timestamp: Date.now(),
-          status: type === 'invite' ? 'waiting' : undefined
+          timestamp: Date.now()
       };
+
+      // Only add status if it's an invite, otherwise it should be null or omitted (but we use null for safety)
+      if (type === 'invite') {
+          msgData.status = 'waiting';
+      } else {
+          msgData.status = null;
+      }
 
       if (type === 'text') setInputText('');
 
@@ -132,8 +140,8 @@ const ChatPage: React.FC = () => {
               participants: { [user.uid]: true, [uid!]: true }
           });
       } catch (err) {
-          console.error(err);
-          // Rollback if needed, but Firebase typically handles retries offline
+          console.error("SendMessage Error:", err);
+          // showToast("Failed to send message", "error");
       }
   };
 
@@ -180,7 +188,7 @@ const ChatPage: React.FC = () => {
           };
           
           // Optimistic update for invite
-          setMessages(prev => [...prev, { id: newMsgRef.key || `temp_${Date.now()}`, ...msgData, timestamp: Date.now() }]);
+          setMessages(prev => [...prev, { id: newMsgRef.key || `temp_${Date.now()}`, ...msgData, timestamp: Date.now() } as any]);
 
           await set(newMsgRef, msgData);
           

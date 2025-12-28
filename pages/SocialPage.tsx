@@ -212,10 +212,10 @@ const SocialPage: React.FC = () => {
                                <Button size="sm" fullWidth onClick={() => acceptRequest(r.uid)}><i className="fas fa-check mr-1"></i> Accept</Button>
                                <Button 
                                     size="sm" 
-                                    variant="outline" 
+                                    variant="danger" 
                                     fullWidth 
                                     onClick={() => rejectRequest(r.uid)}
-                                    className="!border-red-200 dark:!border-red-900/50 !text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/20 hover:!border-red-300 transition-colors"
+                                    className="!bg-red-500 text-white hover:!bg-red-600 shadow-lg shadow-red-500/30"
                                 >
                                    <i className="fas fa-times"></i>
                                </Button>
