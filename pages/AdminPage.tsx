@@ -636,6 +636,7 @@ export const AdminPage: React.FC = () => {
               </div>
           </div>
       </Modal>
+      </div> {/* Added missing closing div for grid */}
     </div>
   );
 };
