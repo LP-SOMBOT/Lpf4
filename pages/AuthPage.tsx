@@ -40,6 +40,10 @@ const AuthPage: React.FC = () => {
             return 'Too many attempts. Try later.';
         case 'auth/network-request-failed':
             return 'Network error.';
+        case 'auth/admin-restricted-operation':
+            return 'Operation not allowed (Check Firebase Console).';
+        case 'auth/operation-not-allowed':
+             return 'Sign-in provider disabled.';
         default: 
             return 'An error occurred.';
     }
@@ -113,7 +117,13 @@ const AuthPage: React.FC = () => {
           // App.tsx listener will handle redirection
       } catch (e: any) {
           console.error(e);
-          showAlert('Login Error', 'Could not sign in as guest. Please try again.', 'error');
+          let msg = 'Could not sign in as guest. Please try again.';
+          if (e.code === 'auth/admin-restricted-operation') {
+              msg = 'Anonymous login is disabled in Firebase Console.';
+          } else if (e.code === 'auth/operation-not-allowed') {
+              msg = 'Guest login is currently disabled.';
+          }
+          showAlert('Login Error', msg, 'error');
           setLoading(false);
       }
   };
