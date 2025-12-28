@@ -210,7 +210,7 @@ const AuthPage: React.FC = () => {
              <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
                 LP-<span className="text-transparent bg-clip-text bg-gradient-to-r from-game-primary to-purple-500">F4</span>
              </h1>
-             <p className="text-slate-500 dark:text-slate-400 font-bold tracking-widest text-xs uppercase mt-2">Battle Arena</p>
+             <p className="text-slate-500 dark:text-slate-400 font-bold tracking-widest text-xs uppercase mt-2">Quiz competition for class F4</p>
          </div>
 
          {/* VIEW: WELCOME (GUEST FIRST) */}
@@ -218,7 +218,7 @@ const AuthPage: React.FC = () => {
              <div className="animate__animated animate__fadeInUp">
                  <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/60 dark:border-slate-700/60 p-8 rounded-[2.5rem] shadow-2xl text-center">
                      <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Ready to Play?</h2>
-                     <p className="text-slate-500 dark:text-slate-400 text-sm font-bold mb-8">Join the battle instantly.</p>
+                     <p className="text-slate-500 dark:text-slate-400 text-sm font-bold mb-8">Join the stage to compete with F4 students.</p>
                      
                      <Button 
                         fullWidth 
@@ -255,7 +255,7 @@ const AuthPage: React.FC = () => {
                         </button>
                      </div>
                  </div>
-                 <p className="text-center mt-6 text-xs text-slate-400 font-bold opacity-60">v2.5.0 - Somali Ed-Tech</p>
+                 <p className="text-center mt-6 text-xs text-slate-400 font-bold opacity-60">Made with ❤️ by LP</p>
              </div>
          )}
 

@@ -119,7 +119,7 @@ const SocialPage: React.FC = () => {
   return (
     <div className="min-h-full p-4 flex flex-col pb-24 max-w-4xl mx-auto w-full">
        {/* Header - Softer Colors */}
-       <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-100 dark:border-gray-700/50 shadow-sm flex items-center justify-between transition-colors">
+       <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center justify-between px-4 py-3 mb-6 transition-colors duration-300 -mx-4">
             <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight">Students</h1>
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                 <button onClick={() => setActiveTab('friends')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'friends' ? 'bg-white shadow text-game-primary' : 'text-slate-500 hover:text-slate-700'}`}>Friends</button>
@@ -144,8 +144,7 @@ const SocialPage: React.FC = () => {
                        <div key={f.uid} onClick={() => setSelectedUser(f)} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                            <div className="flex items-center gap-3">
                                <div className="relative">
-                                  <Avatar src={f.avatar} seed={f.uid} size="md" isVerified={f.isVerified} />
-                                  <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${f.isOnline ? 'bg-green-500' : 'bg-slate-400'}`}></div>
+                                  <Avatar src={f.avatar} seed={f.uid} size="md" isVerified={f.isVerified} isOnline={f.isOnline} />
                                </div>
                                <div>
                                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1">{f.name} {f.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}</div>
@@ -175,7 +174,7 @@ const SocialPage: React.FC = () => {
                    {filteredExplore.map(u => (
                        <div key={u.uid} onClick={() => setSelectedUser(u)} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                             <div className="flex items-center gap-3">
-                               <Avatar src={u.avatar} seed={u.uid} size="md" isVerified={u.isVerified} />
+                               <Avatar src={u.avatar} seed={u.uid} size="md" isVerified={u.isVerified} isOnline={u.isOnline} />
                                <div>
                                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1">{u.name} {u.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}</div>
                                    <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">@{u.username || 'unknown'}</div>

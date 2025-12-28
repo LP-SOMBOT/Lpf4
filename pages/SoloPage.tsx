@@ -72,7 +72,7 @@ const SoloPage: React.FC = () => {
           // Add All Chapters Option
           const allOption: Chapter = {
               id: `ALL_${sub.id}`,
-              name: 'All Operations (Random)',
+              name: 'All chapters', // Updated text
               subjectId: sub.id
           };
           
@@ -193,7 +193,7 @@ const SoloPage: React.FC = () => {
   if (step === 'subject') {
       return (
           <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-4 max-w-4xl mx-auto w-full">
-              <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+              <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 mb-6 transition-colors duration-300">
                   <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-game-primary dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
                   </button>
@@ -228,7 +228,7 @@ const SoloPage: React.FC = () => {
   if (step === 'chapter') {
       return (
           <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-4 max-w-4xl mx-auto w-full">
-              <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+              <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 mb-6 transition-colors duration-300">
                   <button onClick={() => setStep('subject')} className="text-gray-600 dark:text-gray-300 hover:text-game-primary dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
                   </button>
@@ -312,7 +312,7 @@ const SoloPage: React.FC = () => {
              {/* Question Card */}
              <div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-[1.5rem] p-6 shadow-2xl text-center mb-6 min-h-[140px] flex items-center justify-center flex-col transition-colors border-2 border-white/20 dark:border-gray-700 animate__animated animate__fadeIn">
                  <span className="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-[0.2em]">
-                     {selectedChapterId.startsWith('ALL_') ? 'Random Mix' : chapters.find(c => c.id === selectedChapterId)?.name}
+                     {selectedChapterId.startsWith('ALL_') ? selectedSubject?.name : chapters.find(c => c.id === selectedChapterId)?.name}
                  </span>
                  <h2 className="text-lg md:text-xl font-bold leading-relaxed drop-shadow-sm">{currentQ.question}</h2>
              </div>

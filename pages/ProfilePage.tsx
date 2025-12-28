@@ -145,7 +145,7 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-full p-4 flex flex-col transition-colors max-w-3xl mx-auto w-full pb-24">
-       <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md -mx-4 px-4 py-3 mb-8 border-b border-gray-100 dark:border-gray-700/50 shadow-sm flex items-center gap-4 transition-colors">
+       <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 mb-8 transition-colors duration-300 -mx-4">
         <button onClick={() => navigate('/')} className="text-gray-900 dark:text-gray-100 hover:text-game-primary dark:hover:text-blue-400 transition-colors">
             <i className="fas fa-arrow-left fa-lg"></i>
         </button>

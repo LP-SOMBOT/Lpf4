@@ -413,7 +413,7 @@ export const AdminPage: React.FC = () => {
   return (
     <div className="min-h-screen p-4 pb-20 transition-colors max-w-4xl mx-auto w-full">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/95 backdrop-blur-md -mx-4 px-4 py-3 mb-6 border-b border-gray-100 dark:border-gray-700/50 shadow-sm flex items-center justify-between transition-colors">
+      <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-700/50 shadow-sm flex items-center justify-between px-4 py-3 mb-6 transition-colors duration-300 -mx-4">
         <div className="flex items-center gap-3">
             <button onClick={() => navigate('/')} className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-game-primary dark:hover:text-blue-400 transition-colors shadow-sm">
                 <i className="fas fa-arrow-left"></i>

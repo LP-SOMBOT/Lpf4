@@ -108,20 +108,17 @@ export const Avatar: React.FC<{
   const imageUrl = src || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(safeSeed)}&mouth=default&eyes=default&eyebrows=default&facialHairProbability=0`;
 
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block" onClick={onClick}>
         <div 
-          onClick={onClick}
           className={`relative rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden ${sizes[size]} ${className} ${pulse ? 'animate-pulse ring-4 ring-game-danger' : ''} shadow-lg`}
           style={{ border: border || '3px solid white' }}
         >
           <img src={imageUrl} alt="Avatar" className="w-full h-full object-cover" />
         </div>
         
-        {/* Verification Badge REMOVED as per request - it will be displayed next to name in text */}
-        
-        {/* Online Status */}
+        {/* Online Status Overlay */}
         {isOnline && (
-             <div className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
+             <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full z-10"></div>
         )}
     </div>
   );

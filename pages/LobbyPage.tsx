@@ -273,6 +273,15 @@ const LobbyPage: React.FC = () => {
 
   return (
     <div className="min-h-full flex flex-col p-4 pb-24 max-w-4xl mx-auto w-full">
+      {viewMode !== 'selection' && (
+          <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 mb-6 transition-colors duration-300 -mx-4">
+                 <button onClick={handleBack} className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center transition-colors hover:bg-slate-300 dark:hover:bg-slate-700">
+                    <i className="fas fa-chevron-left dark:text-white"></i>
+                 </button>
+                 <h2 className="text-2xl font-black text-slate-800 dark:text-white uppercase">{pageTitle}</h2>
+          </div>
+      )}
+
       {viewMode === 'selection' && (
         <div className="flex flex-col gap-6 pt-10">
              <div className="flex items-center gap-4 mb-4">
@@ -306,14 +315,8 @@ const LobbyPage: React.FC = () => {
       )}
 
       {viewMode !== 'selection' && (
-          <div className="pt-4 animate__animated animate__fadeInRight">
-              <div className="flex items-center gap-4 mb-6">
-                 <button onClick={handleBack} className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center transition-colors hover:bg-slate-300 dark:hover:bg-slate-700">
-                    <i className="fas fa-chevron-left dark:text-white"></i>
-                 </button>
-                 <h2 className="text-2xl font-black text-slate-800 dark:text-white uppercase">{pageTitle}</h2>
-              </div>
-
+          <div className="animate__animated animate__fadeInRight">
+              
               {/* AUTO MATCH SEARCHING UI */}
               {viewMode === 'auto' && isSearching && (
                  <div className="flex flex-col items-center justify-center py-20">
@@ -408,7 +411,7 @@ const LobbyPage: React.FC = () => {
                               type="tel"
                           />
                           <Button fullWidth size="lg" onClick={() => joinRoom()} disabled={roomCode.length !== 4} className="shadow-xl">
-                              JOIN LOBBY
+                              Join
                           </Button>
                       </Card>
                   </div>
@@ -417,34 +420,43 @@ const LobbyPage: React.FC = () => {
               {/* SUBJECT & CHAPTER SELECTORS (Shared by Auto & Create) */}
               {showSelectors && (
                     <div className="space-y-6 animate__animated animate__fadeInUp">
-                        <div className="overflow-x-auto pb-4 flex gap-3 snap-x scrollbar-hide">
-                            {subjects.map(s => (
-                                <button key={s.id} onClick={() => { setSelectedSubject(s.id); playSound('click'); }} className={`snap-start px-6 py-3 rounded-2xl font-black uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${selectedSubject === s.id ? 'bg-game-primary text-white border-game-primaryDark shadow-lg' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
-                                    {s.name}
-                                </button>
-                            ))}
-                        </div>
-
-                        {chapters.length > 0 ? (
-                            <div className="grid grid-cols-1 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                                {chapters.map(c => (
-                                    <div key={c.id} onClick={() => { setSelectedChapter(c.id); playSound('click'); }} className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between group ${selectedChapter === c.id ? 'border-game-primary bg-indigo-50 dark:bg-indigo-900/20 shadow-md transform scale-[1.01]' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${selectedChapter === c.id ? 'bg-game-primary text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
-                                                <i className="fas fa-book-open"></i>
-                                            </div>
-                                            <span className={`font-bold ${selectedChapter === c.id ? 'text-game-primary' : 'text-slate-700 dark:text-slate-300'}`}>{c.name}</span>
-                                        </div>
-                                        {selectedChapter === c.id && <i className="fas fa-check-circle text-game-primary text-xl animate__animated animate__zoomIn"></i>}
+                        {/* Redesigned Dropdowns */}
+                        <div className="grid grid-cols-1 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 ml-1">Subject</label>
+                                <div className="relative">
+                                    <select 
+                                        value={selectedSubject} 
+                                        onChange={(e) => { setSelectedSubject(e.target.value); playSound('click'); }}
+                                        className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-white appearance-none cursor-pointer focus:border-game-primary focus:ring-4 focus:ring-game-primary/20 transition-all shadow-sm"
+                                    >
+                                        <option value="">-- Choose Subject --</option>
+                                        {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                                        <i className="fas fa-chevron-down"></i>
                                     </div>
-                                ))}
+                                </div>
                             </div>
-                        ) : (
-                             <div className="text-center p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-3xl text-slate-400 font-bold bg-slate-50 dark:bg-slate-900/50">
-                                 <i className="fas fa-layer-group text-3xl mb-2 opacity-50"></i>
-                                 <p>Select a Subject above to view Chapters</p>
-                             </div>
-                        )}
+
+                            <div className={!selectedSubject ? 'opacity-50 pointer-events-none' : ''}>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 ml-1">Chapter</label>
+                                <div className="relative">
+                                    <select 
+                                        value={selectedChapter} 
+                                        onChange={(e) => { setSelectedChapter(e.target.value); playSound('click'); }}
+                                        className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-white appearance-none cursor-pointer focus:border-game-primary focus:ring-4 focus:ring-game-primary/20 transition-all shadow-sm"
+                                        disabled={!selectedSubject}
+                                    >
+                                        <option value="">-- Choose Chapter --</option>
+                                        {chapters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                                        <i className="fas fa-chevron-down"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         {viewMode === 'auto' ? (
                             <Button fullWidth size="lg" onClick={handleAutoMatch} disabled={!selectedChapter} className="shadow-xl">FIND MATCH</Button>

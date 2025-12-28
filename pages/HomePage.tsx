@@ -54,9 +54,9 @@ const HomePage: React.FC = () => {
   const progress = ((profile?.points || 0) % 10) / 10 * 100;
 
   return (
-    <div className="min-h-full flex flex-col pb-28 md:pb-6 max-w-5xl mx-auto w-full px-4 pt-6">
+    <div className="min-h-full flex flex-col pb-28 md:pb-6 max-w-5xl mx-auto w-full px-4 pt-4">
       {/* Header Stat Bar */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center justify-between px-4 py-3 mb-6 transition-colors duration-300 rounded-3xl mt-2 mx-1">
          <div className="flex items-center gap-4">
              <div onClick={() => handleNav('/profile')} className="relative cursor-pointer group">
                  <div className="absolute inset-0 bg-white rounded-full blur opacity-50 group-hover:opacity-100 transition-opacity"></div>
@@ -66,10 +66,10 @@ const HomePage: React.FC = () => {
                  </div>
              </div>
              <div>
-                 <h1 className="text-2xl font-black text-slate-900 dark:text-white leading-none mb-1">
+                 <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-none mb-1">
                      Hi, {profile?.name}
                  </h1>
-                 <div className="w-32 h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden border border-slate-300 dark:border-slate-600 relative">
+                 <div className="w-28 md:w-32 h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden border border-slate-300 dark:border-slate-600 relative">
                      <div className="h-full bg-game-success rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]" style={{ width: `${progress}%` }}></div>
                      <span className="absolute inset-0 text-[8px] font-bold flex items-center justify-center text-slate-600 dark:text-slate-300 mix-blend-difference">
                         {profile?.points} / {nextLevel} PTS
