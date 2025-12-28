@@ -72,7 +72,7 @@ const SoloPage: React.FC = () => {
           // Add All Chapters Option
           const allOption: Chapter = {
               id: `ALL_${sub.id}`,
-              name: 'All chapters', // Updated text
+              name: 'All chapters',
               subjectId: sub.id
           };
           
@@ -192,12 +192,12 @@ const SoloPage: React.FC = () => {
   // STEP 1: Select Subject
   if (step === 'subject') {
       return (
-          <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-4 max-w-4xl mx-auto w-full">
-              <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 mb-6 transition-colors duration-300">
+          <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-4 pt-20 max-w-4xl mx-auto w-full">
+              <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 transition-colors duration-300">
                   <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-game-primary dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
                   </button>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Select Subject</h1>
+                  <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Select Subject</h1>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {subjects.length === 0 && <div className="text-gray-500 text-center mt-10">No subjects available.</div>}
@@ -227,12 +227,12 @@ const SoloPage: React.FC = () => {
   // STEP 2: Select Chapter (Dropdown)
   if (step === 'chapter') {
       return (
-          <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-4 max-w-4xl mx-auto w-full">
-              <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 mb-6 transition-colors duration-300">
+          <div className="min-h-full bg-gray-50 dark:bg-gray-900 p-4 pt-20 max-w-4xl mx-auto w-full">
+              <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 transition-colors duration-300">
                   <button onClick={() => setStep('subject')} className="text-gray-600 dark:text-gray-300 hover:text-game-primary dark:hover:text-blue-400 transition-colors">
                     <i className="fas fa-arrow-left fa-lg"></i>
                   </button>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedSubject?.name}</h1>
+                  <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{selectedSubject?.name}</h1>
               </div>
               
               <Card className="max-w-xl mx-auto">
@@ -312,7 +312,7 @@ const SoloPage: React.FC = () => {
              {/* Question Card */}
              <div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-[1.5rem] p-6 shadow-2xl text-center mb-6 min-h-[140px] flex items-center justify-center flex-col transition-colors border-2 border-white/20 dark:border-gray-700 animate__animated animate__fadeIn">
                  <span className="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-[0.2em]">
-                     {selectedChapterId.startsWith('ALL_') ? selectedSubject?.name : chapters.find(c => c.id === selectedChapterId)?.name}
+                     {selectedSubject?.name}
                  </span>
                  <h2 className="text-lg md:text-xl font-bold leading-relaxed drop-shadow-sm">{currentQ.question}</h2>
              </div>

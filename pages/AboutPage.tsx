@@ -6,14 +6,14 @@ const AboutPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-full p-4 pb-8 transition-colors max-w-4xl mx-auto w-full">
+    <div className="min-h-full p-4 pb-8 pt-20 transition-colors max-w-4xl mx-auto w-full">
       
       {/* Sticky Header */}
-      <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 mb-6 transition-colors duration-300 -mx-4">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 transition-colors duration-300">
           <button onClick={() => navigate('/')} className="text-gray-700 dark:text-gray-300 hover:text-somali-blue dark:hover:text-blue-400 transition-colors">
             <i className="fas fa-arrow-left fa-lg"></i>
           </button>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">About Us</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">About Us</h1>
       </div>
 
       <div className="space-y-6">

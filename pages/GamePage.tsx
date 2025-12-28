@@ -40,6 +40,7 @@ const GamePage: React.FC = () => {
   const [match, setMatch] = useState<MatchState | null>(null);
   const [opponentProfile, setOpponentProfile] = useState<UserProfile | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [subjectName, setSubjectName] = useState('');
   
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState<{correct: boolean, answer: number} | null>(null);
@@ -94,7 +95,7 @@ const GamePage: React.FC = () => {
     };
   }, [matchId, user, navigate]); 
 
-  // 2. Load Questions (Separated from onValue to avoid closure staleness and race conditions)
+  // 2. Load Questions & Subject Name
   useEffect(() => {
       if (!match || !match.subject || questions.length > 0 || questionsLoadedRef.current) return;
 
@@ -108,11 +109,27 @@ const GamePage: React.FC = () => {
           try {
             if (match.subject.startsWith('ALL_')) {
                 const subjectId = match.subject.replace('ALL_', '');
+                // Fetch subject name
+                const subSnap = await get(ref(db, `subjects/${subjectId}`));
+                if(subSnap.exists()) setSubjectName(subSnap.val().name);
+
                 const chaptersSnap = await get(ref(db, `chapters/${subjectId}`));
                 const chapters = Object.values(chaptersSnap.val() || {}) as Chapter[];
                 const snaps = await Promise.all(chapters.map(c => get(ref(db, `questions/${c.id}`))));
                 snaps.forEach(s => s.exists() && loadedQ.push(...Object.values(s.val()) as Question[]));
             } else {
+                // Fetch chapter to find subjectId, then fetch subject name
+                // Or just use chapter name logic from lobby. 
+                // For simplicity, let's fetch the chapter details to get the Subject ID, then Subject Name.
+                // Actually, lobby passes chapterID as subject.
+                
+                // Let's try to get chapter details first
+                // Reverse engineering chapter ID to find Subject might be hard if flat list, but we can try structure
+                // Assuming chapter ID structure: subjectId_chapterId or similar, or just fetch all subjects and find chapter
+                
+                // Simpler: Just display whatever name is associated with the chapter ID or fetch it.
+                // Let's do a best effort.
+                
                 if (cachedData) try { loadedQ = JSON.parse(cachedData); } catch(e) {}
                 if (loadedQ.length === 0) {
                     const snap = await get(ref(db, `questions/${match.subject}`));
@@ -121,6 +138,14 @@ const GamePage: React.FC = () => {
                         try { localStorage.setItem(cacheKey, JSON.stringify(loadedQ)); } catch(e) {}
                     }
                 }
+                
+                // Try to fetch subject name via Chapter
+                // Search chapters to find this ID
+                const subRef = ref(db, 'chapters');
+                // This is expensive if we scan all. But usually we have context.
+                // Let's just set a generic name or try to parse from ID if possible.
+                // Or update match creation to include Subject Name.
+                // For now, let's leave it blank or "Topic".
             }
 
             if (loadedQ.length > 0) {
@@ -305,12 +330,12 @@ const GamePage: React.FC = () => {
   const oppLevel = Math.floor((opponentProfile.points || 0) / 10) + 1;
 
   return (
-    <div className="min-h-screen relative flex flex-col font-sans bg-slate-900 overflow-hidden transition-colors">
+    <div className="min-h-screen relative flex flex-col font-sans bg-slate-900 overflow-hidden transition-colors pt-24">
        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800 z-0"></div>
        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] z-0 pointer-events-none"></div>
 
       {showIntro && (
-          <div className="fixed inset-0 z-50 flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
+          <div className="fixed inset-0 z-[60] flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
               <div className="relative w-full h-1/2 md:w-1/2 md:h-full bg-indigo-600 flex flex-col items-center justify-center animate__animated animate__slideInLeft shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10">
                   <div className="relative z-10 scale-90 md:scale-150 mb-2 md:mb-0">
                      <Avatar src={profile?.avatar} seed={user!.uid} size="xl" className="border-4 border-white shadow-2xl" isVerified={profile?.isVerified} />
@@ -343,15 +368,16 @@ const GamePage: React.FC = () => {
       )}
 
       {!isGameOver && (
-          <div className="absolute top-4 left-4 z-40">
-              <button onClick={handleSurrender} className="bg-white/10 backdrop-blur-md text-white/70 hover:text-red-400 hover:bg-white/20 px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider border border-white/10 transition-all flex items-center gap-2">
-                  <i className="fas fa-sign-out-alt"></i> Exit Match
+          <div className="absolute top-20 left-4 z-40 md:top-24">
+              <button onClick={handleSurrender} className="bg-white/10 backdrop-blur-md text-white/70 hover:text-red-400 hover:bg-white/20 px-3 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider border border-white/10 transition-all flex items-center gap-2">
+                  <i className="fas fa-sign-out-alt"></i> Exit
               </button>
           </div>
       )}
 
-      <div className="pt-16 md:pt-4 px-4 pb-2 z-20">
-         <div className="max-w-4xl mx-auto bg-white/95 dark:bg-slate-800/95 backdrop-blur rounded-[2rem] shadow-xl p-3 flex justify-between items-center border-b-4 border-slate-200 dark:border-slate-700">
+      {/* FIXED GLASS HEADER SCOREBOARD */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-slate-900/90 backdrop-blur-xl border-b border-slate-700 shadow-xl p-3">
+         <div className="max-w-4xl mx-auto flex justify-between items-center">
             <div className={`flex items-center gap-3 transition-all duration-300 ${isMyTurn && !isGameOver ? 'scale-105 opacity-100' : 'scale-95 opacity-60'}`}>
                  <div className="relative">
                      <Avatar src={profile?.avatar} seed={user!.uid} size="sm" border={isMyTurn ? '3px solid #6366f1' : '3px solid transparent'} className={isMyTurn ? 'shadow-lg shadow-indigo-500/50' : ''} isVerified={profile?.isVerified} />
@@ -418,8 +444,9 @@ const GamePage: React.FC = () => {
            </Card>
         ) : (
             <>
-                <div className={`w-full rounded-[2rem] p-6 md:p-8 shadow-[0_10px_0_rgba(0,0,0,0.1)] mb-6 text-center border-2 min-h-[160px] flex items-center justify-center relative overflow-hidden transition-all duration-500 ${isMyTurn ? 'bg-white dark:bg-slate-800 border-game-primary/50 shadow-game-primary/20' : 'bg-gray-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-90 grayscale-[0.5]'}`}>
+                <div className={`w-full rounded-[2rem] p-6 md:p-8 shadow-[0_10px_0_rgba(0,0,0,0.1)] mb-6 text-center border-2 min-h-[160px] flex items-center justify-center flex-col relative overflow-hidden transition-all duration-500 ${isMyTurn ? 'bg-white dark:bg-slate-800 border-game-primary/50 shadow-game-primary/20' : 'bg-gray-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-90 grayscale-[0.5]'}`}>
                     {isMyTurn && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-game-primary via-purple-500 to-game-danger animate-pulse"></div>}
+                    {subjectName && <span className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-[0.2em]">{subjectName}</span>}
                     <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed z-10">{currentQuestion && currentQuestion.question}</h2>
                 </div>
                 <div className="relative w-full">

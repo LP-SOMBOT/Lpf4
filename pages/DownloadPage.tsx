@@ -17,7 +17,7 @@ const DownloadPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gray-50 dark:bg-slate-900 transition-colors flex flex-col font-sans">
+    <div className="min-h-screen relative overflow-hidden bg-gray-50 dark:bg-slate-900 transition-colors flex flex-col font-sans pt-24">
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-500/10 dark:bg-indigo-500/20 rounded-full blur-[120px] animate-blob"></div>
@@ -26,19 +26,19 @@ const DownloadPage: React.FC = () => {
         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}></div>
       </div>
 
-      {/* Navbar */}
-      <nav className="p-6 flex justify-between items-center max-w-6xl mx-auto w-full z-10 relative">
+      {/* Navbar - Fixed Glass */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 p-4 shadow-sm flex justify-between items-center transition-colors duration-300">
          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/')}>
             <div className="relative">
                 <div className="absolute inset-0 bg-game-primary blur-lg opacity-40 group-hover:opacity-70 transition-opacity"></div>
-                <img src="https://files.catbox.moe/qn40s6.png" className="w-12 h-12 relative z-10 drop-shadow-md" alt="Logo" />
+                <img src="https://files.catbox.moe/qn40s6.png" className="w-10 h-10 relative z-10 drop-shadow-md" alt="Logo" />
             </div>
-            <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">LP-F4</span>
+            <span className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter">LP-F4</span>
          </div>
          <Button 
            variant="outline"
            onClick={() => navigate('/auth')} 
-           className="hidden md:flex"
+           className="hidden md:flex text-xs py-2 px-4"
          >
            Web App Login
          </Button>

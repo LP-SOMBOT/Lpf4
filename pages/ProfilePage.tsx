@@ -111,7 +111,6 @@ const ProfilePage: React.FC = () => {
       }
 
       // Check uniqueness via client-side filter
-      // This is less efficient but avoids "Index not defined" error without updating Firebase Console rules
       const snapshot = await get(ref(db, 'users'));
       let exists = false;
       if (snapshot.exists()) {
@@ -144,12 +143,12 @@ const ProfilePage: React.FC = () => {
   const pointsToNext = 10 - pointsInCurrentLevel;
 
   return (
-    <div className="min-h-full p-4 flex flex-col transition-colors max-w-3xl mx-auto w-full pb-24">
-       <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 mb-8 transition-colors duration-300 -mx-4">
+    <div className="min-h-full p-4 flex flex-col transition-colors max-w-3xl mx-auto w-full pb-24 pt-24">
+       <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 transition-colors duration-300">
         <button onClick={() => navigate('/')} className="text-gray-900 dark:text-gray-100 hover:text-game-primary dark:hover:text-blue-400 transition-colors">
             <i className="fas fa-arrow-left fa-lg"></i>
         </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
         <div className="flex-1 text-right">
             {!isEditing && (
                 <button onClick={() => setIsEditing(true)} className="font-bold text-sm px-3 py-1 rounded-full border transition-all text-game-primary dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20">

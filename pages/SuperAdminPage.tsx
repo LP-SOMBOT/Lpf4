@@ -4,12 +4,14 @@ import { db } from '../firebase';
 import { UserProfile, Subject, Chapter, Question, MatchState } from '../types';
 import { Button, Card, Input, Modal, Avatar } from '../components/UI';
 import { showAlert, showToast, showConfirm } from '../services/alert';
+import { useNavigate } from 'react-router-dom';
 
 const SuperAdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'quizzes' | 'matches'>('users');
+  const navigate = useNavigate();
   
   // --- USER MANAGEMENT STATE ---
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -327,36 +329,25 @@ const SuperAdminPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-full bg-gray-100 dark:bg-gray-900 p-4 absolute inset-0 overflow-y-auto transition-colors">
-        <div className="max-w-6xl mx-auto pb-20">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+    <div className="min-h-full bg-gray-100 dark:bg-gray-900 p-4 absolute inset-0 overflow-y-auto transition-colors pt-32">
+        {/* Fixed Header */}
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-700/50 shadow-sm flex flex-col px-4 py-3 transition-colors duration-300">
+            <div className="flex justify-between items-center mb-2">
                 <div>
-                    <h1 className="text-3xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Super Admin</h1>
-                    <p className="text-gray-500 dark:text-gray-400 font-bold text-sm">System Control Center</p>
+                    <h1 className="text-xl md:text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Super Admin</h1>
+                    <p className="text-gray-500 dark:text-gray-400 font-bold text-xs">System Control Center</p>
                 </div>
-                <div className="flex bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm overflow-x-auto">
-                    <button 
-                        onClick={() => setActiveTab('users')} 
-                        className={`px-6 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-game-primary text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                    >
-                        <i className="fas fa-users mr-2"></i> Users
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('quizzes')} 
-                        className={`px-6 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'quizzes' ? 'bg-game-primary text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                    >
-                        <i className="fas fa-book-open mr-2"></i> Quizzes
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('matches')} 
-                        className={`px-6 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'matches' ? 'bg-game-primary text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                    >
-                        <i className="fas fa-gamepad mr-2"></i> Live Games
-                    </button>
-                </div>
+                <button onClick={() => navigate('/')} className="text-gray-500 dark:text-gray-400 hover:text-red-500"><i className="fas fa-times text-xl"></i></button>
             </div>
+            <div className="flex bg-slate-100 dark:bg-gray-800 rounded-xl p-1 gap-1 overflow-x-auto">
+                <button onClick={() => setActiveTab('users')} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-white dark:bg-gray-700 shadow text-game-primary' : 'text-gray-500 hover:text-gray-700'}`}>Users</button>
+                <button onClick={() => setActiveTab('quizzes')} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'quizzes' ? 'bg-white dark:bg-gray-700 shadow text-game-primary' : 'text-gray-500 hover:text-gray-700'}`}>Quizzes</button>
+                <button onClick={() => setActiveTab('matches')} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'matches' ? 'bg-white dark:bg-gray-700 shadow text-game-primary' : 'text-gray-500 hover:text-gray-700'}`}>Live</button>
+            </div>
+        </div>
 
+        <div className="max-w-6xl mx-auto pb-20">
+            
             {/* AI Control Card (Visible on both tabs) */}
             <Card className="mb-8 border-l-4 border-indigo-500">
                 <div className="flex items-center justify-between">

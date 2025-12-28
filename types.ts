@@ -77,4 +77,5 @@ export interface ChatMessage {
   timestamp: number;
   type?: 'text' | 'invite'; // Invite for match
   inviteCode?: string; // Room code if type is invite
+  subjectName?: string; // Subject name for the invite
 }

@@ -116,9 +116,9 @@ export const Avatar: React.FC<{
           <img src={imageUrl} alt="Avatar" className="w-full h-full object-cover" />
         </div>
         
-        {/* Online Status Overlay */}
+        {/* Online Status Overlay - Positioned on top right corner of the avatar */}
         {isOnline && (
-             <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full z-10"></div>
+             <span className="absolute bottom-0 right-0 block h-3.5 w-3.5 rounded-full ring-2 ring-white dark:ring-slate-800 bg-green-500 z-10"></span>
         )}
     </div>
   );

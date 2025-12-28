@@ -117,10 +117,10 @@ const SocialPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-full p-4 flex flex-col pb-24 max-w-4xl mx-auto w-full">
+    <div className="min-h-full p-4 flex flex-col pb-24 pt-24 max-w-4xl mx-auto w-full">
        {/* Header - Softer Colors */}
-       <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center justify-between px-4 py-3 mb-6 transition-colors duration-300 -mx-4">
-            <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight">Students</h1>
+       <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center justify-between px-4 py-3 transition-colors duration-300">
+            <h1 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight">Students</h1>
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                 <button onClick={() => setActiveTab('friends')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'friends' ? 'bg-white shadow text-game-primary' : 'text-slate-500 hover:text-slate-700'}`}>Friends</button>
                 <button onClick={() => setActiveTab('explore')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'explore' ? 'bg-white shadow text-game-primary' : 'text-slate-500 hover:text-slate-700'}`}>Explore</button>

@@ -95,15 +95,16 @@ const ChatPage: React.FC = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = async (e?: React.FormEvent, type: 'text' | 'invite' = 'text', inviteCode?: string) => {
+  const sendMessage = async (e?: React.FormEvent, type: 'text' | 'invite' = 'text', inviteCode?: string, subjectName?: string) => {
       e?.preventDefault();
       if ((!inputText.trim() && type === 'text') || !user || !chatId) return;
 
-      const msgData = {
+      const msgData: any = {
           sender: user.uid,
           text: type === 'invite' ? 'CHALLENGE_INVITE' : inputText.trim(),
           type,
           inviteCode: inviteCode || null,
+          subjectName: subjectName || null,
           timestamp: serverTimestamp()
       };
 
@@ -135,6 +136,9 @@ const ChatPage: React.FC = () => {
       setSetupLoading(true);
       
       try {
+          // Get Subject Name for display
+          const subjectName = subjects.find(s => s.id === selectedSubject)?.name || "Unknown Subject";
+
           // Create Room
           const code = Math.floor(1000 + Math.random() * 9000).toString();
           const roomData = { 
@@ -147,8 +151,8 @@ const ChatPage: React.FC = () => {
           
           await set(ref(db, `rooms/${code}`), roomData);
           
-          // Send Invite Message
-          await sendMessage(undefined, 'invite', code);
+          // Send Invite Message with Subject Name
+          await sendMessage(undefined, 'invite', code, subjectName);
           
           setShowGameSetup(false);
           playSound('correct');
@@ -188,8 +192,8 @@ const ChatPage: React.FC = () => {
         ></div>
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/50 dark:to-black/50 pointer-events-none z-0"></div>
 
-        {/* Header */}
-        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md p-4 shadow-sm flex items-center justify-between border-b border-gray-200 dark:border-slate-700 relative z-20">
+        {/* Header - Fixed Glass */}
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 p-4 shadow-sm flex items-center justify-between relative z-20 transition-colors duration-300">
             <div className="flex items-center gap-3">
                 <button onClick={() => navigate(-1)} className="text-gray-500 dark:text-gray-300 w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"><i className="fas fa-arrow-left"></i></button>
                 <div className="relative">
@@ -218,22 +222,30 @@ const ChatPage: React.FC = () => {
                 return (
                     <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate__animated animate__fadeInUp`}>
                         {msg.type === 'invite' ? (
-                             <div className={`max-w-[85%] p-4 rounded-3xl ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border-2 border-game-primary rounded-bl-sm'} shadow-lg`}>
-                                 <div className={`font-black uppercase text-[10px] mb-2 ${isMe ? 'text-indigo-200' : 'text-game-primary'} tracking-widest`}>Battle Challenge</div>
-                                 <div className="text-center py-2">
-                                     <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg">
-                                        <i className="fas fa-trophy text-white text-xl"></i>
+                             <div className={`max-w-[85%] w-64 p-5 rounded-3xl ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border-2 border-game-primary rounded-bl-sm'} shadow-xl relative overflow-hidden`}>
+                                 <div className={`absolute top-0 right-0 p-2 opacity-10 pointer-events-none`}>
+                                     <i className="fas fa-gamepad text-6xl"></i>
+                                 </div>
+                                 <div className={`font-black uppercase text-[10px] mb-3 ${isMe ? 'text-indigo-200' : 'text-game-primary'} tracking-widest border-b border-white/20 pb-2`}>
+                                     Battle Invitation
+                                 </div>
+                                 <div className="text-center">
+                                     <h3 className={`text-lg font-bold leading-tight mb-1 ${isMe ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                                         {msg.subjectName || "Unknown Subject"}
+                                     </h3>
+                                     <div className="my-3 bg-black/20 rounded-lg p-2 backdrop-blur-sm">
+                                         <div className="text-[10px] uppercase font-bold opacity-70">Room Code</div>
+                                         <div className="text-2xl font-mono font-black tracking-widest">{msg.inviteCode}</div>
                                      </div>
-                                     <div className="font-black text-xl mb-3">Room: {msg.inviteCode}</div>
                                      {!isMe ? (
-                                         <button onClick={() => acceptInvite(msg.inviteCode!)} className="bg-game-primary text-white px-6 py-3 rounded-xl font-bold w-full shadow-lg hover:brightness-110 active:scale-95 transition-all">
+                                         <button onClick={() => acceptInvite(msg.inviteCode!)} className="bg-game-primary text-white px-4 py-2 rounded-xl font-bold w-full shadow-lg hover:brightness-110 active:scale-95 transition-all text-xs uppercase tracking-wider">
                                              Join Match
                                          </button>
                                      ) : (
-                                         <div className="text-xs bg-black/20 px-3 py-1 rounded-full inline-block">Waiting for opponent...</div>
+                                         <div className="text-[10px] font-bold italic opacity-70">Waiting for opponent...</div>
                                      )}
                                  </div>
-                                 <div className={`text-[10px] text-right mt-2 ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>{formatTime(msg.timestamp)}</div>
+                                 <div className={`text-[9px] text-right mt-3 ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>{formatTime(msg.timestamp)}</div>
                              </div>
                         ) : (
                              <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-md ${
@@ -274,33 +286,33 @@ const ChatPage: React.FC = () => {
         <Modal isOpen={showGameSetup} title="Start Battle" onClose={() => setShowGameSetup(false)}>
             <div className="space-y-4 pt-2">
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">1. Select Subject</label>
+                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-300 uppercase mb-2">1. Select Subject</label>
                     <div className="relative">
                         <select 
                             value={selectedSubject} 
                             onChange={(e) => setSelectedSubject(e.target.value)}
-                            className="w-full p-4 bg-slate-100 dark:bg-slate-700 dark:text-white border-2 border-transparent focus:border-game-primary rounded-xl appearance-none font-bold cursor-pointer"
+                            className="w-full p-4 bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white border-2 border-transparent focus:border-game-primary rounded-xl appearance-none font-bold cursor-pointer"
                         >
                             <option value="">-- Choose Subject --</option>
                             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
-                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
                     </div>
                 </div>
 
                 <div className={!selectedSubject ? 'opacity-50 pointer-events-none' : ''}>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">2. Select Chapter</label>
+                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-300 uppercase mb-2">2. Select Chapter</label>
                     <div className="relative">
                         <select 
                             value={selectedChapter} 
                             onChange={(e) => setSelectedChapter(e.target.value)}
-                            className="w-full p-4 bg-slate-100 dark:bg-slate-700 dark:text-white border-2 border-transparent focus:border-game-primary rounded-xl appearance-none font-bold cursor-pointer"
+                            className="w-full p-4 bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white border-2 border-transparent focus:border-game-primary rounded-xl appearance-none font-bold cursor-pointer"
                             disabled={!selectedSubject}
                         >
                             <option value="">-- Choose Chapter --</option>
                             {chapters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
-                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
                     </div>
                 </div>
 
