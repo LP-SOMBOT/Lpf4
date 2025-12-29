@@ -8,7 +8,7 @@ const DownloadPage: React.FC = () => {
   const handleDownload = () => {
     // Direct APK Download logic restored
     const link = document.createElement('a');
-    link.href = '/LP-F4.apk';
+    link.href = 'https://files.catbox.moe/o7kd4m.apk';
     link.target = '_blank';
     link.setAttribute('download', 'LP-F4.apk'); 
     document.body.appendChild(link);
