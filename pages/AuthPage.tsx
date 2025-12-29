@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signInAnonymously } from 'firebase/auth';
+
+import React, { useState, useEffect } from 'react';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, set, get } from 'firebase/database';
 import { auth, db } from '../firebase';
 import { playSound } from '../services/audioService';
@@ -11,10 +12,11 @@ const AuthPage: React.FC = () => {
   // UI State
   const [view, setView] = useState<'welcome' | 'login' | 'register'>('welcome');
   
-  // Guest Modal State
+  // Guest State
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [guestUsername, setGuestUsername] = useState('');
+  const [storedGuestSession, setStoredGuestSession] = useState<{email: string, pass: string, name: string} | null>(null);
 
   // Form State
   const [email, setEmail] = useState('');
@@ -23,6 +25,18 @@ const AuthPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [loading, setLoading] = useState(false);
+
+  // Check for existing guest session on mount
+  useEffect(() => {
+      const session = localStorage.getItem('lp_guest_session');
+      if (session) {
+          try {
+              setStoredGuestSession(JSON.parse(session));
+          } catch(e) {
+              localStorage.removeItem('lp_guest_session');
+          }
+      }
+  }, []);
 
   const generateRandomId = () => Math.random().toString(36).substring(2, 8);
 
@@ -42,10 +56,6 @@ const AuthPage: React.FC = () => {
             return 'Too many attempts. Try later.';
         case 'auth/network-request-failed':
             return 'Network error.';
-        case 'auth/admin-restricted-operation':
-            return 'Guest login disabled. Using fallback...';
-        case 'auth/operation-not-allowed':
-             return 'Sign-in provider disabled.';
         default: 
             return 'An error occurred.';
     }
@@ -56,145 +66,115 @@ const AuthPage: React.FC = () => {
         const snapshot = await get(ref(db, 'users'));
         if (!snapshot.exists()) return false;
         const users = snapshot.val();
-        // Safe check for missing username field
         return Object.values(users).some((u: any) => (u?.username || '').toLowerCase() === userHandle.toLowerCase());
       } catch (e) {
-          console.error("Username check failed", e);
           return false;
       }
   };
 
-  // Step 1: Clicked "Play as Guest"
+  // --- GUEST LOGIC ---
+
+  // 1. Initial Click
   const handleGuestClick = () => {
       playSound('click');
-      // Check if we have a saved guest session or profile mapping
-      const cachedGuest = localStorage.getItem('is_guest_setup');
       
-      if (cachedGuest === 'true') {
-          performGuestLogin();
+      // If we have a session, log them in directly (Continue)
+      if (storedGuestSession) {
+          loginExistingGuest();
       } else {
+          // If no session, open modal to setup profile (New Game)
+          setGuestName('');
+          setGuestUsername('');
           setShowGuestModal(true);
       }
   };
 
-  // Step 2: Actually sign in (either after modal or auto)
-  const performGuestLogin = async (customName?: string, customUsername?: string) => {
+  // 2. Login Existing Guest (Continue)
+  const loginExistingGuest = async () => {
+      if (!storedGuestSession) return;
       setLoading(true);
-      let user = null;
-      let isShadowAccount = false;
-
       try {
-          // 1. Try Native Anonymous Auth
-          const userCred = await signInAnonymously(auth);
-          user = userCred.user;
+          await signInWithEmailAndPassword(auth, storedGuestSession.email, storedGuestSession.pass);
+          // App.tsx handles redirection
       } catch (e: any) {
-          // 2. Fallback: Create a shadow email account if Anonymous is disabled (admin-restricted-operation)
-          // This ensures the app works even if the developer forgot to enable Anonymous Auth in Firebase Console
-          if (e.code === 'auth/admin-restricted-operation' || e.code === 'auth/operation-not-allowed') {
-              console.warn("Native Guest Auth disabled. Generating Shadow Account.");
-              try {
-                  const randId = generateRandomId();
-                  const timestamp = Date.now();
-                  // Create a unique non-existent email based on timestamp and random ID
-                  const fakeEmail = `guest_${timestamp}_${randId}@lpf4-temp.com`;
-                  const fakePass = `guest_${randId}_${timestamp}`;
-                  
-                  const userCred = await createUserWithEmailAndPassword(auth, fakeEmail, fakePass);
-                  user = userCred.user;
-                  isShadowAccount = true;
-              } catch (fallbackErr: any) {
-                  console.error("Fallback guest login failed", fallbackErr);
-                  showAlert('Login Error', 'Guest access is unavailable. Please try registering normally.', 'error');
-                  setLoading(false);
-                  return;
-              }
+          console.error("Guest login failed", e);
+          // If login fails (e.g. user deleted from DB), clear session and fallback to new guest
+          if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+              localStorage.removeItem('lp_guest_session');
+              setStoredGuestSession(null);
+              showToast("Previous session expired. Please create new profile.", "info");
+              setShowGuestModal(true);
           } else {
-              // Real error (network, etc)
-              showAlert('Login Error', getErrorMessage(e.code), 'error');
-              setLoading(false);
-              return;
+              showAlert('Error', getErrorMessage(e.code), 'error');
           }
-      }
-
-      if (!user) {
-          setLoading(false);
-          return;
-      }
-
-      try {
-          // 3. Check if profile exists in DB
-          const userRef = ref(db, `users/${user.uid}`);
-          const snapshot = await get(userRef);
-          
-          if (!snapshot.exists()) {
-              // CRITICAL: If profile doesn't exist and we don't have custom inputs, force modal
-              // This handles the "undefined name" issue by forcing user input if DB is empty
-              if (!customName || !customUsername) {
-                  setLoading(false);
-                  setShowGuestModal(true);
-                  return;
-              }
-
-              // 4. Create Profile
-              const seed = generateRandomId();
-              
-              // ENSURE NO NULL/UNDEFINED VALUES
-              const safeName = customName || `Guest ${seed}`;
-              const safeUsername = customUsername || `guest_${seed}`;
-
-              await set(userRef, {
-                name: safeName,
-                username: safeUsername,
-                points: 0, // Explicitly 0 to ensure Level 1 (not NaN)
-                avatar: generateAvatarUrl(seed),
-                gender: 'male',
-                activeMatch: null,
-                banned: false,
-                isGuest: true,
-                isShadowAccount: isShadowAccount, 
-                isVerified: false,
-                createdAt: Date.now()
-              });
-
-              await updateProfile(user, { displayName: safeName });
-              localStorage.setItem('is_guest_setup', 'true');
-          } else {
-              // Profile exists, ensure critical fields aren't missing (self-repair)
-              const data = snapshot.val();
-              if (!data.name || !data.username || typeof data.points !== 'number') {
-                   const seed = generateRandomId();
-                   await set(userRef, {
-                       ...data,
-                       name: data.name || `Guest ${seed}`,
-                       username: data.username || `guest_${seed}`,
-                       points: typeof data.points === 'number' ? data.points : 0
-                   });
-              }
-              localStorage.setItem('is_guest_setup', 'true');
-          }
-          // App.tsx listener will handle redirection to Home
-      } catch (e: any) {
-          console.error("Profile creation failed", e);
-          showAlert('Error', 'Failed to create guest profile data.', 'error');
           setLoading(false);
       }
   };
 
-  const handleGuestSubmit = async () => {
+  // 3. Register New Guest (Create Shadow Account)
+  const handleCreateGuest = async () => {
+      // Validation
       if (!guestName.trim()) { showToast("Enter your name", "error"); return; }
       if (!guestUsername.trim()) { showToast("Enter a username", "error"); return; }
       
       const cleanUser = guestUsername.toLowerCase().replace(/[^a-z0-9_]/g, '');
       if (cleanUser.length < 3) { showToast("Username too short", "error"); return; }
       
-      // Check username existence
-      const taken = await checkUsernameExists(cleanUser);
-      if (taken) { showToast("Username taken", "error"); return; }
+      setLoading(true);
 
-      setShowGuestModal(false);
-      // Pass confirmed values
-      performGuestLogin(guestName.trim(), cleanUser);
+      // Check Username
+      const taken = await checkUsernameExists(cleanUser);
+      if (taken) { 
+          showToast("Username taken", "error"); 
+          setLoading(false); 
+          return; 
+      }
+
+      try {
+          // Generate Shadow Credentials
+          const randId = generateRandomId();
+          const timestamp = Date.now();
+          const fakeEmail = `guest_${timestamp}_${randId}@lpf4-temp.com`;
+          const fakePass = `guest_${randId}_${timestamp}`;
+
+          // Create Auth
+          const userCred = await createUserWithEmailAndPassword(auth, fakeEmail, fakePass);
+          const user = userCred.user;
+          const seed = generateRandomId();
+
+          // Create Profile IMMEDIATELY to prevent "undefined" issues
+          await set(ref(db, `users/${user.uid}`), {
+              name: guestName.trim(),
+              username: cleanUser,
+              points: 0,
+              avatar: generateAvatarUrl(seed),
+              gender: 'male',
+              activeMatch: null,
+              banned: false,
+              isGuest: true,
+              isShadowAccount: true,
+              isVerified: false,
+              usernameUpdated: true, // Mark as updated so they aren't prompted again
+              createdAt: Date.now()
+          });
+
+          await updateProfile(user, { displayName: guestName.trim() });
+
+          // Save Session to LocalStorage for "Continue" feature
+          const sessionData = { email: fakeEmail, pass: fakePass, name: guestName.trim() };
+          localStorage.setItem('lp_guest_session', JSON.stringify(sessionData));
+          setStoredGuestSession(sessionData);
+
+          setShowGuestModal(false);
+          // App.tsx handles redirection
+      } catch (e: any) {
+          console.error("Guest creation failed", e);
+          showAlert('Error', 'Failed to create guest profile.', 'error');
+          setLoading(false);
+      }
   };
+
+  // --- STANDARD AUTH LOGIC ---
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,8 +183,7 @@ const AuthPage: React.FC = () => {
 
     try {
       if (view === 'login') {
-        const userCred = await signInWithEmailAndPassword(auth, email, password);
-        // Ban check handled in App.tsx
+        await signInWithEmailAndPassword(auth, email, password);
       } else {
         // Registration Validation
         if (!name.trim()) throw { code: 'custom/missing-name' };
@@ -226,17 +205,17 @@ const AuthPage: React.FC = () => {
           name: name.trim(),
           username: cleanUsername,
           email: user.email,
-          points: 0, // Default to 0 for Level 1
+          points: 0, 
           avatar: generateAvatarUrl(seed),
           gender: gender,
           activeMatch: null,
           banned: false,
           isVerified: false,
+          usernameUpdated: true, // Normal users set username on register
           createdAt: Date.now()
         });
         
         await updateProfile(user, { displayName: name.trim() });
-        sessionStorage.setItem('showAvatarSelection', 'true');
       }
     } catch (err: any) {
       console.error(err.code);
@@ -284,15 +263,17 @@ const AuthPage: React.FC = () => {
                      <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Ready to Play?</h2>
                      <p className="text-slate-500 dark:text-slate-400 text-sm font-bold mb-8">Join the stage to compete with F4 students.</p>
                      
+                     {/* Dynamic Guest Button */}
                      <Button 
                         fullWidth 
                         size="lg" 
                         onClick={handleGuestClick} 
                         isLoading={loading}
-                        className="py-5 text-xl shadow-lg shadow-orange-500/30 mb-8 relative overflow-hidden group"
+                        className={`py-5 text-xl shadow-lg mb-8 relative overflow-hidden group ${storedGuestSession ? 'bg-green-600 border-green-800' : 'shadow-orange-500/30'}`}
                      >
                         <span className="relative z-10 flex items-center justify-center gap-3">
-                            <i className="fas fa-gamepad text-2xl"></i> Play as Guest
+                            <i className={`fas ${storedGuestSession ? 'fa-play' : 'fa-user-secret'} text-2xl`}></i> 
+                            {storedGuestSession ? `Continue as ${storedGuestSession.name.split(' ')[0]}` : 'Play as Guest'}
                         </span>
                         <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12"></div>
                      </Button>
@@ -319,7 +300,13 @@ const AuthPage: React.FC = () => {
                         </button>
                      </div>
                  </div>
-                 <p className="text-center mt-6 text-xs text-slate-400 font-bold opacity-60">Made with ❤️ by LP</p>
+                 
+                 {storedGuestSession && (
+                     <p className="text-center mt-6 text-xs text-slate-400 font-bold opacity-60 cursor-pointer hover:text-red-500 transition-colors" onClick={() => { localStorage.removeItem('lp_guest_session'); setStoredGuestSession(null); }}>
+                         <i className="fas fa-times mr-1"></i> Forget guest session
+                     </p>
+                 )}
+                 {!storedGuestSession && <p className="text-center mt-6 text-xs text-slate-400 font-bold opacity-60">Made with ❤️ by LP</p>}
              </div>
          )}
 
@@ -431,7 +418,12 @@ const AuthPage: React.FC = () => {
          {/* Guest Registration Modal */}
          <Modal isOpen={showGuestModal} title="Guest Profile" onClose={() => { if(!loading) setShowGuestModal(false); }}>
              <div className="space-y-4">
-                 <p className="text-sm text-slate-500 text-center mb-4">Set up your profile to start playing.</p>
+                 <div className="text-center mb-4">
+                     <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-2 text-3xl">
+                         <i className="fas fa-user-secret text-slate-400"></i>
+                     </div>
+                     <p className="text-sm text-slate-500 font-bold">Set up your profile to start playing.</p>
+                 </div>
                  <Input 
                     icon="fa-user" 
                     placeholder="Full Name" 
@@ -445,8 +437,8 @@ const AuthPage: React.FC = () => {
                     value={guestUsername} 
                     onChange={e => setGuestUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} 
                  />
-                 <Button fullWidth onClick={handleGuestSubmit} isLoading={loading} className="mt-2">
-                     Let's Go!
+                 <Button fullWidth onClick={handleCreateGuest} isLoading={loading} className="mt-2">
+                     Start Game
                  </Button>
              </div>
          </Modal>

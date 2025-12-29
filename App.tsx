@@ -6,6 +6,7 @@ import { auth, db } from './firebase';
 import { UserProfile } from './types';
 import { Navbar } from './components/Navbar';
 import { LPAssistant } from './components/LPAssistant';
+import { UsernamePrompt } from './components/UsernamePrompt';
 import { UserContext, ThemeContext } from './contexts';
 import { showAlert } from './services/alert';
 
@@ -203,6 +204,9 @@ const AppContent: React.FC = () => {
                 
                 {/* LP Assistant */}
                 {showAssistant && <LPAssistant />}
+                
+                {/* Username Prompt for Guests */}
+                {user && <UsernamePrompt />}
 
                 {/* Mobile Bottom Navigation */}
                 {user && showNavbar && (

@@ -11,6 +11,7 @@ export interface UserProfile {
   role?: 'user' | 'admin';
   banned?: boolean;
   avatarUpdated?: boolean;
+  usernameUpdated?: boolean; // Track if guest has set/skipped username
   isVerified?: boolean; // Blue tick
   isGuest?: boolean;
   isOnline?: boolean;
