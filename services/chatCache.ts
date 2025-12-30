@@ -1,4 +1,5 @@
 
+
 import { ChatMessage } from '../types';
 
 const CACHE_KEY_PREFIX = 'quiz_chat_v2_'; 
@@ -40,7 +41,7 @@ class ChatCacheService {
                 m.id.startsWith('temp_') &&
                 m.text === message.text &&
                 m.sender === message.sender &&
-                Math.abs(m.timestamp - message.timestamp) < 5000
+                Math.abs((m.timestamp || 0) - (message.timestamp || 0)) < 5000
             );
             
             if (tempIndex !== -1) {
@@ -77,6 +78,9 @@ class ChatCacheService {
         let msgs: ChatMessage[] = raw ? JSON.parse(raw) : [];
         if (!Array.isArray(msgs)) return [];
 
+        // Ensure timestamps exist
+        msgs = msgs.filter(m => m && typeof m.timestamp === 'number');
+
         // Filter: Get messages OLDER than offsetTimestamp (for scrolling up)
         if (offsetTimestamp) {
             msgs = msgs.filter(m => m.timestamp < offsetTimestamp);
@@ -86,6 +90,9 @@ class ChatCacheService {
         if (msgs.length > limit) {
             msgs = msgs.slice(msgs.length - limit);
         }
+        
+        // Ensure sorted
+        msgs.sort((a, b) => a.timestamp - b.timestamp);
 
         return msgs;
     } catch (e) {
