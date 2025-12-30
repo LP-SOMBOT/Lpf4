@@ -61,6 +61,7 @@ export interface MatchState {
   };
   winner?: string | null; // 'draw', 'disconnect', or uid
   subject: string;
+  subjectTitle?: string; // Friendly Name of the subject (e.g. Mathematics)
   questionLimit?: number; // Total quizzes to play
 }
 

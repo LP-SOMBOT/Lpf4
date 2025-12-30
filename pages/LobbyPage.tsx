@@ -89,10 +89,18 @@ const LobbyPage: React.FC = () => {
          
          // Start 15s Timeout for Social/Private Room
          hostTimerRef.current = setTimeout(() => {
-             // Timeout reached - Cancel room
-             handleBack(); // This cleans up the room
-             showAlert("Room Expired", "No opponent joined in time.", "info");
-         }, PRIVATE_ROOM_TIMEOUT_MS);
+             // Timeout reached - Mark as Expired
+             if (linkedChatPathRef.current) {
+                 update(ref(db, linkedChatPathRef.current), { status: 'expired' });
+                 linkedChatPathRef.current = null;
+             }
+             
+             remove(ref(db, `rooms/${hostedCode}`));
+             setHostedCode(null);
+             // Clear history state
+             window.history.replaceState({}, document.title);
+             showAlert("Room Expired", "No opponent joined in time (15s).", "info");
+         }, 15000); // 15 Seconds hardcoded as per request
 
          const unsub = onValue(roomRef, (snap) => {
              // Store linked chat path if available to update later
@@ -102,9 +110,9 @@ const LobbyPage: React.FC = () => {
              }
 
              // If room is gone, it means someone joined (which deletes the room and creates match)
-             // or it was aborted. 
+             // or it was aborted/expired. 
              if (!snap.exists()) {
-                 // Clear timeout if match started
+                 // Clear timeout if match started or expired
                  if (hostTimerRef.current) clearTimeout(hostTimerRef.current);
              }
          });
@@ -157,6 +165,8 @@ const LobbyPage: React.FC = () => {
     const queueRef = ref(db, `queue/${selectedChapter}`);
     const snapshot = await get(queueRef);
     
+    const currentSubjectName = subjects.find(s => s.id === selectedSubject)?.name || 'Battle Arena';
+
     if (snapshot.exists()) {
       const qData = snapshot.val();
       const oppKey = Object.keys(qData).find(k => qData[k].uid !== user.uid);
@@ -173,7 +183,9 @@ const LobbyPage: React.FC = () => {
           // Create Match
           updates[`matches/${matchId}`] = {
             matchId, status: 'active', mode: 'auto', turn: user.uid, currentQ: 0, answersCount: 0, scores: { [user.uid]: 0, [oppUid]: 0 },
-            subject: selectedChapter, questionLimit: Math.floor(Math.random() * 11) + 10,
+            subject: selectedChapter, 
+            subjectTitle: currentSubjectName,
+            questionLimit: Math.floor(Math.random() * 11) + 10,
             players: { [user.uid]: { name: user.displayName, avatar: '' }, [oppUid]: { name: 'Opponent', avatar: '' } }, createdAt: serverTimestamp()
           };
           
@@ -232,6 +244,15 @@ const LobbyPage: React.FC = () => {
       
       const matchId = `match_${Date.now()}`;
       
+      // FETCH SUBJECT NAME for Title
+      let subjectTitle = 'Battle Arena';
+      try {
+          if(rData.sid) {
+             const sSnap = await get(ref(db, `subjects/${rData.sid}`));
+             if(sSnap.exists()) subjectTitle = sSnap.val().name;
+          }
+      } catch(e) {}
+
       // ATOMIC UPDATE FOR JOINING ROOM
       // This prevents race conditions where one user updates and the other fails/lags
       const updates: any = {};
@@ -250,6 +271,7 @@ const LobbyPage: React.FC = () => {
         answersCount: 0,
         scores: { [rData.host]: 0, [user.uid]: 0 }, 
         subject: rData.lid,
+        subjectTitle: subjectTitle,
         players: { 
             [rData.host]: { name: 'Host', avatar: '' }, // Avatars fetched in GamePage
             [user.uid]: { name: user.displayName, avatar: '' } 

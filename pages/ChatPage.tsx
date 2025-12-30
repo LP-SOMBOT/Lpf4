@@ -35,6 +35,7 @@ const ChatPage: React.FC = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const mountTimeRef = useRef(Date.now());
   
   // Network Listener
   useEffect(() => {
@@ -52,6 +53,9 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
       if (!user || !uid) return;
       
+      // Update ref to avoid playing sounds for history when switching chats
+      mountTimeRef.current = Date.now();
+
       // Reset State when switching chats
       setMessages([]);
       setLoadingHistory(true);
@@ -88,13 +92,23 @@ const ChatPage: React.FC = () => {
           
           const newMsg: ChatMessage = { id: snapshot.key!, ...data, chatId: derivedChatId };
 
-          if (newMsg.type !== 'invite' && (!newMsg.text || !newMsg.text.trim())) return;
-          
-          chatCache.saveMessage(newMsg);
+          // Play Sound for New Incoming Messages
+          if (newMsg.sender !== user.uid && newMsg.timestamp > mountTimeRef.current) {
+              playSound('message');
+          }
 
+          // Real-time update for invitation status if message exists in state
           setMessages(prev => {
-              if (prev.some(m => m.id === newMsg.id)) return prev;
+              const existingIndex = prev.findIndex(m => m.id === newMsg.id);
+              if (existingIndex !== -1) {
+                  const updated = [...prev];
+                  updated[existingIndex] = { ...updated[existingIndex], ...newMsg };
+                  return updated;
+              }
               
+              if (newMsg.type !== 'invite' && (!newMsg.text || !newMsg.text.trim())) return prev;
+              
+              // Handle temp message replacement
               const tempIndex = prev.findIndex(m => 
                   m.tempId && 
                   m.text === newMsg.text && 
@@ -110,12 +124,25 @@ const ChatPage: React.FC = () => {
               
               return [...prev, newMsg].sort((a,b) => a.timestamp - b.timestamp);
           });
+          
+          chatCache.saveMessage(newMsg);
 
           if (newMsg.sender !== user.uid && newMsg.msgStatus !== 'read') {
               update(ref(db, `chats/${derivedChatId}/messages/${newMsg.id}`), { msgStatus: 'read' });
               update(ref(db, `chats/${derivedChatId}/unread/${user.uid}`), { count: 0 });
               update(ref(db, `chats/${derivedChatId}`), { lastMessageStatus: 'read' });
           }
+      });
+      
+      // Also listen for changes to existing messages (specifically for Invite Status updates)
+      const msgsRef = ref(db, `chats/${derivedChatId}/messages`);
+      const changeUnsub = onValue(msgsRef, (snap) => {
+          if(!snap.exists()) return;
+          const data = snap.val();
+          setMessages(prev => prev.map(m => {
+              if (data[m.id]) return { ...m, ...data[m.id] };
+              return m;
+          }));
       });
 
       const metaRef = ref(db, `chats/${derivedChatId}/lastMessageStatus`);
@@ -127,17 +154,15 @@ const ChatPage: React.FC = () => {
 
       return () => {
           unsub();
+          changeUnsub();
           off(metaRef);
+          off(msgsRef);
       };
   }, [user, uid]);
 
   // --- AUTO-SCROLL LOGIC ---
-  // Use layout effect to scroll immediately after render to prevent flash
   useLayoutEffect(() => {
       if (scrollContainerRef.current) {
-          // Instant scroll to bottom on every update to ensure "Always Bottom" behavior
-          // This overrides user scrolling if they are reading history while a message comes in,
-          // but matches the request "always default to bottom".
           scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
       }
   }, [messages, loadingHistory]);
@@ -206,6 +231,8 @@ const ChatPage: React.FC = () => {
   const sendMessage = async (e?: React.FormEvent, type: 'text' | 'invite' = 'text', inviteCode?: string, subjectName?: string) => {
       e?.preventDefault();
       if ((!inputText.trim() && type === 'text') || !user || !chatId) return;
+
+      playSound('message');
 
       const tempId = `temp_${Date.now()}`;
       const timestamp = Date.now();
@@ -286,18 +313,46 @@ const ChatPage: React.FC = () => {
       try {
           const subjectName = subjects.find(s => s.id === selectedSubject)?.name || "Unknown Subject";
           const code = Math.floor(1000 + Math.random() * 9000).toString();
-          
+          const newRef = push(ref(db, `chats/${chatId}/messages`));
+          const msgId = newRef.key;
+
           await set(ref(db, `rooms/${code}`), { 
               host: user.uid, 
               sid: selectedSubject, 
               lid: selectedChapter, 
               questionLimit: 10, 
               createdAt: Date.now(),
-              linkedChatPath: `chats/${chatId}/messages/temp` 
+              linkedChatPath: `chats/${chatId}/messages/${msgId}` 
           });
           
-          await sendMessage(undefined, 'invite', code, subjectName);
+          // Send message directly to avoid tempId mismatch for linked path
+          const timestamp = Date.now();
+          const msgData: ChatMessage = {
+              id: msgId!,
+              chatId,
+              sender: user.uid,
+              text: 'CHALLENGE_INVITE',
+              type: 'invite',
+              inviteCode: code,
+              subjectName,
+              timestamp,
+              status: 'waiting',
+              msgStatus: 'sent'
+          };
           
+          await set(newRef, msgData);
+          
+          await update(ref(db, `chats/${chatId}`), {
+              lastMessage: 'CHALLENGE_INVITE',
+              lastTimestamp: serverTimestamp(),
+              lastMessageSender: user.uid, 
+              lastMessageStatus: 'sent',   
+              participants: { [user.uid]: true, [uid!]: true }
+          });
+
+          const recipientUnreadRef = ref(db, `chats/${chatId}/unread/${uid}/count`);
+          runTransaction(recipientUnreadRef, (c) => (c || 0) + 1);
+
           setShowGameSetup(false);
           playSound('correct');
           showToast('Invite sent!', 'success');
@@ -399,10 +454,14 @@ const ChatPage: React.FC = () => {
                                          <div className="text-[10px] uppercase font-bold opacity-70">Room Code</div>
                                          <div className="text-2xl font-mono font-black tracking-widest">{msg.inviteCode}</div>
                                      </div>
+                                     
+                                     {/* Invite Status Indicators */}
                                      {status === 'played' ? (
                                          <div className="bg-green-500/20 text-green-300 dark:text-green-400 font-bold px-4 py-2 rounded-xl text-xs border border-green-500/30 flex items-center justify-center gap-2"><i className="fas fa-check-circle"></i> Played</div>
                                      ) : status === 'canceled' ? (
                                          <div className="bg-red-500/20 text-red-300 dark:text-red-400 font-bold px-4 py-2 rounded-xl text-xs border border-red-500/30 flex items-center justify-center gap-2"><i className="fas fa-ban"></i> Canceled</div>
+                                     ) : status === 'expired' ? (
+                                         <div className="bg-gray-500/20 text-gray-300 dark:text-gray-400 font-bold px-4 py-2 rounded-xl text-xs border border-gray-500/30 flex items-center justify-center gap-2"><i className="fas fa-clock"></i> Expired</div>
                                      ) : !isMe ? (
                                          <button disabled={isOffline} onClick={() => acceptInvite(msg.inviteCode!)} className="bg-game-primary text-white px-4 py-2 rounded-xl font-bold w-full shadow-lg hover:brightness-110 active:scale-95 transition-all text-xs uppercase tracking-wider disabled:opacity-50">Join Match</button>
                                      ) : (

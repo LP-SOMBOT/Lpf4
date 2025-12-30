@@ -108,7 +108,9 @@ const GamePage: React.FC = () => {
           const cachedData = localStorage.getItem(cacheKey);
           
           try {
-            if (match.subject.startsWith('ALL_')) {
+            if (match.subjectTitle) {
+                setSubjectName(match.subjectTitle);
+            } else if (match.subject.startsWith('ALL_')) {
                 const subjectId = match.subject.replace('ALL_', '');
                 // Fetch subject name
                 const subSnap = await get(ref(db, `subjects/${subjectId}`));
@@ -119,11 +121,6 @@ const GamePage: React.FC = () => {
                 const snaps = await Promise.all(chapters.map(c => get(ref(db, `questions/${c.id}`))));
                 snaps.forEach(s => s.exists() && loadedQ.push(...Object.values(s.val()) as Question[]));
             } else {
-                // Fetch chapter to find subjectId, then fetch subject name
-                const chapSnap = await get(ref(db, `chapters`)); // Need to iterate to find parent subject
-                // Optimization: Usually we have subjectId in match, but if not we search.
-                // For now, let's assume we can get subject name from chapters list if needed or just cache it.
-                
                 if (cachedData) try { loadedQ = JSON.parse(cachedData); } catch(e) {}
                 if (loadedQ.length === 0) {
                     const snap = await get(ref(db, `questions/${match.subject}`));
@@ -132,11 +129,7 @@ const GamePage: React.FC = () => {
                         try { localStorage.setItem(cacheKey, JSON.stringify(loadedQ)); } catch(e) {}
                     }
                 }
-                
-                // Try to find subject name via Chapter ID lookup if possible, or just generic
-                // Simplified:
                 setSubjectName("Battle Arena"); 
-                // To do it properly we'd need a reverse lookup or store subjectName in match data
             }
 
             if (loadedQ.length > 0) {
@@ -217,48 +210,48 @@ const GamePage: React.FC = () => {
     playSound('click');
     processingRef.current = true;
 
+    // Show result immediately
+    const isCorrect = index === currentQuestion.answer;
+    isCorrect ? playSound('correct') : playSound('wrong');
+    setShowFeedback({ correct: isCorrect, answer: currentQuestion.answer });
+
+    // Very short delay just to see the color, then update
     setTimeout(async () => {
-        const isCorrect = index === currentQuestion.answer;
-        isCorrect ? playSound('correct') : playSound('wrong');
-        setShowFeedback({ correct: isCorrect, answer: currentQuestion.answer });
+        const oppUid = Object.keys(match.scores).find(uid => uid !== user.uid) || '';
+        const newScores = { ...match.scores };
+        if (isCorrect) newScores[user.uid] += POINTS_PER_QUESTION;
 
-        setTimeout(async () => {
-            const oppUid = Object.keys(match.scores).find(uid => uid !== user.uid) || '';
-            const newScores = { ...match.scores };
-            if (isCorrect) newScores[user.uid] += POINTS_PER_QUESTION;
+        const currentAnswers = match.answersCount || 0;
+        let nextQ = match.currentQ;
+        let nextAnswersCount = currentAnswers + 1;
+        let nextTurn = oppUid; 
 
-            const currentAnswers = match.answersCount || 0;
-            let nextQ = match.currentQ;
-            let nextAnswersCount = currentAnswers + 1;
-            let nextTurn = oppUid; 
+        if (currentAnswers >= 1) {
+            if (match.currentQ >= questions.length - 1) {
+                let winner = 'draw';
+                if (newScores[user.uid] > newScores[oppUid]) winner = user.uid;
+                else if (newScores[oppUid] > newScores[user.uid]) winner = oppUid;
 
-            if (currentAnswers >= 1) {
-                if (match.currentQ >= questions.length - 1) {
-                    let winner = 'draw';
-                    if (newScores[user.uid] > newScores[oppUid]) winner = user.uid;
-                    else if (newScores[oppUid] > newScores[user.uid]) winner = oppUid;
+                const myPts = (await get(ref(db, `users/${user.uid}/points`))).val() || 0;
+                await update(ref(db, `users/${user.uid}`), { points: myPts + newScores[user.uid], activeMatch: null });
+                const oppPts = (await get(ref(db, `users/${oppUid}/points`))).val() || 0;
+                await update(ref(db, `users/${oppUid}`), { points: oppPts + newScores[oppUid], activeMatch: null });
 
-                    const myPts = (await get(ref(db, `users/${user.uid}/points`))).val() || 0;
-                    await update(ref(db, `users/${user.uid}`), { points: myPts + newScores[user.uid], activeMatch: null });
-                    const oppPts = (await get(ref(db, `users/${oppUid}/points`))).val() || 0;
-                    await update(ref(db, `users/${oppUid}`), { points: oppPts + newScores[oppUid], activeMatch: null });
-
-                    await update(ref(db, `matches/${matchId}`), { scores: newScores, status: 'completed', winner, answersCount: 2 });
-                    
-                    setSelectedOption(null); setShowFeedback(null); processingRef.current = false;
-                    return;
-                }
-                nextQ = match.currentQ + 1;
-                nextAnswersCount = 0;
+                await update(ref(db, `matches/${matchId}`), { scores: newScores, status: 'completed', winner, answersCount: 2 });
+                
+                setSelectedOption(null); setShowFeedback(null); processingRef.current = false;
+                return;
             }
+            nextQ = match.currentQ + 1;
+            nextAnswersCount = 0;
+        }
 
-            await update(ref(db, `matches/${matchId}`), { 
-                scores: newScores, currentQ: nextQ, turn: nextTurn, answersCount: nextAnswersCount 
-            });
+        await update(ref(db, `matches/${matchId}`), { 
+            scores: newScores, currentQ: nextQ, turn: nextTurn, answersCount: nextAnswersCount 
+        });
 
-            setSelectedOption(null); setShowFeedback(null); processingRef.current = false;
-        }, 1500);
-    }, 800);
+        setSelectedOption(null); setShowFeedback(null); processingRef.current = false;
+    }, 400); // 400ms delay for feedback visibility
   };
 
   const handleLeave = async () => {
@@ -366,8 +359,8 @@ const GamePage: React.FC = () => {
       )}
 
       {!isGameOver && (
-          <div className="absolute top-20 left-4 z-40 md:top-24">
-              <button onClick={handleSurrender} className="bg-white/10 backdrop-blur-md text-white/70 hover:text-red-400 hover:bg-white/20 px-3 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider border border-white/10 transition-all flex items-center gap-2">
+          <div className="fixed top-20 left-4 z-[60] md:top-24">
+              <button onClick={handleSurrender} className="bg-red-500/80 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg border-2 border-white/20 transition-all flex items-center gap-2 backdrop-blur-md">
                   <i className="fas fa-sign-out-alt"></i> Exit
               </button>
           </div>
@@ -449,49 +442,97 @@ const GamePage: React.FC = () => {
            </Card>
         ) : (
             <>
-                <div className={`w-full rounded-[2rem] p-6 md:p-8 shadow-[0_10px_0_rgba(0,0,0,0.1)] mb-6 text-center border-2 min-h-[160px] flex items-center justify-center flex-col relative overflow-hidden transition-all duration-500 ${isMyTurn ? 'bg-white dark:bg-slate-800 border-game-primary/50 shadow-game-primary/20' : 'bg-gray-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-90 grayscale-[0.5]'}`}>
-                    {isMyTurn && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-game-primary via-red-500 to-game-danger animate-pulse"></div>}
-                    
-                    {/* Subject Name - Added Here */}
-                    <span className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-[0.2em] animate__animated animate__fadeIn">
-                        {subjectName || "Battle Arena"}
-                    </span>
-                    
-                    <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white leading-relaxed z-10">{currentQuestion && currentQuestion.question}</h2>
-                </div>
-                <div className="relative w-full">
-                    {!isMyTurn && (
-                         <div className="absolute inset-0 z-20 bg-slate-900/10 backdrop-blur-[2px] rounded-3xl flex items-center justify-center animate__animated animate__fadeIn">
-                             <div className="bg-slate-900/80 text-white px-6 py-3 rounded-full font-black uppercase tracking-widest shadow-2xl flex items-center gap-3 border border-white/20">
-                                 <i className="fas fa-hourglass-half animate-spin-slow"></i> {opponentProfile.name}'s Turn
+                {/* Question Card */}
+                 <div className="relative w-full bg-white dark:bg-slate-800 rounded-[2rem] p-8 shadow-[0_8px_30px_rgb(0,0,0,0.12)] mb-8 min-h-[200px] flex flex-col items-center justify-center text-center border border-slate-100 dark:border-slate-700 relative overflow-hidden transition-all duration-300 hover:shadow-2xl">
+                     {/* Decorative Top Line */}
+                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 via-red-500 to-purple-600"></div>
+                     
+                     {/* Subtle Pattern */}
+                     <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='1' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E")` }}></div>
+
+                     {/* Subject Label */}
+                     <div className="relative z-10 mb-5">
+                         <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 shadow-sm backdrop-blur-md">
+                             <i className="fas fa-layer-group text-game-primary text-xs"></i>
+                             <span className="text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">
+                                 {subjectName || "Battle Arena"}
+                             </span>
+                         </span>
+                     </div>
+                     
+                     {/* Question */}
+                     <h2 className="relative z-10 text-xl md:text-3xl font-black text-slate-800 dark:text-white leading-snug drop-shadow-sm animate__animated animate__fadeIn">
+                        {currentQuestion && currentQuestion.question}
+                     </h2>
+                 </div>
+
+                 {/* Options Grid */}
+                 <div className="relative w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {/* Turn Indicator Overlay if not my turn */}
+                     {!isMyTurn && (
+                         <div className="absolute inset-0 z-20 bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur-[2px] rounded-3xl flex items-center justify-center animate__animated animate__fadeIn">
+                             <div className="bg-white dark:bg-slate-800 px-8 py-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2 border-2 border-slate-200 dark:border-slate-600 transform scale-110">
+                                 <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                                     <i className="fas fa-hourglass-half text-indigo-500 animate-spin-slow"></i>
+                                 </div>
+                                 <div className="text-center">
+                                     <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Waiting for</div>
+                                     <div className="text-base font-black text-slate-800 dark:text-white">{opponentProfile.name}</div>
+                                 </div>
                              </div>
                          </div>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                        {currentQuestion && currentQuestion.options.map((opt, idx) => {
-                            let isActive = selectedOption === idx;
-                            let bgClass = isActive ? "bg-game-primary border-b-4 border-game-primaryDark translate-y-[2px] text-white" : "bg-white dark:bg-slate-800 border-b-4 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200";
-                            if (showFeedback) {
-                                if (idx === showFeedback.answer) bgClass = "bg-green-500 border-b-4 border-green-700 animate__animated animate__pulse text-white";
-                                else if (isActive) bgClass = "bg-red-500 border-b-4 border-red-700 animate__animated animate__shakeX text-white";
-                                else bgClass = "bg-slate-100 dark:bg-slate-800 opacity-50 border-transparent grayscale";
+                     )}
+
+                     {currentQuestion && currentQuestion.options.map((opt, idx) => {
+                        let isActive = selectedOption === idx;
+                        // Determine base styles
+                        let bgClass = "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-game-primary dark:hover:border-game-primary";
+                        let letterClass = "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400";
+                        
+                        if (isActive) {
+                             bgClass = "bg-game-primary border-game-primaryDark text-white translate-y-[4px] border-b-0";
+                             letterClass = "bg-white/20 text-white";
+                        } else {
+                             // Default 3D style
+                             bgClass += " border-b-[6px] active:border-b-0 active:translate-y-[6px]";
+                        }
+
+                        if (showFeedback) {
+                            if (idx === showFeedback.answer) {
+                                bgClass = "bg-green-500 border-green-700 text-white translate-y-[4px] border-b-0 animate__animated animate__pulse";
+                                letterClass = "bg-white/20 text-white";
+                            } else if (isActive) {
+                                bgClass = "bg-red-500 border-red-700 text-white translate-y-[4px] border-b-0 animate__animated animate__shakeX";
+                                letterClass = "bg-white/20 text-white";
+                            } else {
+                                bgClass = "bg-slate-100 dark:bg-slate-900 border-transparent opacity-50 grayscale";
                             }
-                            return (
-                                <button key={idx} disabled={!isMyTurn || selectedOption !== null} onClick={() => handleOptionClick(idx)} className={`relative p-5 rounded-2xl text-left transition-all duration-150 active:scale-[0.98] ${bgClass} ${!isMyTurn ? 'cursor-not-allowed' : ''} shadow-lg hover:brightness-105 min-h-[80px] flex items-center`}>
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black mr-4 text-sm shrink-0 ${isActive || (showFeedback && idx === showFeedback.answer) ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>{String.fromCharCode(65 + idx)}</div>
-                                    <span className="font-bold text-lg leading-tight">{opt}</span>
-                                    {isActive && !showFeedback && <i className="fas fa-spinner fa-spin ml-2"></i>}
-                                    {selectedOption !== null && idx === currentQuestion.answer && showFeedback && (
-                                        <i className="fas fa-check-circle absolute right-4 text-white text-xl animate__animated animate__zoomIn"></i>
-                                    )}
-                                     {selectedOption !== null && idx === selectedOption && idx !== currentQuestion.answer && showFeedback && (
-                                        <i className="fas fa-times-circle absolute right-4 text-white text-xl animate__animated animate__zoomIn"></i>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
+                        }
+
+                        return (
+                            <button 
+                                key={idx} 
+                                disabled={!isMyTurn || selectedOption !== null} 
+                                onClick={() => handleOptionClick(idx)} 
+                                className={`group relative w-full p-5 rounded-2xl text-left transition-all duration-100 flex items-center gap-4 ${bgClass} ${!isMyTurn ? 'cursor-not-allowed' : ''}`}
+                            >
+                                {/* Option Letter */}
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 transition-transform group-hover:scale-110 ${letterClass}`}>
+                                    {String.fromCharCode(65 + idx)}
+                                </div>
+                                <span className="font-bold text-lg leading-tight flex-1">{opt}</span>
+                                
+                                {isActive && !showFeedback && <i className="fas fa-spinner fa-spin ml-2"></i>}
+                                {selectedOption !== null && idx === currentQuestion.answer && showFeedback && (
+                                    <i className="fas fa-check-circle text-white text-2xl animate__animated animate__zoomIn"></i>
+                                )}
+                                 {selectedOption !== null && idx === selectedOption && idx !== currentQuestion.answer && showFeedback && (
+                                    <i className="fas fa-times-circle text-white text-2xl animate__animated animate__zoomIn"></i>
+                                )}
+                            </button>
+                        );
+                    })}
+                 </div>
             </>
         )}
       </div>

@@ -244,9 +244,10 @@ const SocialPage: React.FC = () => {
             <div className="min-w-full w-full snap-center overflow-y-auto p-4 custom-scrollbar pb-24" style={{ scrollSnapStop: 'always' }}>
                 <div className="max-w-2xl mx-auto space-y-3">
                     {sortedFriends.length === 0 ? (
-                        <div className="text-center py-20 opacity-50">
+                        <div className="text-center py-20 opacity-50 flex flex-col items-center">
                             <i className="fas fa-comments text-4xl mb-2 text-slate-300"></i>
-                            <p className="font-bold text-slate-400">No active chats</p>
+                            <p className="font-bold text-slate-400 mb-4">No active chats</p>
+                            <Button size="sm" onClick={() => switchTab('explore')} className="!px-6">Find Friends</Button>
                         </div>
                     ) : (
                         sortedFriends.map(f => {
