@@ -80,6 +80,9 @@ class ChatCacheService {
 
         // Ensure timestamps exist
         msgs = msgs.filter(m => m && typeof m.timestamp === 'number');
+        
+        // Filter ghost messages
+        msgs = msgs.filter(m => m.type === 'invite' || (m.text && m.text.trim().length > 0));
 
         // Filter: Get messages OLDER than offsetTimestamp (for scrolling up)
         if (offsetTimestamp) {

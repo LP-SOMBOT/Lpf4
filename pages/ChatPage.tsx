@@ -89,6 +89,9 @@ const ChatPage: React.FC = () => {
           if (!data) return;
           
           const newMsg: ChatMessage = { id: snapshot.key!, ...data, chatId: derivedChatId };
+
+          // Filter ghost messages (e.g. from status updates on non-existent paths)
+          if (newMsg.type !== 'invite' && (!newMsg.text || !newMsg.text.trim())) return;
           
           // Save to cache async
           chatCache.saveMessage(newMsg);
@@ -423,6 +426,9 @@ const ChatPage: React.FC = () => {
             )}
             
             {messages.map((msg, index) => {
+                // Filter ghost messages
+                if (msg.type !== 'invite' && (!msg.text || !msg.text.trim())) return null;
+
                 const isMe = msg.sender === user?.uid;
                 const status = msg.status || 'waiting'; 
                 const isInvite = msg.type === 'invite';
