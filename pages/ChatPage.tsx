@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, push, set, serverTimestamp, update, get, runTransaction } from 'firebase/database';
+import { ref, onValue, push, set, serverTimestamp, update, get, runTransaction, query, orderByChild, startAt, limitToLast, onChildAdded, off } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { ChatMessage, UserProfile, Subject, Chapter } from '../types';
 import { Avatar, Button, Modal, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { showToast, showAlert } from '../services/alert';
+import { chatCache } from '../services/chatCache';
 
 const ChatPage: React.FC = () => {
   const { uid } = useParams(); // Target user ID
@@ -18,6 +19,7 @@ const ChatPage: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [targetUser, setTargetUser] = useState<UserProfile | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   
   // Match Setup State
   const [showGameSetup, setShowGameSetup] = useState(false);
@@ -28,6 +30,19 @@ const ChatPage: React.FC = () => {
   const [setupLoading, setSetupLoading] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Network Listener
+  useEffect(() => {
+      const handleOnline = () => setIsOffline(false);
+      const handleOffline = () => setIsOffline(true);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      return () => {
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+      }
+  }, []);
 
   // Initialize Chat
   useEffect(() => {
@@ -38,63 +53,111 @@ const ChatPage: React.FC = () => {
           if (snap.exists()) setTargetUser({ uid, ...snap.val() });
       });
 
-      // Construct Chat ID (lexicographically sorted to be unique for pair)
+      // Construct Chat ID
       const participants = [user.uid, uid].sort();
       const derivedChatId = `${participants[0]}_${participants[1]}`;
       setChatId(derivedChatId);
 
-      // 1. Reset My Unread Count for this chat
-      update(ref(db, `chats/${derivedChatId}/unread/${user.uid}`), { count: 0 });
+      // --- 1. LOAD CACHE INSTANTLY ---
+      chatCache.getMessages(derivedChatId, 50).then(cachedMsgs => {
+          setMessages(cachedMsgs);
+          // Scroll to bottom after initial load
+          setTimeout(() => messagesEndRef.current?.scrollIntoView(), 100);
+      });
 
-      // 2. Load from Cache first
-      const cachedMsgs = localStorage.getItem(`chat_${derivedChatId}`);
-      if (cachedMsgs) {
-          try {
-              setMessages(JSON.parse(cachedMsgs));
-          } catch(e) {}
-      }
+      // --- 2. SYNC NEW MESSAGES (Bandwidth Optimized) ---
+      // We only listen for items added AFTER the last cached item
+      const syncMessages = async () => {
+          const lastTs = await chatCache.getLastMessageTimestamp(derivedChatId);
+          // If no cache, fetch last 50. If cache exists, fetch newer than last timestamp + 1ms
+          const msgsQuery = lastTs > 0
+            ? query(ref(db, `chats/${derivedChatId}/messages`), orderByChild('timestamp'), startAt(lastTs + 1))
+            : query(ref(db, `chats/${derivedChatId}/messages`), limitToLast(50));
 
-      // 3. Listen for Live Messages
-      const msgsRef = ref(db, `chats/${derivedChatId}/messages`);
-      const unsub = onValue(msgsRef, (snap) => {
-          if (snap.exists()) {
-              const data = snap.val();
-              const list = Object.keys(data).map(k => ({ id: k, ...data[k] })).sort((a,b) => a.timestamp - b.timestamp);
-              setMessages(list);
-              // Save to localStorage immediately on updates
-              localStorage.setItem(`chat_${derivedChatId}`, JSON.stringify(list));
+          const unsub = onChildAdded(msgsQuery, (snapshot) => {
+              const data = snapshot.val();
+              const newMsg: ChatMessage = { id: snapshot.key!, ...data, chatId: derivedChatId };
               
-              // Reset unread count again if we are actively viewing and a new message comes in
-              update(ref(db, `chats/${derivedChatId}/unread/${user.uid}`), { count: 0 });
-              
-              // Mark incoming messages as read if I am the recipient
-              const updates: any = {};
-              let hasReadUpdates = false;
-              let latestMsgId = list[list.length - 1]?.id;
+              // Save to cache
+              chatCache.saveMessage(newMsg);
 
-              list.forEach(m => {
-                  if (m.sender !== user.uid && m.msgStatus !== 'read') {
-                      // Update Message Status
-                      updates[`chats/${derivedChatId}/messages/${m.id}/msgStatus`] = 'read';
-                      hasReadUpdates = true;
-                      
-                      // If this is the LATEST message, update root status too so sender sees blue tick in list
-                      if (m.id === latestMsgId) {
-                          updates[`chats/${derivedChatId}/lastMessageStatus`] = 'read';
-                      }
+              setMessages(prev => {
+                  // Prevent duplicates (especially if we sent it optimistically)
+                  if (prev.some(m => m.id === newMsg.id)) return prev;
+                  // If we have a temp ID that matches this content/timestamp, replace it
+                  const tempMatchIndex = prev.findIndex(m => m.tempId && m.text === newMsg.text && Math.abs(m.timestamp - newMsg.timestamp) < 5000);
+                  
+                  if (tempMatchIndex !== -1) {
+                      const updated = [...prev];
+                      updated[tempMatchIndex] = newMsg;
+                      return updated;
                   }
+                  
+                  return [...prev, newMsg].sort((a,b) => a.timestamp - b.timestamp);
               });
 
-              if (hasReadUpdates) {
-                  update(ref(db), updates);
+              // Mark as read if not mine
+              if (newMsg.sender !== user.uid && newMsg.msgStatus !== 'read') {
+                  update(ref(db, `chats/${derivedChatId}/messages/${newMsg.id}`), { msgStatus: 'read' });
+                  update(ref(db, `chats/${derivedChatId}`), { lastMessageStatus: 'read' });
+                  // Also update unread count
+                  update(ref(db, `chats/${derivedChatId}/unread/${user.uid}`), { count: 0 });
               }
+          });
+
+          return unsub;
+      };
+
+      let unsubscribe: Function | undefined;
+      syncMessages().then(unsub => unsubscribe = unsub);
+
+      // Listen for global status updates (like read receipts)
+      // This is still lightweight as it's just the root object, not the list
+      const metaRef = ref(db, `chats/${derivedChatId}/lastMessageStatus`);
+      const metaUnsub = onValue(metaRef, (snap) => {
+          if (snap.exists() && snap.val() === 'read') {
+              setMessages(prev => prev.map(m => m.msgStatus !== 'read' && m.sender === user.uid ? { ...m, msgStatus: 'read' } : m));
           }
       });
 
-      return () => unsub();
+      return () => {
+          if (unsubscribe) unsubscribe();
+          off(metaRef);
+      };
   }, [user, uid]);
 
-  // Load Subjects for Match Setup
+  // Pagination Handler
+  const handleScroll = async () => {
+      if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0 && chatId && messages.length > 0) {
+          const oldestTs = messages[0].timestamp;
+          const olderMsgs = await chatCache.getMessages(chatId, 20, oldestTs - 1);
+          
+          if (olderMsgs.length > 0) {
+              const oldHeight = scrollContainerRef.current.scrollHeight;
+              setMessages(prev => [...olderMsgs, ...prev]);
+              // Maintain scroll position
+              setTimeout(() => {
+                  if (scrollContainerRef.current) {
+                      const newHeight = scrollContainerRef.current.scrollHeight;
+                      scrollContainerRef.current.scrollTop = newHeight - oldHeight;
+                  }
+              }, 0);
+          }
+      }
+  };
+
+  useEffect(() => {
+      // Auto-scroll on new message if near bottom
+      const container = scrollContainerRef.current;
+      if (container) {
+          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+          if (isNearBottom) {
+              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }
+      }
+  }, [messages]);
+
+  // Load Subjects
   useEffect(() => {
       if (showGameSetup) {
           get(ref(db, 'subjects')).then(snap => {
@@ -106,7 +169,7 @@ const ChatPage: React.FC = () => {
       }
   }, [showGameSetup]);
 
-  // Load Chapters when Subject Selected
+  // Load Chapters
   useEffect(() => {
     if (!selectedSubject) { setChapters([]); return; }
     get(ref(db, `chapters/${selectedSubject}`)).then(snap => {
@@ -119,45 +182,60 @@ const ChatPage: React.FC = () => {
     });
   }, [selectedSubject]);
 
-  useEffect(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Persist messages to LocalStorage whenever state changes
-  useEffect(() => {
-      if (chatId && messages.length > 0) {
-          localStorage.setItem(`chat_${chatId}`, JSON.stringify(messages));
-      }
-  }, [messages, chatId]);
-
   const sendMessage = async (e?: React.FormEvent, type: 'text' | 'invite' = 'text', inviteCode?: string, subjectName?: string) => {
       e?.preventDefault();
       if ((!inputText.trim() && type === 'text') || !user || !chatId) return;
 
       const tempId = `temp_${Date.now()}`;
+      const timestamp = Date.now();
       
-      const msgData: any = {
+      const msgData: ChatMessage = {
+          id: tempId, // Use temp ID initially
+          tempId: tempId,
+          chatId: chatId,
           sender: user.uid,
           text: type === 'invite' ? 'CHALLENGE_INVITE' : inputText.trim(),
           type,
-          inviteCode: inviteCode || null,
-          subjectName: subjectName || null,
-          timestamp: Date.now(),
-          status: type === 'invite' ? 'waiting' : null,
-          msgStatus: 'sent'
+          inviteCode: inviteCode || undefined,
+          subjectName: subjectName || undefined,
+          timestamp: timestamp,
+          status: type === 'invite' ? 'waiting' : undefined,
+          msgStatus: 'sending' // Optimistic Status
       };
 
       if (type === 'text') setInputText('');
 
-      // Optimistic Update
-      const optimisticMsg: ChatMessage = { id: tempId, ...msgData };
-      setMessages(prev => [...prev, optimisticMsg]);
+      // 1. Optimistic UI Update
+      setMessages(prev => [...prev, msgData]);
       
+      // 2. Save to Cache immediately
+      chatCache.saveMessage(msgData);
+      
+      // Scroll down
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+
       try {
-          // Push to Firebase
-          await push(ref(db, `chats/${chatId}/messages`), msgData);
+          // 3. Push to Firebase
+          // Note: We use the Firebase key as the real ID
+          const newRef = push(ref(db, `chats/${chatId}/messages`));
+          const realId = newRef.key!;
           
-          // Update last message metadata AND Root Status
+          const finalMsg = { 
+              ...msgData, 
+              id: realId, 
+              msgStatus: 'sent' as const 
+          };
+          delete finalMsg.tempId; // Clean up before sending to DB (though type allows optional)
+
+          await set(newRef, finalMsg);
+          
+          // 4. Update Cache with Real ID and Status
+          chatCache.saveMessage({ ...finalMsg, chatId });
+
+          // 5. Update UI with Real ID and Status
+          setMessages(prev => prev.map(m => m.tempId === tempId ? { ...finalMsg, chatId } : m));
+
+          // Update root metadata
           await update(ref(db, `chats/${chatId}`), {
               lastMessage: msgData.text,
               lastTimestamp: serverTimestamp(),
@@ -166,15 +244,13 @@ const ChatPage: React.FC = () => {
               participants: { [user.uid]: true, [uid!]: true }
           });
 
-          // Increment Unread Count for Recipient
           const recipientUnreadRef = ref(db, `chats/${chatId}/unread/${uid}/count`);
-          runTransaction(recipientUnreadRef, (currentCount) => {
-              return (currentCount || 0) + 1;
-          });
+          runTransaction(recipientUnreadRef, (c) => (c || 0) + 1);
 
       } catch (err) {
           console.error("SendMessage Error:", err);
           showToast("Failed to send message", "error");
+          // Optionally mark message as failed in UI here
       }
   };
 
@@ -194,48 +270,17 @@ const ChatPage: React.FC = () => {
           const subjectName = subjects.find(s => s.id === selectedSubject)?.name || "Unknown Subject";
           const code = Math.floor(1000 + Math.random() * 9000).toString();
           
-          const msgsRef = ref(db, `chats/${chatId}/messages`);
-          const newMsgRef = push(msgsRef);
-          
-          const roomData = { 
+          // Create Room
+          await set(ref(db, `rooms/${code}`), { 
               host: user.uid, 
               sid: selectedSubject, 
               lid: selectedChapter, 
               questionLimit: 10, 
               createdAt: Date.now(),
-              linkedChatPath: `chats/${chatId}/messages/${newMsgRef.key}`
-          };
-          
-          await set(ref(db, `rooms/${code}`), roomData);
-          
-          const msgData = {
-              sender: user.uid,
-              text: 'CHALLENGE_INVITE',
-              type: 'invite',
-              inviteCode: code,
-              subjectName: subjectName,
-              timestamp: serverTimestamp(),
-              status: 'waiting',
-              msgStatus: 'sent'
-          };
-          
-          // Optimistic update
-          setMessages(prev => [...prev, { id: newMsgRef.key || `temp_${Date.now()}`, ...msgData, timestamp: Date.now() } as any]);
-
-          await set(newMsgRef, msgData);
-          
-          // Update root metadata
-          await update(ref(db, `chats/${chatId}`), {
-              lastMessage: msgData.text,
-              lastTimestamp: serverTimestamp(),
-              lastMessageSender: user.uid,
-              lastMessageStatus: 'sent',
-              participants: { [user.uid]: true, [uid!]: true }
+              linkedChatPath: `chats/${chatId}/messages/temp` // Placeholder, will update if needed but usually just invite code helps
           });
-
-           // Increment Unread Count for Recipient
-           const recipientUnreadRef = ref(db, `chats/${chatId}/unread/${uid}/count`);
-           runTransaction(recipientUnreadRef, (count) => (count || 0) + 1);
+          
+          await sendMessage(undefined, 'invite', code, subjectName);
           
           setShowGameSetup(false);
           playSound('correct');
@@ -261,16 +306,13 @@ const ChatPage: React.FC = () => {
       return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Improved Tick Rendering: High Contrast Colors
   const renderMessageStatus = (status: string | undefined, isInvite: boolean = false) => {
-      // Base color for Sent/Delivered (White transparent works on both Orange and Blue backgrounds)
       const baseColor = "text-white/60";
-      
-      // Read Color Logic:
-      // If Invite (Blue BG) -> Orange Tick (text-orange-400)
-      // If Text (Orange BG) -> Blue Tick (text-blue-800)
       const readColor = isInvite ? "text-orange-400" : "text-blue-800";
 
+      if (status === 'sending') {
+          return <i className={`fas fa-clock ${baseColor} text-[10px] ml-1 animate-pulse`} title="Sending..."></i>;
+      }
       if (!status || status === 'sent') {
           return <i className={`fas fa-check ${baseColor} text-[10px] ml-1`} title="Sent"></i>;
       }
@@ -309,26 +351,40 @@ const ChatPage: React.FC = () => {
                         {targetUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
                         {targetUser.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">@{targetUser.username}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                        {isOffline ? <span className="text-red-500"><i className="fas fa-wifi"></i> Offline</span> : `@${targetUser.username}`}
+                    </div>
                 </div>
             </div>
             <button 
                 onClick={openMatchSetup}
-                className="bg-game-primary text-white px-4 py-2 rounded-xl text-xs font-bold uppercase shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform hover:bg-indigo-600"
+                disabled={isOffline}
+                className="bg-game-primary text-white px-4 py-2 rounded-xl text-xs font-bold uppercase shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform hover:bg-indigo-600 disabled:opacity-50 disabled:grayscale"
             >
                 <i className="fas fa-gamepad mr-2"></i> Play
             </button>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-28 md:pb-32 relative z-10 custom-scrollbar">
-            {messages.map((msg) => {
+        <div 
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto p-4 space-y-3 pb-28 md:pb-32 relative z-10 custom-scrollbar"
+        >
+            {messages.length === 0 && (
+                <div className="flex items-center justify-center h-48 opacity-50">
+                    <p className="text-sm font-bold">No messages yet. Say hi!</p>
+                </div>
+            )}
+            
+            {messages.map((msg, index) => {
                 const isMe = msg.sender === user?.uid;
                 const status = msg.status || 'waiting'; 
                 const isInvite = msg.type === 'invite';
                 
+                // Grouping logic? Maybe later. For now simple render.
                 return (
-                    <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate__animated animate__fadeInUp`}>
+                    <div key={msg.id || `temp-${index}`} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate__animated animate__fadeInUp`}>
                         {isInvite ? (
                              <div className={`max-w-[85%] w-64 p-5 rounded-3xl ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border-2 border-game-primary rounded-bl-sm'} shadow-xl relative overflow-hidden`}>
                                  <div className={`absolute top-0 right-0 p-2 opacity-10 pointer-events-none`}>
@@ -346,7 +402,6 @@ const ChatPage: React.FC = () => {
                                          <div className="text-2xl font-mono font-black tracking-widest">{msg.inviteCode}</div>
                                      </div>
                                      
-                                     {/* Status Rendering */}
                                      {status === 'played' ? (
                                          <div className="bg-green-500/20 text-green-300 dark:text-green-400 font-bold px-4 py-2 rounded-xl text-xs border border-green-500/30 flex items-center justify-center gap-2">
                                              <i className="fas fa-check-circle"></i> Played
@@ -356,7 +411,7 @@ const ChatPage: React.FC = () => {
                                              <i className="fas fa-ban"></i> Canceled
                                          </div>
                                      ) : !isMe ? (
-                                         <button onClick={() => acceptInvite(msg.inviteCode!)} className="bg-game-primary text-white px-4 py-2 rounded-xl font-bold w-full shadow-lg hover:brightness-110 active:scale-95 transition-all text-xs uppercase tracking-wider">
+                                         <button disabled={isOffline} onClick={() => acceptInvite(msg.inviteCode!)} className="bg-game-primary text-white px-4 py-2 rounded-xl font-bold w-full shadow-lg hover:brightness-110 active:scale-95 transition-all text-xs uppercase tracking-wider disabled:opacity-50">
                                              Join Match
                                          </button>
                                      ) : (
@@ -398,15 +453,16 @@ const ChatPage: React.FC = () => {
                         <div className="flex-1 relative group">
                             <input 
                                 className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-5 py-3 md:py-3.5 pl-5 pr-12 text-sm md:text-base text-slate-900 dark:text-white focus:outline-none focus:border-game-primary focus:ring-2 focus:ring-game-primary/20 transition-all font-medium placeholder-slate-400 dark:placeholder-slate-500 shadow-inner"
-                                placeholder="Message..."
+                                placeholder={isOffline ? "Waiting for connection..." : "Message..."}
                                 value={inputText}
                                 onChange={e => setInputText(e.target.value)}
+                                disabled={isOffline}
                             />
                         </div>
                         
                         <button 
                             type="submit" 
-                            disabled={!inputText.trim()}
+                            disabled={!inputText.trim() || isOffline}
                             className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-full bg-gradient-to-tr from-game-primary to-indigo-600 text-white flex items-center justify-center disabled:opacity-50 disabled:scale-95 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-90 transition-all duration-200"
                         >
                             <i className="fas fa-paper-plane text-sm md:text-base"></i>

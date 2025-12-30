@@ -76,11 +76,13 @@ export interface Room {
 
 export interface ChatMessage {
   id: string;
+  tempId?: string; // For local optimistic updates
+  chatId?: string; // Used for indexing in local cache
   sender: string;
   text: string;
   timestamp: number;
   type?: 'text' | 'invite'; // Invite for match
-  msgStatus?: 'sent' | 'delivered' | 'read'; // WhatsApp style ticks
+  msgStatus?: 'sending' | 'sent' | 'delivered' | 'read'; // Added 'sending'
   inviteCode?: string; // Room code if type is invite
   subjectName?: string; // Subject name for the invite
   status?: 'waiting' | 'played' | 'canceled';
