@@ -69,12 +69,21 @@ const ChatPage: React.FC = () => {
           if (cachedMsgs.length === 0) {
               setInitialScrollDone(true);
           }
+      }).catch(err => {
+          console.error("Cache Error", err);
+          setInitialScrollDone(true);
       });
 
       // --- 2. SYNC NEW MESSAGES (Bandwidth Optimized) ---
       // We only listen for items added AFTER the last cached item
       const syncMessages = async () => {
-          const lastTs = await chatCache.getLastMessageTimestamp(derivedChatId);
+          let lastTs = 0;
+          try {
+              lastTs = await chatCache.getLastMessageTimestamp(derivedChatId);
+          } catch(e) {
+              console.warn("Error getting last TS", e);
+          }
+
           // If no cache, fetch last 50. If cache exists, fetch newer than last timestamp + 1ms
           const msgsQuery = lastTs > 0
             ? query(ref(db, `chats/${derivedChatId}/messages`), orderByChild('timestamp'), startAt(lastTs + 1))
