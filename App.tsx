@@ -156,22 +156,22 @@ const AppContent: React.FC = () => {
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
       <ThemeContext.Provider value={{ theme, setTheme }}>
-        {/* Global Modern Background - Theme Aware & Vibrant */}
-        <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden transition-colors duration-500">
-            {/* Base Layer: Light Mode = Orange Tint, Dark Mode = Deep Slate */}
-            <div className="absolute inset-0 bg-orange-50 dark:bg-slate-950 transition-colors duration-500"></div>
+        {/* Global Modern Background - Optimized for Cross-Browser Compatibility */}
+        <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden transition-colors duration-500 bg-orange-50 dark:bg-slate-900">
+            {/* 1. Static Gradient Fallback (CSS) */}
+            <div className="absolute inset-0 opacity-50 dark:opacity-40" 
+                 style={{
+                     backgroundImage: 'radial-gradient(circle at 0% 0%, rgba(249, 115, 22, 0.4) 0%, transparent 50%), radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.4) 0%, transparent 50%), radial-gradient(circle at 100% 100%, rgba(239, 68, 68, 0.3) 0%, transparent 50%)'
+                 }}>
+            </div>
 
-            {/* Gradient Orb 1: Primary Orange */}
-            <div className="absolute top-[-10%] left-[-10%] w-[70vw] h-[70vw] bg-orange-400/30 dark:bg-orange-600/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[80px] animate-blob"></div>
-
-            {/* Gradient Orb 2: Indigo */}
-            <div className="absolute top-[-10%] right-[-10%] w-[70vw] h-[70vw] bg-indigo-400/30 dark:bg-indigo-600/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[80px] animate-blob animation-delay-2000"></div>
-
-            {/* Gradient Orb 3: Red/Pink (Accent) */}
-            <div className="absolute bottom-[-20%] left-[20%] w-[70vw] h-[70vw] bg-red-400/30 dark:bg-red-600/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[80px] animate-blob animation-delay-4000"></div>
+            {/* 2. Animated Blobs - Reduced Blur radius for performance, NO mix-blend-mode */}
+            <div className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vw] bg-orange-400/30 dark:bg-orange-600/30 rounded-full blur-[60px] animate-blob"></div>
+            <div className="absolute top-[10%] right-[-20%] w-[70vw] h-[70vw] bg-indigo-400/30 dark:bg-indigo-600/30 rounded-full blur-[60px] animate-blob" style={{ animationDelay: '2s' }}></div>
+            <div className="absolute bottom-[-20%] left-[20%] w-[70vw] h-[70vw] bg-red-400/30 dark:bg-red-600/30 rounded-full blur-[60px] animate-blob" style={{ animationDelay: '4s' }}></div>
             
-            {/* Subtle Noise Overlay for Texture */}
-            <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/noise.png")' }}></div>
+            {/* 3. Subtle Texture */}
+            <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/noise.png")' }}></div>
         </div>
 
         <div className="w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden relative z-10">
