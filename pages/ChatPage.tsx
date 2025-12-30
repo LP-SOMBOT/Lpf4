@@ -35,6 +35,7 @@ const ChatPage: React.FC = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDone = useRef(false);
   
   // Network Listener
   useEffect(() => {
@@ -55,6 +56,7 @@ const ChatPage: React.FC = () => {
       // Reset State when switching chats
       setMessages([]);
       setLoadingHistory(true);
+      initialScrollDone.current = false;
       
       // Fetch Target User Info
       get(ref(db, `users/${uid}`)).then(snap => {
@@ -143,23 +145,27 @@ const ChatPage: React.FC = () => {
   }, [user, uid]);
 
   // Auto-Scroll Handling
-  useEffect(() => {
+  useLayoutEffect(() => {
       if (loadingHistory) return;
       
       const container = scrollContainerRef.current;
       if (!container) return;
 
+      // 1. Initial Load: Always scroll to bottom once history is fully loaded
+      if (!initialScrollDone.current && messages.length > 0) {
+          container.scrollTop = container.scrollHeight;
+          initialScrollDone.current = true;
+          return;
+      }
+
+      // 2. New Message Handling:
+      // Scroll if the user sent the message OR if the user was already near the bottom
       const lastMsg = messages[messages.length - 1];
       const isMe = lastMsg?.sender === user?.uid;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 250;
       
-      // Smart scroll: If I sent it, or if we were already near bottom, or if it's initial load
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 300;
-      
-      if (isMe || isNearBottom || messages.length <= 20) {
-          // Use setTimeout to ensure DOM is updated
-          setTimeout(() => {
-             container.scrollTop = container.scrollHeight;
-          }, 100);
+      if (isMe || isNearBottom) {
+          container.scrollTop = container.scrollHeight;
       }
   }, [messages, loadingHistory, user?.uid]);
 
