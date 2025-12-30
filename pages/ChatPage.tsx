@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ref, onValue, push, set, serverTimestamp, update, get, runTransaction, query, orderByChild, startAt, limitToLast, onChildAdded, off } from 'firebase/database';
 import { db } from '../firebase';
@@ -20,6 +20,10 @@ const ChatPage: React.FC = () => {
   const [targetUser, setTargetUser] = useState<UserProfile | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  
+  // UX State
+  const [initialScrollDone, setInitialScrollDone] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   
   // Match Setup State
   const [showGameSetup, setShowGameSetup] = useState(false);
@@ -61,8 +65,10 @@ const ChatPage: React.FC = () => {
       // --- 1. LOAD CACHE INSTANTLY ---
       chatCache.getMessages(derivedChatId, 50).then(cachedMsgs => {
           setMessages(cachedMsgs);
-          // Scroll to bottom after initial load
-          setTimeout(() => messagesEndRef.current?.scrollIntoView(), 100);
+          // If no messages, we are "done" scrolling
+          if (cachedMsgs.length === 0) {
+              setInitialScrollDone(true);
+          }
       });
 
       // --- 2. SYNC NEW MESSAGES (Bandwidth Optimized) ---
@@ -82,10 +88,17 @@ const ChatPage: React.FC = () => {
               chatCache.saveMessage(newMsg);
 
               setMessages(prev => {
-                  // Prevent duplicates (especially if we sent it optimistically)
+                  // Prevent duplicates (Strict Check)
                   if (prev.some(m => m.id === newMsg.id)) return prev;
-                  // If we have a temp ID that matches this content/timestamp, replace it
-                  const tempMatchIndex = prev.findIndex(m => m.tempId && m.text === newMsg.text && Math.abs(m.timestamp - newMsg.timestamp) < 5000);
+                  
+                  // Match optimistic temporary messages
+                  const tempMatchIndex = prev.findIndex(m => 
+                      m.tempId && 
+                      m.text === newMsg.text && 
+                      // If it's an invite, inviteCode MUST match
+                      (m.type === 'invite' ? m.inviteCode === newMsg.inviteCode : true) &&
+                      Math.abs(m.timestamp - newMsg.timestamp) < 5000
+                  );
                   
                   if (tempMatchIndex !== -1) {
                       const updated = [...prev];
@@ -112,7 +125,6 @@ const ChatPage: React.FC = () => {
       syncMessages().then(unsub => unsubscribe = unsub);
 
       // Listen for global status updates (like read receipts)
-      // This is still lightweight as it's just the root object, not the list
       const metaRef = ref(db, `chats/${derivedChatId}/lastMessageStatus`);
       const metaUnsub = onValue(metaRef, (snap) => {
           if (snap.exists() && snap.val() === 'read') {
@@ -126,36 +138,68 @@ const ChatPage: React.FC = () => {
       };
   }, [user, uid]);
 
-  // Pagination Handler
+  // Scroll Handling
+  useLayoutEffect(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      if (!initialScrollDone && messages.length > 0) {
+          // Force scroll to bottom using scrollTop for exact positioning
+          container.scrollTop = container.scrollHeight;
+          // Reveal list
+          setInitialScrollDone(true);
+      } else if (initialScrollDone) {
+          // Smart Auto-scroll
+          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+          const lastMsg = messages[messages.length - 1];
+          const isMe = lastMsg?.sender === user?.uid;
+
+          // Always scroll if I sent it, or if I'm already at the bottom
+          if (isMe || isNearBottom) {
+              container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+          } else if (!isMe && !isNearBottom) {
+              // Optionally show "New Message" badge if needed, currently handling via floating button logic
+          }
+      }
+  }, [messages, initialScrollDone, user?.uid]);
+
+  // Pagination & Scroll Button Handler
   const handleScroll = async () => {
-      if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0 && chatId && messages.length > 0) {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      // 1. Floating Button Logic
+      // Show button if scrolled up more than 300px from bottom
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 300;
+      setShowScrollButton(!isNearBottom);
+
+      // 2. Pagination Logic
+      if (container.scrollTop === 0 && chatId && messages.length > 0) {
           const oldestTs = messages[0].timestamp;
           const olderMsgs = await chatCache.getMessages(chatId, 20, oldestTs - 1);
           
           if (olderMsgs.length > 0) {
-              const oldHeight = scrollContainerRef.current.scrollHeight;
+              const oldHeight = container.scrollHeight;
+              const currentScrollTop = container.scrollTop; // Should be 0
+              
               setMessages(prev => [...olderMsgs, ...prev]);
-              // Maintain scroll position
-              setTimeout(() => {
-                  if (scrollContainerRef.current) {
-                      const newHeight = scrollContainerRef.current.scrollHeight;
-                      scrollContainerRef.current.scrollTop = newHeight - oldHeight;
-                  }
-              }, 0);
+              
+              // Restore scroll position to keep view stable
+              // We need to wait for render, but layout effect runs after render
+              // A simple requestAnimationFrame or timeout usually works for this specific restore
+              requestAnimationFrame(() => {
+                  const newHeight = container.scrollHeight;
+                  container.scrollTop = newHeight - oldHeight;
+              });
           }
       }
   };
 
-  useEffect(() => {
-      // Auto-scroll on new message if near bottom
-      const container = scrollContainerRef.current;
-      if (container) {
-          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-          if (isNearBottom) {
-              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }
+  const scrollToBottom = () => {
+      if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
       }
-  }, [messages]);
+  };
 
   // Load Subjects
   useEffect(() => {
@@ -211,12 +255,8 @@ const ChatPage: React.FC = () => {
       // 2. Save to Cache immediately
       chatCache.saveMessage(msgData);
       
-      // Scroll down
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-
       try {
           // 3. Push to Firebase
-          // Note: We use the Firebase key as the real ID
           const newRef = push(ref(db, `chats/${chatId}/messages`));
           const realId = newRef.key!;
           
@@ -227,7 +267,7 @@ const ChatPage: React.FC = () => {
           };
           delete finalMsg.tempId; 
           
-          // Remove undefined fields because Firebase set() does not allow them
+          // Remove undefined fields
           Object.keys(finalMsg).forEach(key => {
               if (finalMsg[key] === undefined) {
                   delete finalMsg[key];
@@ -236,10 +276,10 @@ const ChatPage: React.FC = () => {
 
           await set(newRef, finalMsg);
           
-          // 4. Update Cache with Real ID and Status
+          // 4. Update Cache with Real ID
           chatCache.saveMessage({ ...finalMsg, chatId });
 
-          // 5. Update UI with Real ID and Status
+          // 5. Update UI with Real ID
           setMessages(prev => prev.map(m => m.tempId === tempId ? { ...finalMsg, chatId } : m));
 
           // Update root metadata
@@ -257,7 +297,6 @@ const ChatPage: React.FC = () => {
       } catch (err) {
           console.error("SendMessage Error:", err);
           showToast("Failed to send message", "error");
-          // Optionally mark message as failed in UI here
       }
   };
 
@@ -284,7 +323,7 @@ const ChatPage: React.FC = () => {
               lid: selectedChapter, 
               questionLimit: 10, 
               createdAt: Date.now(),
-              linkedChatPath: `chats/${chatId}/messages/temp` // Placeholder, will update if needed but usually just invite code helps
+              linkedChatPath: `chats/${chatId}/messages/temp` // Placeholder
           });
           
           await sendMessage(undefined, 'invite', code, subjectName);
@@ -376,7 +415,7 @@ const ChatPage: React.FC = () => {
         <div 
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto p-4 space-y-3 pb-28 md:pb-32 relative z-10 custom-scrollbar"
+            className={`flex-1 overflow-y-auto p-4 space-y-3 pb-28 md:pb-32 relative z-10 custom-scrollbar ${!initialScrollDone && messages.length > 0 ? 'opacity-0' : 'opacity-100 transition-opacity duration-300'}`}
         >
             {messages.length === 0 && (
                 <div className="flex items-center justify-center h-48 opacity-50">
@@ -450,6 +489,19 @@ const ChatPage: React.FC = () => {
             })}
             <div ref={messagesEndRef}></div>
         </div>
+
+        {/* Scroll to Bottom Floating Button */}
+        {showScrollButton && (
+            <button 
+                onClick={scrollToBottom}
+                className="fixed bottom-24 right-4 z-50 w-10 h-10 bg-slate-900/50 dark:bg-slate-700/50 text-white rounded-full shadow-lg backdrop-blur-md flex items-center justify-center animate__animated animate__fadeInUp hover:bg-slate-900 dark:hover:bg-slate-600 transition-colors"
+            >
+                <i className="fas fa-arrow-down"></i>
+                {messages.length > 0 && messages[messages.length - 1].sender !== user?.uid && (
+                    <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-slate-800 animate-pulse"></span>
+                )}
+            </button>
+        )}
 
         {/* Modern Responsive Fixed Input Area */}
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 transition-all duration-300">
