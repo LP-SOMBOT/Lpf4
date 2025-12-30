@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { ref, onValue, off, update, push, remove } from 'firebase/database';
+import { ref, onValue, off, update, push, remove, get, query, orderByChild, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { UserProfile } from '../types';
@@ -94,7 +94,7 @@ const SocialPage: React.FC = () => {
       return () => off(usersRef);
   }, [user]);
 
-  // Listen to Chat Metadata for ALL friends
+  // Listen to Chat Metadata & Mark Delivered
   useEffect(() => {
     if (!user || friends.length === 0) return;
 
@@ -105,11 +105,37 @@ const SocialPage: React.FC = () => {
         const chatId = `${participants[0]}_${participants[1]}`;
         const chatRef = ref(db, `chats/${chatId}`);
 
-        const unsub = onValue(chatRef, (snapshot) => {
+        const unsub = onValue(chatRef, async (snapshot) => {
             if (snapshot.exists()) {
                 const data = snapshot.val();
                 const unreadForMe = data.unread?.[user.uid]?.count || 0;
                 
+                // Logic: If there are unread messages for me, and I have "received" this data update (i.e. I am online in the app),
+                // we should attempt to mark those messages as 'delivered' if they are currently 'sent'.
+                if (unreadForMe > 0) {
+                    // We only check the last few messages to be efficient
+                    try {
+                        const msgsQuery = query(ref(db, `chats/${chatId}/messages`), limitToLast(unreadForMe + 2));
+                        const msgsSnap = await get(msgsQuery);
+                        if (msgsSnap.exists()) {
+                            const msgs = msgsSnap.val();
+                            const updates: any = {};
+                            Object.keys(msgs).forEach(key => {
+                                const m = msgs[key];
+                                // If I am NOT the sender, and status is 'sent', mark as 'delivered'
+                                if (m.sender !== user.uid && (!m.msgStatus || m.msgStatus === 'sent')) {
+                                    updates[`chats/${chatId}/messages/${key}/msgStatus`] = 'delivered';
+                                }
+                            });
+                            if (Object.keys(updates).length > 0) {
+                                update(ref(db), updates);
+                            }
+                        }
+                    } catch(e) {
+                         // silent fail for delivery updates
+                    }
+                }
+
                 setChatMetadata(prev => {
                     const updated = {
                         ...prev,

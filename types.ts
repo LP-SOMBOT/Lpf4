@@ -78,6 +78,7 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   type?: 'text' | 'invite'; // Invite for match
+  msgStatus?: 'sent' | 'delivered' | 'read'; // WhatsApp style ticks
   inviteCode?: string; // Room code if type is invite
   subjectName?: string; // Subject name for the invite
   status?: 'waiting' | 'played' | 'canceled';
