@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { ref, onValue, off, update, push, remove, get, query, orderByChild, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
@@ -251,9 +252,9 @@ const SocialPage: React.FC = () => {
       const bOnline = b.isOnline ? 1 : 0;
       if (aOnline !== bOnline) return bOnline - aOnline;
 
-      // 2. Verified users next
-      const aVerified = a.isVerified ? 1 : 0;
-      const bVerified = b.isVerified ? 1 : 0;
+      // 2. Verified/Support users next
+      const aVerified = (a.isVerified || a.isSupport) ? 1 : 0;
+      const bVerified = (b.isVerified || b.isSupport) ? 1 : 0;
       if (aVerified !== bVerified) return bVerified - aVerified;
       
       // 3. Then alphabetical
@@ -268,8 +269,8 @@ const SocialPage: React.FC = () => {
       // 1. Most recent timestamp first
       if (timeB !== timeA) return timeB - timeA;
       // 2. Verified users next
-      if (a.isVerified && !b.isVerified) return -1;
-      if (!a.isVerified && b.isVerified) return 1;
+      if ((a.isVerified || a.isSupport) && (!b.isVerified && !b.isSupport)) return -1;
+      if ((!a.isVerified && !a.isSupport) && (b.isVerified || b.isSupport)) return 1;
       return (a.name || '').localeCompare(b.name || '');
   });
 
@@ -322,7 +323,9 @@ const SocialPage: React.FC = () => {
                                    <div className="flex-1 min-w-0 pr-2">
                                        <div className="flex justify-between items-baseline">
                                             <div className="font-bold text-slate-900 dark:text-white text-base truncate flex items-center gap-1">
-                                                {f.name} {f.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                                {f.name} 
+                                                {f.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                                {f.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
                                             </div>
                                             <div className={`text-[10px] font-bold ${hasUnread ? 'text-game-primary' : 'text-slate-400'}`}>
                                                 {formatLastTime(meta.lastTimestamp)}
@@ -376,6 +379,7 @@ const SocialPage: React.FC = () => {
                                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
                                             {u.name} 
                                             {u.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                            {u.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
                                        </div>
                                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">@{u.username || 'unknown'}</div>
                                    </div>
@@ -415,7 +419,11 @@ const SocialPage: React.FC = () => {
                             <div className="flex items-center gap-3 w-full sm:w-auto">
                                <Avatar src={r.user.avatar} seed={r.user.uid} size="md" isVerified={r.user.isVerified} />
                                <div>
-                                   <div className="font-bold text-slate-900 dark:text-white">{r.user.name}</div>
+                                   <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                                       {r.user.name}
+                                       {r.user.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                       {r.user.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
+                                   </div>
                                    <div className="text-xs text-slate-500 dark:text-slate-400">wants to be friends</div>
                                </div>
                            </div>
@@ -443,6 +451,7 @@ const SocialPage: React.FC = () => {
                    <h2 className="text-2xl font-black text-slate-900 dark:text-white text-center flex items-center gap-2">
                        {selectedUser.name}
                        {selectedUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg"></i>}
+                       {selectedUser.isSupport && <i className="fas fa-check-circle text-game-primary text-lg" title="Support"></i>}
                    </h2>
                    <p className="text-slate-500 dark:text-slate-400 font-mono font-bold mb-4">@{selectedUser.username}</p>
                    

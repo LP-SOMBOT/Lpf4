@@ -332,7 +332,9 @@ const GamePage: React.FC = () => {
                      <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-slate-900 font-black px-2 py-0.5 rounded-full border-2 border-white text-sm">LVL {myLevel}</div>
                   </div>
                   <h2 className="mt-4 md:mt-8 text-2xl md:text-4xl font-black text-white uppercase italic tracking-widest drop-shadow-lg text-center px-2 break-words max-w-full flex items-center justify-center gap-2">
-                      {profile?.name} {profile?.isVerified && <i className="fas fa-check-circle text-blue-300"></i>}
+                      {profile?.name} 
+                      {profile?.isVerified && <i className="fas fa-check-circle text-blue-300"></i>}
+                      {profile?.isSupport && <i className="fas fa-check-circle text-white"></i>}
                   </h2>
               </div>
               <div className="relative w-full h-1/2 md:w-1/2 md:h-full bg-red-600 flex flex-col items-center justify-center animate__animated animate__slideInRight shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10">
@@ -341,7 +343,9 @@ const GamePage: React.FC = () => {
                      <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-slate-900 font-black px-2 py-0.5 rounded-full border-2 border-white text-sm">LVL {oppLevel}</div>
                   </div>
                   <h2 className="mt-4 md:mt-8 text-2xl md:text-4xl font-black text-white uppercase italic tracking-widest drop-shadow-lg text-center px-2 break-words max-w-full flex items-center justify-center gap-2">
-                      {opponentProfile.name} {opponentProfile.isVerified && <i className="fas fa-check-circle text-blue-300"></i>}
+                      {opponentProfile.name} 
+                      {opponentProfile.isVerified && <i className="fas fa-check-circle text-blue-300"></i>}
+                      {opponentProfile.isSupport && <i className="fas fa-check-circle text-white"></i>}
                   </h2>
               </div>
               <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none">
@@ -383,7 +387,7 @@ const GamePage: React.FC = () => {
                  </div>
             </div>
             <div className="flex flex-col items-center">
-                 <div className="text-xl font-black text-slate-300 dark:text-slate-600 italic">VS</div>
+                 <div className="text-xl font-black text-slate-300 dark:text-gray-600 italic">VS</div>
                  <div className="text-xs font-bold text-slate-400">Q {match.currentQ + 1}/{questions.length}</div>
             </div>
             <div className={`flex items-center gap-3 flex-row-reverse text-right transition-all duration-300 cursor-pointer ${!isMyTurn && !isGameOver ? 'scale-105 opacity-100' : 'scale-95 opacity-60'}`} onClick={() => setShowOpponentModal(true)}>
@@ -397,6 +401,7 @@ const GamePage: React.FC = () => {
                          <div className="text-[10px] font-black uppercase text-slate-400 truncate w-16 flex items-center gap-1 justify-end">
                              {opponentProfile.name}
                              {opponentProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-[8px]"></i>}
+                             {opponentProfile.isSupport && <i className="fas fa-check-circle text-game-primary text-[8px]"></i>}
                          </div>
                      </div>
                      <div className="text-2xl font-black text-game-danger leading-none">{match.scores[opponentProfile.uid]}</div>
@@ -495,7 +500,11 @@ const GamePage: React.FC = () => {
           <Modal isOpen={true} onClose={() => setShowOpponentModal(false)} title="Opponent Profile">
                <div className="flex flex-col items-center mb-6">
                    <Avatar src={opponentProfile.avatar} seed={opponentProfile.uid} size="xl" isVerified={opponentProfile.isVerified} className="mb-4 shadow-xl border-4 border-white dark:border-slate-700" />
-                   <h2 className="text-2xl font-black text-slate-900 dark:text-white text-center flex items-center gap-2">{opponentProfile.name} {opponentProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg"></i>}</h2>
+                   <h2 className="text-2xl font-black text-slate-900 dark:text-white text-center flex items-center gap-2">
+                       {opponentProfile.name} 
+                       {opponentProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg"></i>}
+                       {opponentProfile.isSupport && <i className="fas fa-check-circle text-game-primary text-lg"></i>}
+                   </h2>
                    <div className="grid grid-cols-2 gap-4 w-full mt-4"><div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center"><div className="text-xs text-slate-400 font-bold uppercase">Level</div><div className="text-xl font-black text-slate-800 dark:text-white">{oppLevel}</div></div><div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center"><div className="text-xs text-slate-400 font-bold uppercase">Points</div><div className="text-xl font-black text-game-primary dark:text-blue-400">{opponentProfile.points}</div></div></div>
                </div>
                <Button fullWidth onClick={addFriend}><i className="fas fa-user-plus mr-2"></i> Add Friend</Button>

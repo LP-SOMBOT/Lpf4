@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ref, onValue, off } from 'firebase/database';
@@ -33,7 +34,8 @@ const LeaderboardPage: React.FC = () => {
                  email: data[key].email || '',
                  points: typeof data[key].points === 'number' ? data[key].points : 0,
                  avatar: data[key].avatar || '',
-                 isVerified: data[key].isVerified
+                 isVerified: data[key].isVerified,
+                 isSupport: data[key].isSupport // Ensure isSupport is fetched
              }));
              
              // Sort descending
@@ -114,6 +116,7 @@ const LeaderboardPage: React.FC = () => {
                             <div className="font-bold text-sm md:text-base text-slate-900 dark:text-white truncate flex items-center gap-2">
                                 {p.name}
                                 {p.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                {p.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
                                 {isMe && <span className="bg-game-primary text-white text-[9px] px-1.5 py-0.5 rounded-md font-black tracking-wide">You</span>}
                             </div>
                             <div className="text-[10px] md:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">

@@ -271,6 +271,7 @@ const ProfilePage: React.FC = () => {
                 >
                     {profile.name}
                     {profile.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg" title="Verified"></i>}
+                    {profile.isSupport && <i className="fas fa-check-circle text-game-primary text-lg" title="Support Team"></i>}
                     <i className="fas fa-pencil-alt text-xs opacity-0 group-hover:opacity-100 transition-opacity text-game-primary"></i>
                 </h2>
                 <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300 font-bold font-mono bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full mt-2">

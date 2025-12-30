@@ -212,6 +212,17 @@ const SuperAdminPage: React.FC = () => {
       } catch(e) { console.error(e); }
   };
 
+  const toggleSupport = async (uid: string, currentStatus?: boolean) => {
+      const newStatus = !currentStatus;
+      try {
+          await update(ref(db, `users/${uid}`), { isSupport: newStatus });
+          showToast(newStatus ? 'Support Badge Granted' : 'Support Badge Revoked', 'success');
+          if (selectedUser && selectedUser.uid === uid) {
+              setSelectedUser({ ...selectedUser, isSupport: newStatus });
+          }
+      } catch(e) { console.error(e); }
+  };
+
   const toggleCustomAvatarPrivilege = async (uid: string, currentStatus?: boolean) => {
       const newStatus = !currentStatus;
       try {
@@ -440,7 +451,8 @@ const SuperAdminPage: React.FC = () => {
                                                     <div>
                                                         <div className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
                                                             {u.name}
-                                                            {u.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                                            {u.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs" title="Verified"></i>}
+                                                            {u.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
                                                             {u.role === 'admin' && <i className="fas fa-shield-alt text-somali-blue text-xs" title="Admin"></i>}
                                                         </div>
                                                         <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">@{u.username}</div>
@@ -626,7 +638,11 @@ const SuperAdminPage: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    <h2 className="text-2xl font-black mt-4 text-gray-900 dark:text-white">{selectedUser.name}</h2>
+                    <h2 className="text-2xl font-black mt-4 text-gray-900 dark:text-white flex items-center gap-2">
+                        {selectedUser.name}
+                        {selectedUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg" title="Verified"></i>}
+                        {selectedUser.isSupport && <i className="fas fa-check-circle text-game-primary text-lg" title="Support Team"></i>}
+                    </h2>
                     <p className="text-gray-600 dark:text-gray-300 font-bold font-mono">@{selectedUser.username}</p>
                     <div className="grid grid-cols-2 gap-4 w-full mt-6">
                         <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-xl text-center">
@@ -642,6 +658,10 @@ const SuperAdminPage: React.FC = () => {
                 <div className="space-y-3">
                     <Button fullWidth onClick={() => toggleVerification(selectedUser.uid, selectedUser.isVerified)} variant="outline">
                         {selectedUser.isVerified ? 'Remove Verification' : 'Verify User'}
+                    </Button>
+                    {/* Support Badge Toggle */}
+                    <Button fullWidth onClick={() => toggleSupport(selectedUser.uid, selectedUser.isSupport)} className="bg-orange-100 hover:bg-orange-200 text-orange-600 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800">
+                        {selectedUser.isSupport ? 'Revoke Support Badge' : 'Grant Support Badge'}
                     </Button>
                     <Button fullWidth onClick={() => toggleCustomAvatarPrivilege(selectedUser.uid, selectedUser.allowCustomAvatar)} className="bg-purple-600 hover:bg-purple-700 border-purple-800">
                         {selectedUser.allowCustomAvatar ? 'Revoke Custom Avatar' : 'Allow Custom Avatar'}

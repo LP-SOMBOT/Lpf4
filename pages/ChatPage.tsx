@@ -307,6 +307,7 @@ const ChatPage: React.FC = () => {
                     <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1">
                         {targetUser.name}
                         {targetUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                        {targetUser.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">@{targetUser.username}</div>
                 </div>
