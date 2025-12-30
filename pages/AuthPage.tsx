@@ -231,14 +231,8 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col justify-center items-center p-4 relative overflow-hidden bg-orange-50 dark:bg-slate-900 transition-colors">
-      {/* Dynamic Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-game-primary/20 rounded-full blur-[120px] animate-blob"></div>
-        <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] bg-red-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
-        <div className="absolute inset-0 opacity-[0.4]" style={{ backgroundImage: 'radial-gradient(rgba(251, 146, 60, 0.3) 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
-      </div>
-
+    <div className="min-h-screen w-full flex flex-col justify-center items-center p-4 relative overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors">
+      
       {/* Main Content */}
       <div className="relative z-10 w-full max-w-md">
          

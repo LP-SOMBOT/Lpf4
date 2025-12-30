@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
@@ -17,15 +18,7 @@ const DownloadPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-orange-50 dark:bg-slate-900 transition-colors flex flex-col font-sans pt-24">
-      {/* Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-orange-500/10 dark:bg-orange-500/20 rounded-full blur-[120px] animate-blob"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-red-500/10 dark:bg-red-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
-        <div className="absolute top-[40%] left-[40%] w-[30%] h-[30%] bg-yellow-500/10 dark:bg-yellow-500/20 rounded-full blur-[100px] animate-blob animation-delay-4000"></div>
-        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}></div>
-      </div>
-
+    <div className="min-h-screen relative overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors flex flex-col font-sans pt-24">
       {/* Navbar - Fixed Glass */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 p-4 shadow-sm flex justify-between items-center transition-colors duration-300">
          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/')}>

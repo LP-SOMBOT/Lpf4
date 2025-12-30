@@ -135,8 +135,7 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-orange-50 dark:bg-slate-900 text-white transition-colors">
-        <div className="absolute inset-0 bg-white/5 backdrop-blur-xl z-0"></div>
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 text-white transition-colors">
         <div className="relative z-10 w-24 h-24 mb-4">
              <div className="absolute inset-0 bg-orange-500 opacity-20 rounded-full animate-ping"></div>
              <div className="relative w-full h-full bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center shadow-xl z-10">
@@ -156,25 +155,7 @@ const AppContent: React.FC = () => {
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
       <ThemeContext.Provider value={{ theme, setTheme }}>
-        {/* Global Modern Background - Optimized for Cross-Browser Compatibility */}
-        <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden transition-colors duration-500 bg-orange-50 dark:bg-slate-900">
-            {/* 1. Static Gradient Fallback (CSS) */}
-            <div className="absolute inset-0 opacity-50 dark:opacity-40" 
-                 style={{
-                     backgroundImage: 'radial-gradient(circle at 0% 0%, rgba(249, 115, 22, 0.4) 0%, transparent 50%), radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.4) 0%, transparent 50%), radial-gradient(circle at 100% 100%, rgba(239, 68, 68, 0.3) 0%, transparent 50%)'
-                 }}>
-            </div>
-
-            {/* 2. Animated Blobs - Reduced Blur radius for performance, NO mix-blend-mode */}
-            <div className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vw] bg-orange-400/30 dark:bg-orange-600/30 rounded-full blur-[60px] animate-blob"></div>
-            <div className="absolute top-[10%] right-[-20%] w-[70vw] h-[70vw] bg-indigo-400/30 dark:bg-indigo-600/30 rounded-full blur-[60px] animate-blob" style={{ animationDelay: '2s' }}></div>
-            <div className="absolute bottom-[-20%] left-[20%] w-[70vw] h-[70vw] bg-red-400/30 dark:bg-red-600/30 rounded-full blur-[60px] animate-blob" style={{ animationDelay: '4s' }}></div>
-            
-            {/* 3. Subtle Texture */}
-            <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/noise.png")' }}></div>
-        </div>
-
-        <div className="w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden relative z-10">
+        <div className="w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden relative z-10 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-300">
             {/* Desktop Navigation */}
             {user && showNavbar && (
                 <div className="hidden md:block w-24 lg:w-72 shrink-0 z-20 h-full p-4">
