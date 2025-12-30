@@ -10,28 +10,37 @@ const FALLBACK_LIMIT = 50;
 class ChatCacheService {
   private db: IDBDatabase | null = null;
   private useLocalStorage = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
     if (typeof window !== 'undefined' && !('indexedDB' in window)) {
-      console.warn('IndexedDB not supported. Falling back to LocalStorage.');
       this.useLocalStorage = true;
     }
   }
 
   async init(): Promise<void> {
     if (this.useLocalStorage) return;
+    if (this.initPromise) return this.initPromise;
 
-    return new Promise((resolve) => {
+    this.initPromise = new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+          console.warn("IDB init timed out, falling back to LS");
+          this.useLocalStorage = true;
+          resolve();
+      }, 2000); // 2 second timeout
+
       try {
           const request = indexedDB.open(DB_NAME, DB_VERSION);
 
           request.onerror = () => {
+            clearTimeout(timeout);
             console.error('Failed to open chat cache DB');
             this.useLocalStorage = true;
             resolve();
           };
 
           request.onsuccess = (event) => {
+            clearTimeout(timeout);
             this.db = (event.target as IDBOpenDBRequest).result;
             resolve();
           };
@@ -45,11 +54,13 @@ class ChatCacheService {
             }
           };
       } catch (e) {
+          clearTimeout(timeout);
           console.error("IDB Open Error", e);
           this.useLocalStorage = true;
           resolve();
       }
     });
+    return this.initPromise;
   }
 
   async saveMessage(message: ChatMessage): Promise<void> {
@@ -66,21 +77,17 @@ class ChatCacheService {
       try {
           const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
           const store = transaction.objectStore(STORE_NAME);
-          
           store.put(message);
-
           transaction.oncomplete = () => {
             this.cleanupChat(message.chatId!);
             resolve();
           };
-          
           transaction.onerror = () => {
-              // Fallback silently
-              this.saveToLocalStorage(message);
+              this.saveToLocalStorage(message); // Fallback
               resolve();
           };
       } catch(e) {
-          this.saveToLocalStorage(message);
+          this.saveToLocalStorage(message); // Fallback
           resolve();
       }
     });
@@ -102,7 +109,6 @@ class ChatCacheService {
           const range = offsetTimestamp ? IDBKeyRange.upperBound(offsetTimestamp, true) : null;
           
           const messages: ChatMessage[] = [];
-          // Iterate backwards (newest first)
           const request = index.openCursor(range, 'prev');
 
           request.onsuccess = (event) => {
@@ -113,43 +119,18 @@ class ChatCacheService {
               }
               cursor.continue();
             } else {
-              // Return reversed to show chronological order in UI
               resolve(messages.reverse());
             }
           };
 
           request.onerror = () => {
-              console.warn("IDB Read Error");
+              console.warn("IDB Read Error, using LS");
               resolve(this.getFromLocalStorage(chatId, limit, offsetTimestamp));
           };
       } catch(e) {
           console.error("IDB Transaction Error", e);
           resolve(this.getFromLocalStorage(chatId, limit, offsetTimestamp));
       }
-    });
-  }
-
-  async updateMessageStatus(id: string, status: 'sent' | 'delivered' | 'read'): Promise<void> {
-    if (!this.db && !this.useLocalStorage) await this.init();
-    
-    if (this.useLocalStorage || !this.db) return;
-
-    return new Promise((resolve) => {
-        try {
-            const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.get(id);
-
-            request.onsuccess = () => {
-                const data = request.result as ChatMessage;
-                if (data) {
-                    data.msgStatus = status;
-                    store.put(data);
-                }
-                resolve();
-            };
-            request.onerror = () => resolve();
-        } catch { resolve(); }
     });
   }
 
@@ -164,7 +145,6 @@ class ChatCacheService {
 
   private async cleanupChat(chatId: string) {
     if (!this.db) return;
-    
     try {
         const transaction = this.db.transaction([STORE_NAME], 'readwrite');
         const store = transaction.objectStore(STORE_NAME);
@@ -175,7 +155,6 @@ class ChatCacheService {
             if (countRequest.result > CACHE_LIMIT) {
                 const diff = countRequest.result - CACHE_LIMIT;
                 let deleted = 0;
-                // Oldest first
                 const cursorReq = index.openCursor(IDBKeyRange.only(chatId));
                 cursorReq.onsuccess = (e) => {
                     const cursor = (e.target as IDBRequest).result as IDBCursor;
@@ -200,36 +179,40 @@ class ChatCacheService {
       const key = this.getLocalStorageKey(message.chatId);
       let msgs: ChatMessage[] = [];
       try {
-          msgs = JSON.parse(localStorage.getItem(key) || '[]');
+          const raw = localStorage.getItem(key);
+          msgs = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(msgs)) msgs = [];
       } catch(e) { msgs = []; }
 
-      // Remove existing if updating (by id or tempId)
+      // Deduplicate
       msgs = msgs.filter(m => m.id !== message.id && m.tempId !== message.tempId);
       msgs.push(message);
       
-      // Sort by timestamp
-      msgs.sort((a, b) => a.timestamp - b.timestamp);
+      msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
       
-      // Limit size
       if (msgs.length > FALLBACK_LIMIT) {
           msgs = msgs.slice(msgs.length - FALLBACK_LIMIT);
       }
       
-      localStorage.setItem(key, JSON.stringify(msgs));
+      try {
+        localStorage.setItem(key, JSON.stringify(msgs));
+      } catch (e) {
+        console.warn("LocalStorage full or disabled");
+      }
   }
 
   private getFromLocalStorage(chatId: string, limit: number = 50, offsetTimestamp?: number): ChatMessage[] {
       const key = this.getLocalStorageKey(chatId);
       try {
-          let msgs: ChatMessage[] = JSON.parse(localStorage.getItem(key) || '[]');
+          const raw = localStorage.getItem(key);
+          let msgs: ChatMessage[] = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(msgs)) return [];
           
-          // Filter if offset is provided (fetch older messages)
           if (offsetTimestamp) {
               msgs = msgs.filter(m => m.timestamp < offsetTimestamp);
           }
           
-          // Since LS stores in chronological order (old -> new), 
-          // and we usually want the *latest* subset for the UI:
+          // Return last N messages
           if (msgs.length > limit) {
               msgs = msgs.slice(msgs.length - limit);
           }

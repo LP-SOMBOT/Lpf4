@@ -63,75 +63,59 @@ const ChatPage: React.FC = () => {
       setChatId(derivedChatId);
 
       // --- 1. LOAD CACHE INSTANTLY ---
+      // We start by showing what we have locally
       chatCache.getMessages(derivedChatId, 50).then(cachedMsgs => {
           setMessages(cachedMsgs);
-          // If no messages, we are "done" scrolling
           if (cachedMsgs.length === 0) {
-              setInitialScrollDone(true);
+              setInitialScrollDone(true); // Nothing to scroll, just show
           }
       }).catch(err => {
           console.error("Cache Error", err);
           setInitialScrollDone(true);
       });
 
-      // --- 2. SYNC NEW MESSAGES (Bandwidth Optimized) ---
-      // We only listen for items added AFTER the last cached item
-      const syncMessages = async () => {
-          let lastTs = 0;
-          try {
-              lastTs = await chatCache.getLastMessageTimestamp(derivedChatId);
-          } catch(e) {
-              console.warn("Error getting last TS", e);
-          }
+      // --- 2. SYNC NEW MESSAGES (Optimized) ---
+      // Instead of complex timestamp filtering which causes index warnings and potential freezes,
+      // we simply listen to the last 50 messages. The client-side dedup logic below handles the overlap.
+      // This is efficient because Firebase transmits negligible data for unchanged items in the listener window.
+      const msgsQuery = query(ref(db, `chats/${derivedChatId}/messages`), limitToLast(50));
 
-          // If no cache, fetch last 50. If cache exists, fetch newer than last timestamp + 1ms
-          const msgsQuery = lastTs > 0
-            ? query(ref(db, `chats/${derivedChatId}/messages`), orderByChild('timestamp'), startAt(lastTs + 1))
-            : query(ref(db, `chats/${derivedChatId}/messages`), limitToLast(50));
+      const unsub = onChildAdded(msgsQuery, (snapshot) => {
+          const data = snapshot.val();
+          const newMsg: ChatMessage = { id: snapshot.key!, ...data, chatId: derivedChatId };
+          
+          // Save to cache
+          chatCache.saveMessage(newMsg);
 
-          const unsub = onChildAdded(msgsQuery, (snapshot) => {
-              const data = snapshot.val();
-              const newMsg: ChatMessage = { id: snapshot.key!, ...data, chatId: derivedChatId };
+          setMessages(prev => {
+              // Prevent duplicates (Strict Check)
+              if (prev.some(m => m.id === newMsg.id)) return prev;
               
-              // Save to cache
-              chatCache.saveMessage(newMsg);
-
-              setMessages(prev => {
-                  // Prevent duplicates (Strict Check)
-                  if (prev.some(m => m.id === newMsg.id)) return prev;
-                  
-                  // Match optimistic temporary messages
-                  const tempMatchIndex = prev.findIndex(m => 
-                      m.tempId && 
-                      m.text === newMsg.text && 
-                      // If it's an invite, inviteCode MUST match
-                      (m.type === 'invite' ? m.inviteCode === newMsg.inviteCode : true) &&
-                      Math.abs(m.timestamp - newMsg.timestamp) < 5000
-                  );
-                  
-                  if (tempMatchIndex !== -1) {
-                      const updated = [...prev];
-                      updated[tempMatchIndex] = newMsg;
-                      return updated;
-                  }
-                  
-                  return [...prev, newMsg].sort((a,b) => a.timestamp - b.timestamp);
-              });
-
-              // Mark as read if not mine
-              if (newMsg.sender !== user.uid && newMsg.msgStatus !== 'read') {
-                  update(ref(db, `chats/${derivedChatId}/messages/${newMsg.id}`), { msgStatus: 'read' });
-                  update(ref(db, `chats/${derivedChatId}`), { lastMessageStatus: 'read' });
-                  // Also update unread count
-                  update(ref(db, `chats/${derivedChatId}/unread/${user.uid}`), { count: 0 });
+              // Match optimistic temporary messages
+              const tempMatchIndex = prev.findIndex(m => 
+                  m.tempId && 
+                  m.text === newMsg.text && 
+                  (m.type === 'invite' ? m.inviteCode === newMsg.inviteCode : true) &&
+                  Math.abs(m.timestamp - newMsg.timestamp) < 5000
+              );
+              
+              if (tempMatchIndex !== -1) {
+                  const updated = [...prev];
+                  updated[tempMatchIndex] = newMsg;
+                  return updated;
               }
+              
+              return [...prev, newMsg].sort((a,b) => a.timestamp - b.timestamp);
           });
 
-          return unsub;
-      };
-
-      let unsubscribe: Function | undefined;
-      syncMessages().then(unsub => unsubscribe = unsub);
+          // Mark as read if not mine
+          if (newMsg.sender !== user.uid && newMsg.msgStatus !== 'read') {
+              update(ref(db, `chats/${derivedChatId}/messages/${newMsg.id}`), { msgStatus: 'read' });
+              update(ref(db, `chats/${derivedChatId}`), { lastMessageStatus: 'read' });
+              // Also update unread count
+              update(ref(db, `chats/${derivedChatId}/unread/${user.uid}`), { count: 0 });
+          }
+      });
 
       // Listen for global status updates (like read receipts)
       const metaRef = ref(db, `chats/${derivedChatId}/lastMessageStatus`);
@@ -142,7 +126,7 @@ const ChatPage: React.FC = () => {
       });
 
       return () => {
-          if (unsubscribe) unsubscribe();
+          unsub();
           off(metaRef);
       };
   }, [user, uid]);
@@ -166,8 +150,6 @@ const ChatPage: React.FC = () => {
           // Always scroll if I sent it, or if I'm already at the bottom
           if (isMe || isNearBottom) {
               container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-          } else if (!isMe && !isNearBottom) {
-              // Optionally show "New Message" badge if needed, currently handling via floating button logic
           }
       }
   }, [messages, initialScrollDone, user?.uid]);
@@ -189,13 +171,9 @@ const ChatPage: React.FC = () => {
           
           if (olderMsgs.length > 0) {
               const oldHeight = container.scrollHeight;
-              const currentScrollTop = container.scrollTop; // Should be 0
               
               setMessages(prev => [...olderMsgs, ...prev]);
               
-              // Restore scroll position to keep view stable
-              // We need to wait for render, but layout effect runs after render
-              // A simple requestAnimationFrame or timeout usually works for this specific restore
               requestAnimationFrame(() => {
                   const newHeight = container.scrollHeight;
                   container.scrollTop = newHeight - oldHeight;
