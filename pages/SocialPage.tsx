@@ -415,16 +415,24 @@ const SocialPage: React.FC = () => {
                     </h2>
                     <p className="text-slate-400 font-bold font-mono text-sm">@{selectedUser.username}</p>
                     
-                    <div className="grid grid-cols-2 gap-4 w-full mt-6">
-                        <div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center">
-                            <div className="text-xs text-slate-400 font-bold uppercase">Level</div>
-                            <div className="text-xl font-black text-slate-800 dark:text-white">{Math.floor((selectedUser.points || 0) / 10) + 1}</div>
+                    {selectedUser.isSupport ? (
+                        <div className="mt-6">
+                            <span className="inline-flex items-center gap-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800 px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest">
+                                <i className="fas fa-shield-alt"></i> Official Account
+                            </span>
                         </div>
-                        <div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center">
-                            <div className="text-xs text-slate-400 font-bold uppercase">Points</div>
-                            <div className="text-xl font-black text-game-primary dark:text-blue-400">{selectedUser.points}</div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-4 w-full mt-6">
+                            <div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center">
+                                <div className="text-xs text-slate-400 font-bold uppercase">Level</div>
+                                <div className="text-xl font-black text-slate-800 dark:text-white">{Math.floor((selectedUser.points || 0) / 10) + 1}</div>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center">
+                                <div className="text-xs text-slate-400 font-bold uppercase">Points</div>
+                                <div className="text-xl font-black text-game-primary dark:text-blue-400">{selectedUser.points}</div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
                 
                 <div className="flex gap-3">
