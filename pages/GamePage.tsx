@@ -388,6 +388,14 @@ const GamePage: React.FC = () => {
   const safeScores = match.scores || {};
   const winnerUid = match.winner;
 
+  // Helper to render verified/support badges
+  const renderBadges = (user: UserProfile) => (
+      <>
+          {user.isVerified && <i className="fas fa-check-circle text-blue-500 ml-1" title="Verified"></i>}
+          {user.isSupport && <i className="fas fa-check-circle text-game-primary ml-1" title="Support"></i>}
+      </>
+  );
+
   return (
     <div className="min-h-screen relative flex flex-col font-sans overflow-hidden transition-colors pt-24">
        
@@ -397,8 +405,12 @@ const GamePage: React.FC = () => {
               {/* Left Side (Me) */}
               <div className="w-full md:w-1/2 h-1/2 md:h-full bg-orange-500 relative flex items-center justify-center animate__animated animate__slideInLeft">
                   <div className="text-center z-10">
-                      <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="xl" className="border-4 border-white shadow-2xl mb-4 mx-auto" isVerified={leftProfile.isVerified} />
-                      <h2 className="text-3xl font-black text-white uppercase drop-shadow-md">{leftProfile.name}</h2>
+                      <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="xl" className="border-4 border-white shadow-2xl mb-4 mx-auto" isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
+                      <h2 className="text-3xl font-black text-white uppercase drop-shadow-md flex items-center justify-center gap-2">
+                          {leftProfile.name}
+                          {leftProfile.isVerified && <i className="fas fa-check-circle text-white text-2xl"></i>}
+                          {leftProfile.isSupport && <i className="fas fa-check-circle text-yellow-300 text-2xl"></i>}
+                      </h2>
                       <div className="inline-block bg-black/30 px-3 py-1 rounded-full text-white font-bold mt-2">LVL {leftLevel}</div>
                   </div>
                   {/* Background Pattern */}
@@ -415,8 +427,12 @@ const GamePage: React.FC = () => {
               {/* Right Side (Opponent) */}
               <div className="w-full md:w-1/2 h-1/2 md:h-full bg-blue-600 relative flex items-center justify-center animate__animated animate__slideInRight">
                   <div className="text-center z-10">
-                      <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" className="border-4 border-white shadow-2xl mb-4 mx-auto" isVerified={rightProfile.isVerified} />
-                      <h2 className="text-3xl font-black text-white uppercase drop-shadow-md">{rightProfile.name}</h2>
+                      <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" className="border-4 border-white shadow-2xl mb-4 mx-auto" isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
+                      <h2 className="text-3xl font-black text-white uppercase drop-shadow-md flex items-center justify-center gap-2">
+                          {rightProfile.name}
+                          {rightProfile.isVerified && <i className="fas fa-check-circle text-white text-2xl"></i>}
+                          {rightProfile.isSupport && <i className="fas fa-check-circle text-yellow-300 text-2xl"></i>}
+                      </h2>
                       <div className="inline-block bg-black/30 px-3 py-1 rounded-full text-white font-bold mt-2">LVL {rightLevel}</div>
                   </div>
                   {/* Background Pattern */}
@@ -456,13 +472,14 @@ const GamePage: React.FC = () => {
             {/* Left Player */}
             <div className={`flex items-center gap-3 transition-all duration-300 ${leftIsActive && !isGameOver ? 'scale-105 opacity-100' : 'scale-95 opacity-60'}`}>
                  <div className="relative">
-                     <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="sm" border={leftIsActive ? '3px solid #f97316' : '3px solid transparent'} className={leftIsActive ? 'shadow-lg shadow-orange-500/50' : ''} isVerified={leftProfile.isVerified} />
+                     <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="sm" border={leftIsActive ? '3px solid #f97316' : '3px solid transparent'} className={leftIsActive ? 'shadow-lg shadow-orange-500/50' : ''} isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
                      <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-[8px] px-1 rounded font-bold border border-white">LVL {leftLevel}</div>
                  </div>
                  <div>
-                     <div className="flex items-center gap-1">
-                         <div className="text-[10px] font-black uppercase text-slate-400 truncate w-16">{leftProfile.name}</div>
-                         {leftIsActive && !isGameOver && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>}
+                     <div className="flex items-center gap-1 max-w-[120px]">
+                         <div className="text-[10px] font-black uppercase text-slate-400 truncate">{leftProfile.name}</div>
+                         {renderBadges(leftProfile)}
+                         {leftIsActive && !isGameOver && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-1"></span>}
                      </div>
                      <div className="text-2xl font-black text-game-primary leading-none">{safeScores[leftProfile.uid] ?? 0}</div>
                  </div>
@@ -476,15 +493,14 @@ const GamePage: React.FC = () => {
             {/* Right Player */}
             <div className={`flex items-center gap-3 flex-row-reverse text-right transition-all duration-300 ${rightIsActive && !isGameOver ? 'scale-105 opacity-100' : 'scale-95 opacity-60'} ${!isSpectator ? 'cursor-pointer' : ''}`} onClick={() => !isSpectator && setShowOpponentModal(true)}>
                  <div className="relative">
-                    <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="sm" border={rightIsActive ? '3px solid #ef4444' : '3px solid transparent'} className={rightIsActive ? 'shadow-lg shadow-red-500/50' : ''} isVerified={rightProfile.isVerified} />
+                    <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="sm" border={rightIsActive ? '3px solid #ef4444' : '3px solid transparent'} className={rightIsActive ? 'shadow-lg shadow-red-500/50' : ''} isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
                     <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-[8px] px-1 rounded font-bold border border-white">LVL {rightLevel}</div>
                  </div>
                  <div>
-                     <div className="flex items-center gap-1 justify-end">
-                         {rightIsActive && !isGameOver && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
-                         <div className="text-[10px] font-black uppercase text-slate-400 truncate w-16">
-                             {rightProfile.name}
-                         </div>
+                     <div className="flex items-center gap-1 justify-end max-w-[120px] ml-auto">
+                         {rightIsActive && !isGameOver && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse mr-1"></span>}
+                         <div className="text-[10px] font-black uppercase text-slate-400 truncate">{rightProfile.name}</div>
+                         {renderBadges(rightProfile)}
                      </div>
                      <div className="text-2xl font-black text-game-danger leading-none">{safeScores[rightProfile.uid] ?? 0}</div>
                  </div>
@@ -510,10 +526,13 @@ const GamePage: React.FC = () => {
                    <div className="flex justify-center items-center gap-8 mb-8">
                        <div className="text-center">
                            <div className="relative">
-                               <Avatar src={leftProfile.avatar} size="lg" className={`mx-auto mb-3 shadow-xl border-4 ${winnerUid === leftProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/30' : 'border-slate-200 grayscale'}`} />
+                               <Avatar src={leftProfile.avatar} size="lg" className={`mx-auto mb-3 shadow-xl border-4 ${winnerUid === leftProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/30' : 'border-slate-200 grayscale'}`} isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
                                {winnerUid === leftProfile.uid && <div className="absolute -top-6 -right-2 text-4xl animate-bounce">👑</div>}
                            </div>
-                           <div className="font-bold text-slate-800 dark:text-white truncate max-w-[100px]">{leftProfile.name}</div>
+                           <div className="font-bold text-slate-800 dark:text-white truncate max-w-[120px] flex items-center justify-center gap-1">
+                               {leftProfile.name}
+                               {renderBadges(leftProfile)}
+                           </div>
                            <div className="font-black text-3xl text-slate-900 dark:text-white mt-1">{safeScores[leftProfile.uid] ?? 0}</div>
                        </div>
 
@@ -521,10 +540,13 @@ const GamePage: React.FC = () => {
 
                        <div className="text-center">
                            <div className="relative">
-                               <Avatar src={rightProfile.avatar} size="lg" className={`mx-auto mb-3 shadow-xl border-4 ${winnerUid === rightProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/30' : 'border-slate-200 grayscale'}`} />
+                               <Avatar src={rightProfile.avatar} size="lg" className={`mx-auto mb-3 shadow-xl border-4 ${winnerUid === rightProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/30' : 'border-slate-200 grayscale'}`} isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
                                {winnerUid === rightProfile.uid && <div className="absolute -top-6 -right-2 text-4xl animate-bounce">👑</div>}
                            </div>
-                           <div className="font-bold text-slate-800 dark:text-white truncate max-w-[100px]">{rightProfile.name}</div>
+                           <div className="font-bold text-slate-800 dark:text-white truncate max-w-[120px] flex items-center justify-center gap-1">
+                               {rightProfile.name}
+                               {renderBadges(rightProfile)}
+                           </div>
                            <div className="font-black text-3xl text-slate-900 dark:text-white mt-1">{safeScores[rightProfile.uid] ?? 0}</div>
                        </div>
                    </div>
@@ -646,10 +668,11 @@ const GamePage: React.FC = () => {
       {showOpponentModal && (
           <Modal isOpen={true} onClose={() => setShowOpponentModal(false)} title="Opponent Profile">
                <div className="flex flex-col items-center mb-6">
-                   <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" isVerified={rightProfile.isVerified} className="mb-4 shadow-xl border-4 border-white dark:border-slate-700" />
-                   <h2 className="text-2xl font-black text-slate-900 dark:text-white text-center flex items-center gap-2">
+                   <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} className="mb-4 shadow-xl border-4 border-white dark:border-slate-700" />
+                   <h2 className="text-2xl font-black text-slate-900 dark:text-white text-center flex items-center justify-center gap-2">
                        {rightProfile.name} 
-                       {rightProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg"></i>}
+                       {rightProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg" title="Verified"></i>}
+                       {rightProfile.isSupport && <i className="fas fa-check-circle text-game-primary text-lg" title="Support"></i>}
                    </h2>
                    <div className="grid grid-cols-2 gap-4 w-full mt-4"><div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center"><div className="text-xs text-slate-400 font-bold uppercase">Level</div><div className="text-xl font-black text-slate-800 dark:text-white">{rightLevel}</div></div><div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center"><div className="text-xs text-slate-400 font-bold uppercase">Points</div><div className="text-xl font-black text-game-primary dark:text-blue-400">{rightProfile.points}</div></div></div>
                </div>
