@@ -9,6 +9,7 @@ import { Avatar, Button, Modal, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { showToast, showAlert } from '../services/alert';
 import { chatCache } from '../services/chatCache';
+import confetti from 'canvas-confetti';
 
 const ChatPage: React.FC = () => {
   const { uid } = useParams(); // Target user ID
@@ -24,6 +25,10 @@ const ChatPage: React.FC = () => {
   // UX State
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  
+  // 2026 Animation State
+  const [showYearAnim, setShowYearAnim] = useState(false);
+  const [yearStep, setYearStep] = useState(0); // 0: init, 1: 2025, 2: swap
   
   // Match Setup State
   const [showGameSetup, setShowGameSetup] = useState(false);
@@ -95,6 +100,10 @@ const ChatPage: React.FC = () => {
           // Play Sound for New Incoming Messages
           if (newMsg.sender !== user.uid && newMsg.timestamp > mountTimeRef.current) {
               playSound('message');
+              // Check for 2026 Animation trigger
+              if (newMsg.text && (newMsg.text.includes('2025') || newMsg.text.includes('2026'))) {
+                  triggerYearCelebration();
+              }
           }
 
           // Real-time update for invitation status if message exists in state
@@ -203,6 +212,43 @@ const ChatPage: React.FC = () => {
       }
   };
 
+  // 2026 Celebration Logic
+  const triggerYearCelebration = () => {
+      if (showYearAnim) return; 
+      setShowYearAnim(true);
+      setYearStep(1);
+      
+      const duration = 4000;
+      const end = Date.now() + duration;
+      
+      playSound('win');
+
+      const interval = setInterval(function() {
+          if (Date.now() > end) {
+              return clearInterval(interval);
+          }
+          confetti({ 
+              startVelocity: 30, 
+              spread: 360, 
+              ticks: 60, 
+              zIndex: 200, 
+              particleCount: 40, 
+              origin: { x: Math.random(), y: Math.random() - 0.2 } 
+          });
+      }, 250);
+
+      // Swap sequence
+      setTimeout(() => {
+          setYearStep(2); // The Swap
+          playSound('correct'); 
+      }, 1500);
+
+      setTimeout(() => {
+          setShowYearAnim(false);
+          setYearStep(0);
+      }, 5000);
+  };
+
   // Load Subjects for Game Invite
   useEffect(() => {
       if (showGameSetup) {
@@ -233,6 +279,11 @@ const ChatPage: React.FC = () => {
       if ((!inputText.trim() && type === 'text') || !user || !chatId) return;
 
       playSound('message');
+
+      // Check for keywords in outgoing message
+      if (type === 'text' && (inputText.includes('2025') || inputText.includes('2026'))) {
+          triggerYearCelebration();
+      }
 
       const tempId = `temp_${Date.now()}`;
       const timestamp = Date.now();
@@ -545,6 +596,30 @@ const ChatPage: React.FC = () => {
                 </div>
             </div>
         </Modal>
+
+        {/* 2026 Celebration Overlay */}
+        {showYearAnim && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none animate__animated animate__fadeIn">
+                <div className="relative font-black text-8xl md:text-9xl text-white drop-shadow-[0_0_25px_rgba(255,215,0,0.8)] flex items-center">
+                    <span className="text-yellow-400">202</span>
+                    <div className="relative w-[0.6em] h-[1em]">
+                        {/* Number 5 */}
+                        <span className={`absolute inset-0 text-yellow-400 transition-all duration-700 transform ${yearStep === 2 ? 'translate-y-32 opacity-0 rotate-45' : 'translate-y-0 opacity-100'}`}>
+                            5
+                        </span>
+                        {/* Number 6 */}
+                        <span className={`absolute inset-0 text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-orange-500 transition-all duration-700 transform ${yearStep === 2 ? 'translate-y-0 opacity-100 scale-110' : '-translate-y-32 opacity-0'}`}>
+                            6
+                        </span>
+                    </div>
+                </div>
+                {yearStep === 2 && (
+                    <div className="absolute top-2/3 mt-12 text-2xl md:text-4xl font-black text-white uppercase tracking-widest animate__animated animate__zoomIn drop-shadow-lg text-center px-4">
+                        Happy New Year!
+                    </div>
+                )}
+            </div>
+        )}
     </div>
   );
 };
