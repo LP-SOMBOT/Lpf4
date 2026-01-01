@@ -27,14 +27,50 @@ const SocialPage: React.FC = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
 
-  // --- DATA STATES ---
-  const [friends, setFriends] = useState<UserProfile[]>([]);
-  const [requests, setRequests] = useState<{uid: string, user: UserProfile}[]>([]);
-  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [chatMetadata, setChatMetadata] = useState<Record<string, ChatMeta>>({});
+  // --- DATA STATES WITH LOCAL STORAGE RESTORED ---
+
+  const [friends, setFriends] = useState<UserProfile[]>(() => {
+      try {
+          const cached = localStorage.getItem(`lp_social_friends_${user?.uid}`);
+          return cached ? JSON.parse(cached) : [];
+      } catch { return []; }
+  });
+
+  const [requests, setRequests] = useState<{uid: string, user: UserProfile}[]>(() => {
+      try {
+          const cached = localStorage.getItem(`lp_social_requests_${user?.uid}`);
+          return cached ? JSON.parse(cached) : [];
+      } catch { return []; }
+  });
+
+  const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
+      try {
+          const cached = localStorage.getItem(`lp_social_all_users`);
+          return cached ? JSON.parse(cached) : [];
+      } catch { return []; }
+  });
+
+  const [chatMetadata, setChatMetadata] = useState<Record<string, ChatMeta>>(() => {
+      try {
+          const cached = localStorage.getItem(`lp_chat_meta_${user?.uid}`);
+          return cached ? JSON.parse(cached) : {};
+      } catch { return {}; }
+  });
+
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
+  // --- PERSISTENCE EFFECT ---
+  useEffect(() => {
+      if(user) {
+          localStorage.setItem(`lp_social_friends_${user.uid}`, JSON.stringify(friends));
+          localStorage.setItem(`lp_social_requests_${user.uid}`, JSON.stringify(requests));
+          localStorage.setItem(`lp_social_all_users`, JSON.stringify(allUsers));
+          localStorage.setItem(`lp_chat_meta_${user.uid}`, JSON.stringify(chatMetadata));
+      }
+  }, [friends, requests, allUsers, chatMetadata, user]);
+
   // --- FIREBASE LISTENERS ---
+
   useEffect(() => {
       if (!user) return;
       const usersRef = ref(db, 'users');
@@ -100,6 +136,7 @@ const SocialPage: React.FC = () => {
   }, [user, friends]);
 
   // --- ACTIONS ---
+
   const sendRequest = async (targetUid: string) => {
       if(!user) return;
       await update(ref(db, `users/${targetUid}/friendRequests`), { [user.uid]: true });
@@ -127,6 +164,7 @@ const SocialPage: React.FC = () => {
   };
 
   // --- SWIPE LOGIC ---
+  
   const handleScroll = () => {
       if (scrollContainerRef.current) {
           const x = scrollContainerRef.current.scrollLeft;
@@ -149,7 +187,7 @@ const SocialPage: React.FC = () => {
       }
   };
 
-  // Filter & Sort Logic (Strict: Verified -> Online -> Alpha)
+  // Filter & Sort Logic: 1. Verified/Support 2. Online 3. Alpha
   const exploreList = useMemo(() => {
       return allUsers.filter(u => {
           const isFriend = friends.some(f => f.uid === u.uid);
@@ -205,6 +243,7 @@ const SocialPage: React.FC = () => {
             className="flex-1 flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
+            
             {/* CHATS TAB */}
             <div className="min-w-full w-full snap-center overflow-y-auto p-4 custom-scrollbar pb-24" style={{ scrollSnapStop: 'always' }}>
                 <div className="max-w-2xl mx-auto space-y-3">
@@ -258,6 +297,7 @@ const SocialPage: React.FC = () => {
                                                 </div>
                                             )}
                                             
+                                            {/* Unread Count Badge (Red Circle) */}
                                             {meta.unreadCount > 0 && (
                                                 <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-sm animate-pulse ml-auto">
                                                     {meta.unreadCount}
