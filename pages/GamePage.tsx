@@ -256,7 +256,6 @@ const GamePage: React.FC = () => {
   const triggerReactionAnimation = (reaction: MatchReaction) => {
     const id = ++reactionCounter.current;
     setActiveReactions(prev => {
-        // Fix: Automatically disappear the first/previous reaction when a new one is sent by the same user
         const filtered = prev.filter(r => r.senderId !== reaction.senderId);
         return [...filtered, { id, senderId: reaction.senderId, value: reaction.value }];
     });
@@ -475,7 +474,7 @@ const GamePage: React.FC = () => {
           </div>
       )}
 
-      {/* Exit Button Pill */}
+      {/* Exit Button Pill - Fixed Top Center */}
       {!isGameOver && (
           <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60]">
               <button onClick={handleSurrender} className="bg-[#e74c3c] hover:bg-red-600 text-white px-5 py-2 rounded-full font-black text-xs uppercase tracking-tighter shadow-2xl border-2 border-white/30 transition-all flex items-center gap-2 active:scale-95">
@@ -534,7 +533,6 @@ const GamePage: React.FC = () => {
                      ))}
                  </div>
                  <div>
-                     {/* Fix: Display Verified badge after the name as requested */}
                      <div className="flex items-center gap-1.5 justify-end">
                          {rightProfile.isOnline && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>}
                          <div className="text-[10px] font-black uppercase text-slate-300 truncate">{rightProfile.name}</div>
@@ -548,41 +546,94 @@ const GamePage: React.FC = () => {
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 w-full max-w-3xl mx-auto z-10">
         {isGameOver ? (
-           <Card className="text-center w-full animate__animated animate__zoomIn !p-0 overflow-hidden border-none shadow-2xl bg-white">
-               <div className={`py-12 relative ${winnerUid === user?.uid ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-red-500'}`}>
-                   <h1 className="text-5xl font-black text-white uppercase italic tracking-tighter drop-shadow-lg relative z-10">
-                       {winnerUid === user?.uid ? 'Victory!' : 'Defeat'}
-                   </h1>
-               </div>
-               <div className="p-8">
-                   <div className="flex justify-center items-center gap-8 mb-8">
-                       <div className="text-center">
-                           <Avatar src={leftProfile.avatar} size="lg" className={`mx-auto mb-3 shadow-xl border-4 ${winnerUid === leftProfile.uid ? 'border-yellow-400' : 'border-slate-200 grayscale'}`} />
-                           <div className="font-black text-3xl text-slate-900 mt-1">{safeScores[leftProfile.uid] ?? 0}</div>
-                       </div>
-                       <div className="text-slate-300 font-black text-xl italic">VS</div>
-                       <div className="text-center">
-                           <Avatar src={rightProfile.avatar} size="lg" className={`mx-auto mb-3 shadow-xl border-4 ${winnerUid === rightProfile.uid ? 'border-yellow-400' : 'border-slate-200 grayscale'}`} />
-                           <div className="font-black text-3xl text-slate-900 mt-1">{safeScores[rightProfile.uid] ?? 0}</div>
-                       </div>
-                   </div>
-                   <Button onClick={handleLeave} size="lg" fullWidth className="shadow-xl">Continue <i className="fas fa-arrow-right ml-2"></i></Button>
-               </div>
-           </Card>
+           /* REDESIGNED RESULT UI */
+           <div className="w-full max-w-lg animate__animated animate__zoomIn">
+              <Card className="!p-0 overflow-hidden border-none shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-white dark:bg-slate-800 rounded-[2.5rem]">
+                  {/* Header Banner */}
+                  <div className={`py-10 px-6 relative text-center overflow-hidden ${winnerUid === user?.uid ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600' : winnerUid === 'draw' ? 'bg-slate-700' : 'bg-gradient-to-br from-slate-700 to-slate-900'}`}>
+                      {/* Decorative elements */}
+                      <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                      <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"></div>
+                      <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-black/20 rounded-full blur-3xl"></div>
+                      
+                      <div className="relative z-10">
+                          <div className="inline-block px-4 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black text-white uppercase tracking-[0.2em] mb-3">Match Summary</div>
+                          <h1 className="text-5xl md:text-6xl font-black text-white uppercase italic tracking-tighter drop-shadow-lg leading-none">
+                              {winnerUid === user?.uid ? 'VICTORY' : winnerUid === 'draw' ? 'DRAW' : 'DEFEAT'}
+                          </h1>
+                          <p className="text-white/80 font-bold mt-2 text-sm uppercase tracking-widest">{subjectName}</p>
+                      </div>
+                  </div>
+
+                  {/* Summary Content */}
+                  <div className="p-8">
+                      {/* Comparison Bar */}
+                      <div className="flex justify-between items-center mb-10 gap-4">
+                          {/* Me */}
+                          <div className="flex-1 flex flex-col items-center">
+                              <div className="relative mb-3">
+                                  <Avatar src={leftProfile.avatar} size="lg" className={`border-4 ${winnerUid === leftProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-100 dark:border-slate-700'}`} isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
+                                  {winnerUid === leftProfile.uid && <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl animate-bounce">👑</div>}
+                              </div>
+                              <div className="text-center">
+                                  <div className="font-black text-slate-800 dark:text-white uppercase text-xs truncate max-w-[80px]">You</div>
+                                  <div className="text-3xl font-black text-game-primary">{safeScores[leftProfile.uid] ?? 0}</div>
+                              </div>
+                          </div>
+
+                          <div className="text-slate-200 dark:text-slate-600 font-black text-2xl italic px-4">VS</div>
+
+                          {/* Opponent */}
+                          <div className="flex-1 flex flex-col items-center">
+                              <div className="relative mb-3">
+                                  <Avatar src={rightProfile.avatar} size="lg" className={`border-4 ${winnerUid === rightProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-100 dark:border-slate-700'}`} isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
+                                  {winnerUid === rightProfile.uid && <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl animate-bounce">👑</div>}
+                              </div>
+                              <div className="text-center">
+                                  <div className="font-black text-slate-800 dark:text-white uppercase text-xs truncate max-w-[80px]">{rightProfile.name.split(' ')[0]}</div>
+                                  <div className="text-3xl font-black text-slate-400">{safeScores[rightProfile.uid] ?? 0}</div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-4 mb-10">
+                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex flex-col items-center">
+                              <span className="text-[10px] font-black text-slate-400 uppercase mb-1">XP Gained</span>
+                              <div className="flex items-center gap-2">
+                                  <i className="fas fa-bolt text-game-primary"></i>
+                                  <span className="text-2xl font-black text-slate-800 dark:text-white">+{safeScores[user?.uid || ''] ?? 0}</span>
+                              </div>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex flex-col items-center">
+                              <span className="text-[10px] font-black text-slate-400 uppercase mb-1">New Level</span>
+                              <div className="flex items-center gap-2">
+                                  <i className="fas fa-star text-amber-500"></i>
+                                  <span className="text-2xl font-black text-slate-800 dark:text-white">{leftLevel}</span>
+                              </div>
+                          </div>
+                      </div>
+
+                      <Button onClick={handleLeave} size="lg" fullWidth className="py-5 shadow-xl !rounded-2xl text-lg shadow-orange-500/20">
+                          CONTINUE <i className="fas fa-arrow-right ml-2"></i>
+                      </Button>
+                  </div>
+              </Card>
+           </div>
         ) : (
             <>
                  {/* Question Card */}
-                 <div className="relative w-full bg-slate-100 rounded-[1.5rem] p-6 shadow-xl mb-6 min-h-[180px] flex flex-col items-center justify-center text-center border-t-4 border-orange-500">
+                 <div className="relative w-full bg-slate-100 dark:bg-slate-800 rounded-[1.5rem] p-6 shadow-xl mb-6 min-h-[180px] flex flex-col items-center justify-center text-center border-t-4 border-orange-500">
                      <button onClick={handleReport} className="absolute top-4 right-6 text-slate-300 hover:text-red-500 transition-colors z-30" title="Report Question">
                          <i className="fas fa-flag text-lg opacity-50 hover:opacity-100"></i>
                      </button>
 
                      <div className="mb-4">
-                         <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-200 text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                         <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-200 dark:bg-slate-700 text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">
                              <i className="fas fa-layer-group text-game-primary"></i> {subjectName}
                          </span>
                      </div>
-                     <h2 className="relative z-10 text-xl md:text-2xl font-black text-[#2c3e50] leading-snug drop-shadow-sm">
+                     <h2 className="relative z-10 text-xl md:text-2xl font-black text-[#2c3e50] dark:text-white leading-snug drop-shadow-sm">
                         {currentQuestion && currentQuestion.question}
                      </h2>
                  </div>
@@ -591,24 +642,24 @@ const GamePage: React.FC = () => {
                  <div className="relative w-full grid grid-cols-1 gap-3">
                      {!isMyTurn && !isSpectator && (
                          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                             <div className="bg-white px-10 py-6 rounded-[2rem] shadow-[0_15px_50px_rgba(0,0,0,0.15)] flex flex-col items-center gap-3 animate__animated animate__fadeIn transform scale-110 border border-slate-50">
-                                 <div className="w-12 h-12 rounded-full bg-[#f1f1ff] flex items-center justify-center">
+                             <div className="bg-white dark:bg-slate-800 px-10 py-6 rounded-[2rem] shadow-[0_15px_50px_rgba(0,0,0,0.15)] flex flex-col items-center gap-3 animate__animated animate__fadeIn transform scale-110 border border-slate-50 dark:border-slate-700">
+                                 <div className="w-12 h-12 rounded-full bg-[#f1f1ff] dark:bg-indigo-900/30 flex items-center justify-center">
                                      <i className="fas fa-hourglass-half text-[#6366f1] animate-pulse"></i>
                                  </div>
                                  <div className="text-center">
                                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Waiting for</div>
-                                     <div className="text-lg font-black text-[#2c3e50] tracking-tight">{rightProfile.name}</div>
+                                     <div className="text-lg font-black text-[#2c3e50] dark:text-white tracking-tight">{rightProfile.name}</div>
                                  </div>
                              </div>
                          </div>
                      )}
 
                      {currentQuestion && currentQuestion.options.map((opt, idx) => {
-                        let bgClass = "bg-white border-slate-100 text-slate-700";
+                        let bgClass = "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200";
                         if (showFeedback) {
-                            if (idx === showFeedback.answer) bgClass = "bg-green-500 text-white";
-                            else if (selectedOption === idx) bgClass = "bg-red-500 text-white";
-                            else bgClass = "opacity-50";
+                            if (idx === showFeedback.answer) bgClass = "bg-green-500 text-white border-green-500";
+                            else if (selectedOption === idx) bgClass = "bg-red-500 text-white border-red-500";
+                            else bgClass = "opacity-50 grayscale";
                         }
 
                         return (
@@ -618,7 +669,7 @@ const GamePage: React.FC = () => {
                                 onClick={() => handleOptionClick(idx)} 
                                 className={`w-full p-4 rounded-2xl text-left transition-all duration-100 flex items-center gap-4 border-2 shadow-sm ${bgClass}`}
                             >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 bg-slate-50 text-slate-400 ${showFeedback ? 'bg-white/20 text-white' : ''}`}>
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 bg-slate-50 dark:bg-slate-700 text-slate-400 ${showFeedback ? 'bg-white/20 text-white' : ''}`}>
                                     {String.fromCharCode(65 + idx)}
                                 </div>
                                 <span className="font-bold text-base leading-tight flex-1">{opt}</span>
