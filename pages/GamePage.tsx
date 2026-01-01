@@ -473,10 +473,10 @@ const GamePage: React.FC = () => {
           </div>
       )}
 
-      {/* Exit Button Pill - Moved to Bottom-Left to avoid blocking reactions */}
+      {/* Exit Button Pill - Moved to Top Center (below VS) as indicated in screenshot */}
       {!isGameOver && (
-          <div className="fixed bottom-24 left-4 z-[60]">
-              <button onClick={handleSurrender} className="bg-[#e74c3c] hover:bg-red-600 text-white px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-tighter shadow-2xl border-2 border-white/30 transition-all flex items-center gap-2 active:scale-95">
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60]">
+              <button onClick={handleSurrender} className="bg-[#e74c3c] hover:bg-red-600 text-white px-5 py-2 rounded-full font-black text-xs uppercase tracking-tighter shadow-2xl border-2 border-white/30 transition-all flex items-center gap-2 active:scale-95">
                   <i className="fas fa-sign-out-alt rotate-180"></i> EXIT
               </button>
           </div>
@@ -496,6 +496,7 @@ const GamePage: React.FC = () => {
                          <div key={r.id} className="absolute -bottom-14 left-0 z-50 animate__animated animate__bounceIn animate__faster">
                              <div className="bg-white px-3 py-1.5 rounded-2xl shadow-2xl border-2 border-game-primary whitespace-nowrap flex flex-col items-center relative">
                                 <span className={r.value.length > 2 ? "text-[10px] font-black text-game-primary uppercase" : "text-3xl"}>{r.value}</span>
+                                {/* Speech Bubble Arrow pointing to Avatar */}
                                 <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white border-t-2 border-l-2 border-game-primary rotate-45"></div>
                              </div>
                          </div>
@@ -526,6 +527,7 @@ const GamePage: React.FC = () => {
                          <div key={r.id} className="absolute -bottom-14 right-0 z-50 animate__animated animate__bounceIn animate__faster">
                              <div className="bg-white px-3 py-1.5 rounded-2xl shadow-2xl border-2 border-game-primary whitespace-nowrap flex flex-col items-center relative">
                                 <span className={r.value.length > 2 ? "text-[10px] font-black text-game-primary uppercase" : "text-3xl"}>{r.value}</span>
+                                {/* Speech Bubble Arrow pointing to Avatar */}
                                 <div className="absolute -top-1.5 right-4 w-3 h-3 bg-white border-t-2 border-l-2 border-game-primary rotate-45"></div>
                              </div>
                          </div>
