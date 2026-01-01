@@ -8,6 +8,7 @@ import { Avatar, Card, Modal, Button } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { generateAvatarUrl } from '../constants';
 import { showToast } from '../services/alert';
+import confetti from 'canvas-confetti';
 
 const HomePage: React.FC = () => {
   const { profile, user } = useContext(UserContext);
@@ -15,6 +16,9 @@ const HomePage: React.FC = () => {
 
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [avatarSeeds, setAvatarSeeds] = useState<string[]>([]);
+  
+  // New Year Celebration State
+  const [showNewYear, setShowNewYear] = useState(false);
 
   useEffect(() => {
     // Prompt to change avatar if not updated yet (Once per user lifetime)
@@ -23,6 +27,46 @@ const HomePage: React.FC = () => {
       setAvatarSeeds(Array.from({length: 9}, () => Math.random().toString(36).substring(7)));
     }
   }, [profile]);
+
+  // New Year 2026 Logic
+  useEffect(() => {
+      const hasCelebrated = localStorage.getItem('celebrated_2026');
+      if (!hasCelebrated && user) {
+          // Delay slightly to allow page load transition
+          const timer = setTimeout(() => {
+              setShowNewYear(true);
+              triggerFireworks();
+              playSound('win');
+          }, 800);
+          return () => clearTimeout(timer);
+      }
+  }, [user]);
+
+  const triggerFireworks = () => {
+      const duration = 3 * 1000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+      const interval: any = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+      }, 250);
+  };
+
+  const handleCloseNewYear = () => {
+      localStorage.setItem('celebrated_2026', 'true');
+      setShowNewYear(false);
+      playSound('click');
+  };
 
   const handleAvatarSelect = async (seed: string) => {
       if (!user) return;
@@ -203,6 +247,33 @@ const HomePage: React.FC = () => {
           <Button fullWidth variant="secondary" className="mt-8" onClick={refreshAvatars}>
              <i className="fas fa-sync mr-2"></i> Randomize
           </Button>
+      </Modal>
+
+      {/* New Year 2026 Celebration Modal */}
+      <Modal isOpen={showNewYear} onClose={handleCloseNewYear}>
+          <div className="text-center py-4 relative overflow-hidden">
+              {/* Radial Gradient BG Effect */}
+              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,rgba(255,215,0,0.4)_0%,transparent_70%)] animate-pulse"></div>
+              
+              <div className="text-7xl mb-4 animate-bounce relative z-10">🎊</div>
+              
+              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 via-red-500 to-purple-600 mb-2 uppercase tracking-tighter">
+                  Happy New Year!
+              </h2>
+              
+              <div className="text-6xl font-black text-slate-800 dark:text-white mb-6 tracking-tighter drop-shadow-sm">
+                  2026
+              </div>
+              
+              <p className="text-slate-600 dark:text-slate-300 font-bold mb-8 text-sm leading-relaxed">
+                  Wishing you a year filled with knowledge, epic battles, and victory streaks! 
+                  <br/><span className="text-game-primary">Let's make this year count.</span>
+              </p>
+              
+              <Button fullWidth onClick={handleCloseNewYear} className="shadow-xl bg-gradient-to-r from-yellow-500 to-orange-600 border-none text-white animate-pulse">
+                  Let's Go 2026! 🚀
+              </Button>
+          </div>
       </Modal>
     </div>
   );

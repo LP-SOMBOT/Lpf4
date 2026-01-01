@@ -244,8 +244,10 @@ const AuthPage: React.FC = () => {
                     <img src="https://files.catbox.moe/qn40s6.png" className="w-20 h-20 object-contain" alt="Logo" />
                 </div>
              </div>
-             <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                LP-<span className="text-transparent bg-clip-text bg-gradient-to-r from-game-primary to-red-500">F4</span>
+             <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight relative inline-block">
+                LP-<span className="text-transparent bg-clip-text bg-gradient-to-r from-game-primary to-red-600">F4</span>
+                {/* 2026 Badge */}
+                <span className="absolute -top-2 -right-10 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-[10px] px-2 py-0.5 rounded-full transform rotate-12 border border-white/50 shadow-lg animate-pulse">2026</span>
              </h1>
              <p className="text-slate-500 dark:text-slate-400 font-bold tracking-widest text-xs uppercase mt-2">Quiz competition for class F4</p>
          </div>
