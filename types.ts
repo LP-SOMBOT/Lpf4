@@ -41,6 +41,16 @@ export interface Question {
   subject: string; // This will now typically refer to the chapterId
 }
 
+export interface QuestionReport {
+  id: string;
+  questionId: string;
+  chapterId: string;
+  reason: string;
+  reporterUid: string;
+  timestamp: number;
+  questionText: string;
+}
+
 export interface MatchState {
   matchId: string;
   status: 'active' | 'completed' | 'cancelled';

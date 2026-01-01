@@ -1,12 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ref, get, onValue, off } from 'firebase/database';
+import { ref, get, onValue, off, push, set, serverTimestamp } from 'firebase/database';
 import { db } from '../firebase';
+import { UserContext } from '../contexts';
 import { Button, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { showToast } from '../services/alert';
 import { Question, Subject, Chapter } from '../types';
+import Swal from 'sweetalert2';
 
 // Utility to shuffle array
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -20,6 +22,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 
 const SoloPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useContext(UserContext);
   
   // State for Flow: 'subject' -> 'chapter' -> 'game'
   const [step, setStep] = useState<'subject' | 'chapter' | 'game'>('subject');
@@ -95,7 +98,7 @@ const SoloPage: React.FC = () => {
       let loadedQ: Question[] = [];
       const cacheKey = `questions_cache_${selectedChapterId}`;
 
-      // Check Cache First (skip for ALL_ mode for more randomness, or could cache that too but risky size)
+      // Check Cache First
       if (!selectedChapterId.startsWith('ALL_')) {
           const cached = localStorage.getItem(cacheKey);
           if(cached) {
@@ -111,7 +114,9 @@ const SoloPage: React.FC = () => {
               const snapshots = await Promise.all(promises);
               snapshots.forEach(snap => {
                   if (snap.exists()) {
-                      loadedQ.push(...(Object.values(snap.val()) as Question[]));
+                      const data = snap.val();
+                      const chapterQ = Object.keys(data).map(key => ({ ...data[key], id: key }));
+                      loadedQ.push(...chapterQ);
                   }
               });
           } else {
@@ -119,7 +124,8 @@ const SoloPage: React.FC = () => {
               const qRef = ref(db, `questions/${selectedChapterId}`);
               const snapshot = await get(qRef);
               if (snapshot.exists()) {
-                  loadedQ = Object.values(snapshot.val()) as Question[];
+                  const data = snapshot.val();
+                  loadedQ = Object.keys(data).map(key => ({ ...data[key], id: key }));
                   // Update Cache
                   localStorage.setItem(cacheKey, JSON.stringify(loadedQ));
               }
@@ -182,6 +188,49 @@ const SoloPage: React.FC = () => {
         playSound('win');
       }
     }, 1200);
+  };
+
+  const handleReport = async () => {
+    const currentQ = questions[currentQIndex];
+    if (!currentQ || !user) return;
+    playSound('click');
+    
+    const { value: reason } = await Swal.fire({
+        title: 'Report Question',
+        input: 'select',
+        inputOptions: {
+            'wrong_answer': 'Jawaabta ayaa qaldan (Wrong answer)',
+            'typo': 'Qoraal ayaa qaldan (Typo/Error)',
+            'other': 'Sabab kale (Other)'
+        },
+        inputPlaceholder: 'Dooro sababta...',
+        showCancelButton: true,
+        confirmButtonText: 'Dir (Send)',
+        customClass: {
+            popup: 'glass-swal-popup',
+            title: 'glass-swal-title',
+            confirmButton: 'glass-swal-btn-confirm',
+            cancelButton: 'glass-swal-btn-cancel'
+        }
+    });
+
+    if (reason) {
+        try {
+            const reportRef = push(ref(db, 'reports'));
+            await set(reportRef, {
+                id: reportRef.key,
+                questionId: currentQ.id,
+                chapterId: selectedChapterId,
+                reason: reason,
+                reporterUid: user.uid,
+                timestamp: serverTimestamp(),
+                questionText: currentQ.question
+            });
+            showToast("Waad ku mahadsantahay soo sheegidda!", "success");
+        } catch (e) {
+            showToast("Waan ka xumahay, cilad ayaa dhacday.", "error");
+        }
+    }
   };
 
   // --- Render Selection Screens ---
@@ -310,6 +359,12 @@ const SoloPage: React.FC = () => {
              {/* Question Card */}
              <div className="bg-white dark:bg-slate-800 text-gray-900 dark:text-white rounded-[1.5rem] p-6 shadow-2xl text-center mb-6 min-h-[140px] flex items-center justify-center flex-col transition-colors border-2 border-slate-100 dark:border-slate-700 animate__animated animate__fadeIn relative">
                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-game-primary to-purple-600"></div>
+                 
+                 {/* Report Icon */}
+                 <button onClick={handleReport} className="absolute top-4 right-6 text-slate-300 hover:text-red-500 transition-colors z-30" title="Report Question">
+                    <i className="fas fa-flag text-lg"></i>
+                 </button>
+
                  <span className="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-[0.2em]">
                      {selectedSubject?.name}
                  </span>

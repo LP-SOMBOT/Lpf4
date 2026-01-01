@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ref, update, onValue, off, set, remove, get } from 'firebase/database';
 import { db } from '../firebase';
-import { UserProfile, Subject, Chapter, Question, MatchState } from '../types';
+import { UserProfile, Subject, Chapter, Question, MatchState, QuestionReport } from '../types';
 import { Button, Card, Input, Modal, Avatar } from '../components/UI';
 import { showAlert, showToast, showConfirm } from '../services/alert';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ const SuperAdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'quizzes' | 'matches'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'quizzes' | 'matches' | 'reports'>('users');
   const navigate = useNavigate();
   
   // --- USER MANAGEMENT STATE ---
@@ -31,6 +31,9 @@ const SuperAdminPage: React.FC = () => {
   
   // --- MATCH MANAGEMENT STATE ---
   const [matches, setMatches] = useState<MatchState[]>([]);
+
+  // --- REPORT MANAGEMENT STATE ---
+  const [reports, setReports] = useState<QuestionReport[]>([]);
   
   // Editing Question
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -116,6 +119,24 @@ const SuperAdminPage: React.FC = () => {
           };
           onValue(matchesRef, handleMatches);
           return () => off(matchesRef);
+      }
+  }, [isAuthenticated, activeTab]);
+
+  // FETCH REPORTS
+  useEffect(() => {
+      if (isAuthenticated && activeTab === 'reports') {
+          const reportsRef = ref(db, 'reports');
+          const handleReports = (snap: any) => {
+              if (snap.exists()) {
+                  const data = snap.val();
+                  const list: QuestionReport[] = Object.keys(data).map(key => ({ ...data[key], id: key }));
+                  setReports(list.reverse());
+              } else {
+                  setReports([]);
+              }
+          };
+          onValue(reportsRef, handleReports);
+          return () => off(reportsRef);
       }
   }, [isAuthenticated, activeTab]);
 
@@ -297,7 +318,9 @@ const SuperAdminPage: React.FC = () => {
       }
       
       try {
-          await update(ref(db, `questions/${selectedChapter}/${editingQuestion.id}`), {
+          // Path determined by subject property which stores chapterId
+          const path = `questions/${editingQuestion.subject}/${editingQuestion.id}`;
+          await update(ref(db, path), {
               question: editingQuestion.question,
               options: editingQuestion.options,
               answer: editingQuestion.answer
@@ -341,6 +364,40 @@ const SuperAdminPage: React.FC = () => {
       } catch (e) {
           console.error(e);
           showAlert("Error", "Failed to destroy match", "error");
+      }
+  };
+
+  // --- REPORT ACTIONS ---
+  
+  const handleEditReported = async (report: QuestionReport) => {
+      try {
+          const qSnap = await get(ref(db, `questions/${report.chapterId}/${report.questionId}`));
+          if (qSnap.exists()) {
+              // Explicitly pass subject (chapterId) for update path
+              setEditingQuestion({ id: report.questionId, ...qSnap.val(), subject: report.chapterId });
+          } else {
+              showAlert("Error", "Question no longer exists.", "error");
+          }
+      } catch (e) {
+          showAlert("Error", "Could not fetch question details.", "error");
+      }
+  };
+
+  const handleClearReport = async (reportId: string) => {
+      try {
+          await remove(ref(db, `reports/${reportId}`));
+          showToast("Report cleared", "success");
+      } catch (e) {
+          showToast("Clear failed", "error");
+      }
+  };
+
+  const getReasonLabel = (reason: string) => {
+      switch(reason) {
+          case 'wrong_answer': return 'Wrong Answer';
+          case 'typo': return 'Typo/Error';
+          case 'other': return 'Other';
+          default: return reason;
       }
   };
 
@@ -388,12 +445,16 @@ const SuperAdminPage: React.FC = () => {
                 <button onClick={() => setActiveTab('users')} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-white dark:bg-gray-700 shadow text-game-primary' : 'text-gray-500 hover:text-gray-700'}`}>Users</button>
                 <button onClick={() => setActiveTab('quizzes')} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'quizzes' ? 'bg-white dark:bg-gray-700 shadow text-game-primary' : 'text-gray-500 hover:text-gray-700'}`}>Quizzes</button>
                 <button onClick={() => setActiveTab('matches')} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'matches' ? 'bg-white dark:bg-gray-700 shadow text-game-primary' : 'text-gray-500 hover:text-gray-700'}`}>Live</button>
+                <button onClick={() => setActiveTab('reports')} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all relative ${activeTab === 'reports' ? 'bg-white dark:bg-gray-700 shadow text-game-primary' : 'text-gray-500 hover:text-gray-700'}`}>
+                    Reports
+                    {reports.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-black animate-pulse">{reports.length}</span>}
+                </button>
             </div>
         </div>
 
         <div className="max-w-6xl mx-auto pb-20">
             
-            {/* AI Control Card (Visible on both tabs) */}
+            {/* AI Control Card */}
             <Card className="mb-8 border-l-4 border-indigo-500">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -416,7 +477,7 @@ const SuperAdminPage: React.FC = () => {
                         <span
                             aria-hidden="true"
                             className={`
-                                pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out
+                                pointer-none inline-block h-7 w-7 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out
                                 ${aiEnabled ? 'translate-x-6' : 'translate-x-0'}
                             `}
                         />
@@ -628,6 +689,45 @@ const SuperAdminPage: React.FC = () => {
                     )}
                 </div>
             )}
+
+            {/* --- REPORT MANAGEMENT TAB --- */}
+            {activeTab === 'reports' && (
+                <div className="animate__animated animate__fadeIn space-y-4">
+                    {reports.length === 0 ? (
+                        <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                             <div className="w-20 h-20 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500 text-3xl">
+                                <i className="fas fa-check-double"></i>
+                             </div>
+                             <h3 className="text-xl font-bold text-gray-500 dark:text-gray-400">All Clear!</h3>
+                             <p className="text-sm text-gray-400 dark:text-gray-500">No question reports pending review.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4">
+                            {reports.map(r => (
+                                <div key={r.id} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 group hover:border-red-200 transition-colors">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${r.reason === 'wrong_answer' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
+                                                {getReasonLabel(r.reason)}
+                                            </span>
+                                            <span className="text-[10px] font-bold text-slate-400 font-mono">ID: {r.id.substring(0, 8)}</span>
+                                        </div>
+                                        <div className="text-[10px] font-bold text-slate-400">{new Date(r.timestamp).toLocaleString()}</div>
+                                    </div>
+                                    <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl mb-4 border border-slate-100 dark:border-slate-800">
+                                        <p className="font-bold text-sm text-gray-800 dark:text-white leading-relaxed">"{r.questionText}"</p>
+                                        <p className="text-[10px] text-slate-500 mt-2 uppercase font-black">Chapter: {r.chapterId}</p>
+                                    </div>
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-50 dark:border-slate-700/50">
+                                        <button onClick={() => handleClearReport(r.id)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">Dismiss</button>
+                                        <Button size="sm" onClick={() => handleEditReported(r)} className="!bg-indigo-600 border-indigo-800">Review & Fix</Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
 
         {/* --- MODALS --- */}
@@ -702,7 +802,7 @@ const SuperAdminPage: React.FC = () => {
                                 <div key={idx} className="flex gap-2 items-center">
                                     <div 
                                         onClick={() => setEditingQuestion({...editingQuestion, answer: idx})}
-                                        className={`w-8 h-8 rounded flex items-center justify-center font-bold cursor-pointer border-2 ${idx === editingQuestion.answer ? 'bg-green-500 border-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 border-transparent text-gray-500 dark:text-gray-400'}`}
+                                        className={`w-8 h-8 rounded flex items-center justify-center font-bold cursor-pointer border-2 ${idx === editingQuestion.answer ? 'bg-green-50 border-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 border-transparent text-gray-500 dark:text-gray-400'}`}
                                     >
                                         {String.fromCharCode(65+idx)}
                                     </div>

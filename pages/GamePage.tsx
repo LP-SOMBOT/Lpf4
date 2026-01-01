@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp } from 'firebase/database';
+import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp, push } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { POINTS_PER_QUESTION } from '../constants';
@@ -10,6 +10,7 @@ import { Avatar, Button, Card, Modal } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { showToast, showConfirm, showAlert } from '../services/alert';
 import confetti from 'canvas-confetti';
+import Swal from 'sweetalert2';
 
 const createSeededRandom = (seedStr: string) => {
     let hash = 0;
@@ -189,14 +190,21 @@ const GamePage: React.FC = () => {
             if (chaptersSnap.exists()) {
                 const chapters = Object.values(chaptersSnap.val() || {}) as Chapter[];
                 const snaps = await Promise.all(chapters.map(c => get(ref(db, `questions/${c.id}`))));
-                snaps.forEach(s => s.exists() && loadedQ.push(...Object.values(s.val()) as Question[]));
+                snaps.forEach(s => {
+                    if (s.exists()) {
+                        const data = s.val();
+                        const chapterQ = Object.keys(data).map(key => ({ ...data[key], id: key }));
+                        loadedQ.push(...chapterQ);
+                    }
+                });
             }
         } else {
             if (cachedData) try { loadedQ = JSON.parse(cachedData); } catch(e) {}
             if (loadedQ.length === 0) {
                 const snap = await get(ref(db, `questions/${match.subject}`));
                 if(snap.exists()) {
-                    loadedQ = Object.values(snap.val()) as Question[];
+                    const data = snap.val();
+                    loadedQ = Object.keys(data).map(key => ({ ...data[key], id: key }));
                     try { localStorage.setItem(cacheKey, JSON.stringify(loadedQ)); } catch(e) {}
                 }
             }
@@ -315,6 +323,48 @@ const GamePage: React.FC = () => {
 
         setSelectedOption(null); setShowFeedback(null); processingRef.current = false;
     }, 400); 
+  };
+
+  const handleReport = async () => {
+      if (!currentQuestion || !user) return;
+      playSound('click');
+      
+      const { value: reason } = await Swal.fire({
+          title: 'Report Question',
+          input: 'select',
+          inputOptions: {
+              'wrong_answer': 'Jawaabta ayaa qaldan (Wrong answer)',
+              'typo': 'Qoraal ayaa qaldan (Typo/Error)',
+              'other': 'Sabab kale (Other)'
+          },
+          inputPlaceholder: 'Dooro sababta...',
+          showCancelButton: true,
+          confirmButtonText: 'Dir (Send)',
+          customClass: {
+              popup: 'glass-swal-popup',
+              title: 'glass-swal-title',
+              confirmButton: 'glass-swal-btn-confirm',
+              cancelButton: 'glass-swal-btn-cancel'
+          }
+      });
+
+      if (reason) {
+          try {
+              const reportRef = push(ref(db, 'reports'));
+              await set(reportRef, {
+                  id: reportRef.key,
+                  questionId: currentQuestion.id,
+                  chapterId: match?.subject || 'unknown',
+                  reason: reason,
+                  reporterUid: user.uid,
+                  timestamp: serverTimestamp(),
+                  questionText: currentQuestion.question
+              });
+              showToast("Waad ku mahadsantahay soo sheegidda!", "success");
+          } catch (e) {
+              showToast("Waan ka xumahay, cilad ayaa dhacday.", "error");
+          }
+      }
   };
 
   const handleLeave = async () => {
@@ -451,7 +501,7 @@ const GamePage: React.FC = () => {
       )}
 
       {!isGameOver && (
-          <div className="fixed top-20 left-4 z-[60] md:top-24">
+          <div className="fixed top-20 left-4 z-[60] md:top-24 flex gap-2">
               <button onClick={handleSurrender} className="bg-red-500/80 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg border-2 border-white/20 transition-all flex items-center gap-2 backdrop-blur-md">
                   <i className="fas fa-sign-out-alt"></i> Exit
               </button>
@@ -576,6 +626,12 @@ const GamePage: React.FC = () => {
                  {/* Question Card */}
                  <div className="relative w-full bg-white dark:bg-slate-800 rounded-[2rem] p-8 shadow-[0_8px_30px_rgb(0,0,0,0.12)] mb-8 min-h-[200px] flex flex-col items-center justify-center text-center border border-slate-100 dark:border-slate-700 relative overflow-hidden transition-all duration-300 hover:shadow-2xl">
                      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 via-red-500 to-purple-600"></div>
+                     
+                     {/* Report Icon */}
+                     <button onClick={handleReport} className="absolute top-4 right-6 text-slate-300 hover:text-red-500 transition-colors z-30" title="Report Question">
+                         <i className="fas fa-flag text-lg"></i>
+                     </button>
+
                      <div className="relative z-10 mb-5">
                          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 shadow-sm backdrop-blur-md">
                              <i className="fas fa-layer-group text-game-primary text-xs"></i>
