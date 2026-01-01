@@ -1,3 +1,4 @@
+
 import { Howl } from 'howler';
 
 const sounds = {
@@ -6,6 +7,7 @@ const sounds = {
   click: new Howl({ src: ['https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'] }), // Click
   win: new Howl({ src: ['https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'] }), // Cheering
   message: new Howl({ src: ['https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'] }), // Bubble Pop/Message
+  reaction: new Howl({ src: ['https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3'] }), // Notification Pop
   bgm: new Howl({ 
     src: ['https://assets.mixkit.co/active_storage/sfx/123/123-preview.mp3'], // Placeholder background beat
     loop: true,

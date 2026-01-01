@@ -5,12 +5,15 @@ import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp, 
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { POINTS_PER_QUESTION } from '../constants';
-import { MatchState, Question, Chapter, UserProfile } from '../types';
+import { MatchState, Question, Chapter, UserProfile, MatchReaction } from '../types';
 import { Avatar, Button, Card, Modal } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { showToast, showConfirm, showAlert } from '../services/alert';
 import confetti from 'canvas-confetti';
 import Swal from 'sweetalert2';
+
+const REACTION_EMOJIS = ['😂', '😡', '👏', '😱', '🥲', '🔥', '🏆', '🤯'];
+const REACTION_MESSAGES = ['Nasiib wacan!', 'Aad u fiican', 'Iska jir!', 'Hala soo baxo!', 'Mahadsanid'];
 
 const createSeededRandom = (seedStr: string) => {
     let hash = 0;
@@ -59,6 +62,12 @@ const GamePage: React.FC = () => {
   // Opponent Details Modal
   const [showOpponentModal, setShowOpponentModal] = useState(false);
   
+  // Reaction States
+  const [showReactionMenu, setShowReactionMenu] = useState(false);
+  const [activeReactions, setActiveReactions] = useState<{id: number, senderId: string, value: string}[]>([]);
+  const reactionCounter = useRef(0);
+  const lastProcessedReactionTime = useRef(0);
+
   // Loading State
   const [isLoadingError, setIsLoadingError] = useState(false);
   
@@ -80,6 +89,12 @@ const GamePage: React.FC = () => {
       }
       
       setMatch(data);
+
+      // Handle Reactions
+      if (data.lastReaction && data.lastReaction.timestamp > lastProcessedReactionTime.current) {
+          lastProcessedReactionTime.current = data.lastReaction.timestamp;
+          triggerReactionAnimation(data.lastReaction);
+      }
 
       // Determine Role
       const pIds = Object.keys(data.players || {});
@@ -262,6 +277,28 @@ const GamePage: React.FC = () => {
       }
       prevTurnRef.current = match.turn;
   }, [match?.turn, user?.uid, isSpectator]);
+
+  const triggerReactionAnimation = (reaction: MatchReaction) => {
+    const id = ++reactionCounter.current;
+    setActiveReactions(prev => [...prev, { id, senderId: reaction.senderId, value: reaction.value }]);
+    playSound('reaction');
+    setTimeout(() => {
+        setActiveReactions(prev => prev.filter(r => r.id !== id));
+    }, 4000);
+  };
+
+  const sendReaction = async (val: string) => {
+      if (!user || !matchId) return;
+      setShowReactionMenu(false);
+      playSound('click');
+      await update(ref(db, `matches/${matchId}`), {
+          lastReaction: {
+              senderId: user.uid,
+              value: val,
+              timestamp: Date.now()
+          }
+      });
+  };
 
   const currentQuestion = match && questions.length > 0 ? questions[match.currentQ] : null;
   const isMyTurn = match?.turn === user?.uid;
@@ -449,6 +486,31 @@ const GamePage: React.FC = () => {
   return (
     <div className="min-h-screen relative flex flex-col font-sans overflow-hidden transition-colors pt-24">
        
+      {/* Reaction Animation Overlay */}
+      {activeReactions.map(r => {
+          const isLeft = r.senderId === leftProfile.uid;
+          return (
+              <div 
+                  key={r.id} 
+                  className={`fixed z-[100] flex flex-col items-center animate__animated animate__bounceInUp animate__faster pointer-events-none`}
+                  style={{ 
+                      top: '25%', 
+                      [isLeft ? 'left' : 'right']: '15%',
+                  }}
+              >
+                  <div className={`bg-white dark:bg-slate-800 p-2 rounded-2xl shadow-2xl border-2 border-game-primary flex items-center justify-center transition-all animate__animated animate__pulse animate__infinite`}>
+                      {r.value.length > 2 ? (
+                          <span className="font-black text-xs md:text-sm text-game-primary uppercase px-3 py-1">{r.value}</span>
+                      ) : (
+                          <span className="text-4xl md:text-6xl drop-shadow-lg">{r.value}</span>
+                      )}
+                  </div>
+                  {/* Floating pointer */}
+                  <div className={`w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-game-primary`}></div>
+              </div>
+          );
+      })}
+
       {/* VS Screen Animation */}
       {showIntro && !isSpectator && (
           <div className="fixed inset-0 z-[60] flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
@@ -513,6 +575,45 @@ const GamePage: React.FC = () => {
               <div className="bg-blue-600/90 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg border-2 border-white/20 flex items-center gap-2 backdrop-blur-md animate-pulse">
                   <i className="fas fa-eye"></i> Spectating
               </div>
+          </div>
+      )}
+
+      {/* Reaction Toggle Button */}
+      {!isGameOver && !isSpectator && (
+          <div className="fixed bottom-24 right-4 z-[60]">
+               <button 
+                onClick={() => setShowReactionMenu(!showReactionMenu)}
+                className={`w-14 h-14 rounded-full bg-white dark:bg-slate-800 shadow-2xl border-4 border-game-primary text-2xl flex items-center justify-center transition-all ${showReactionMenu ? 'rotate-90 scale-110' : 'hover:scale-105 active:scale-95'}`}
+               >
+                   <i className={`fas ${showReactionMenu ? 'fa-times text-red-500' : 'fa-smile text-game-primary'}`}></i>
+               </button>
+               
+               {showReactionMenu && (
+                   <div className="absolute bottom-16 right-0 w-64 p-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-2xl border-2 border-slate-100 dark:border-slate-700 animate__animated animate__bounceIn">
+                       <div className="grid grid-cols-4 gap-3 mb-4">
+                           {REACTION_EMOJIS.map(emoji => (
+                               <button 
+                                key={emoji} 
+                                onClick={() => sendReaction(emoji)}
+                                className="text-3xl hover:scale-125 transition-transform p-1"
+                               >
+                                   {emoji}
+                               </button>
+                           ))}
+                       </div>
+                       <div className="space-y-2 border-t border-slate-100 dark:border-slate-700 pt-3">
+                           {REACTION_MESSAGES.map(msg => (
+                               <button 
+                                key={msg} 
+                                onClick={() => sendReaction(msg)}
+                                className="w-full text-left px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-wide hover:bg-game-primary hover:text-white transition-colors"
+                               >
+                                   {msg}
+                               </button>
+                           ))}
+                       </div>
+                   </div>
+               )}
           </div>
       )}
 

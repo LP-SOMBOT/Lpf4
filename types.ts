@@ -51,6 +51,12 @@ export interface QuestionReport {
   questionText: string;
 }
 
+export interface MatchReaction {
+  senderId: string;
+  value: string;
+  timestamp: number;
+}
+
 export interface MatchState {
   matchId: string;
   status: 'active' | 'completed' | 'cancelled';
@@ -74,6 +80,7 @@ export interface MatchState {
   subject: string;
   subjectTitle?: string; // Friendly Name of the subject (e.g. Mathematics)
   questionLimit?: number; // Total quizzes to play
+  lastReaction?: MatchReaction;
 }
 
 export interface Room {
