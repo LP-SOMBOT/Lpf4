@@ -55,6 +55,8 @@ export interface MatchReaction {
   senderId: string;
   value: string;
   timestamp: number;
+  senderAvatar?: string;
+  senderName?: string;
 }
 
 export interface MatchState {
@@ -74,6 +76,12 @@ export interface MatchState {
       level?: number;
       status?: 'online' | 'offline';
       lastSeen?: number;
+    }
+  };
+  spectators?: {
+    [uid: string]: {
+      name: string;
+      avatar: string;
     }
   };
   winner?: string | null; // 'draw', 'disconnect', or uid

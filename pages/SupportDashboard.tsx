@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ref, onValue, off, update, remove } from 'firebase/database';
+import { ref, onValue, off, update, remove, get } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { UserProfile, MatchState } from '../types';
@@ -22,7 +22,6 @@ export const SupportDashboard: React.FC = () => {
   const [newPoints, setNewPoints] = useState<string>('');
 
   useEffect(() => {
-      // Redirect if not support
       if (profile && !profile.isSupport) {
           navigate('/');
       }
@@ -115,7 +114,15 @@ export const SupportDashboard: React.FC = () => {
       const confirm = await showConfirm("End Match?", "Force stop this game?");
       if (!confirm) return;
       try {
-          await remove(ref(db, `matches/${matchId}`));
+          const match = matches.find(m => m.matchId === matchId);
+          const updates: any = {};
+          updates[`matches/${matchId}`] = null;
+          if (match && match.players) {
+              Object.keys(match.players).forEach(uid => {
+                  updates[`users/${uid}/activeMatch`] = null;
+              });
+          }
+          await update(ref(db), updates);
           showToast("Match Terminated", "success");
       } catch(e) { showToast("Failed", "error"); }
   };
@@ -131,7 +138,6 @@ export const SupportDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col font-sans transition-colors pt-20">
-        {/* Header */}
         <div className="fixed top-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 px-6 py-4 shadow-sm flex justify-between items-center">
             <div className="flex items-center gap-4">
                 <button onClick={() => navigate('/')} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-game-primary transition-colors">
@@ -150,7 +156,6 @@ export const SupportDashboard: React.FC = () => {
         </div>
 
         <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
-            {/* Stats Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <Card className="!p-4 border-l-4 border-blue-500">
                     <div className="text-xs font-bold text-slate-400 uppercase">Total Users</div>
@@ -170,34 +175,16 @@ export const SupportDashboard: React.FC = () => {
                 </Card>
             </div>
 
-            {/* Tabs */}
             <div className="flex gap-4 mb-6 border-b border-slate-200 dark:border-slate-700 pb-1">
-                <button 
-                    onClick={() => setActiveTab('users')} 
-                    className={`pb-3 px-4 font-bold text-sm uppercase tracking-wide transition-all ${activeTab === 'users' ? 'text-game-primary border-b-2 border-game-primary' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                    User Management
-                </button>
-                <button 
-                    onClick={() => setActiveTab('matches')} 
-                    className={`pb-3 px-4 font-bold text-sm uppercase tracking-wide transition-all ${activeTab === 'matches' ? 'text-game-primary border-b-2 border-game-primary' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                    Live Arena
-                </button>
+                <button onClick={() => setActiveTab('users')} className={`pb-3 px-4 font-bold text-sm uppercase tracking-wide transition-all ${activeTab === 'users' ? 'text-game-primary border-b-2 border-game-primary' : 'text-slate-400 hover:text-slate-600'}`}>User Management</button>
+                <button onClick={() => setActiveTab('matches')} className={`pb-3 px-4 font-bold text-sm uppercase tracking-wide transition-all ${activeTab === 'matches' ? 'text-game-primary border-b-2 border-game-primary' : 'text-slate-400 hover:text-slate-600'}`}>Live Arena</button>
             </div>
 
-            {/* USERS TAB */}
             {activeTab === 'users' && (
                 <div className="animate__animated animate__fadeIn">
-                    <div className="mb-6 relative max-w-md">
-                        <Input 
-                            placeholder="Search by name or username..." 
-                            icon="fa-search" 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
-                        />
+                    <div className="mb-6 max-w-md">
+                        <Input placeholder="Search students..." icon="fa-search" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                     </div>
-                    
                     <div className="grid grid-cols-1 gap-4">
                         {filteredUsers.slice(0, 50).map(u => (
                             <div key={u.uid} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -212,20 +199,11 @@ export const SupportDashboard: React.FC = () => {
                                         <div className="text-xs text-game-primary font-black mt-1">{u.points} PTS <span className="text-slate-300">|</span> LVL {Math.floor(u.points/10)+1}</div>
                                     </div>
                                 </div>
-                                
                                 <div className="flex flex-wrap gap-2">
-                                    <button onClick={() => handleVerify(u)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${u.isVerified ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                        {u.isVerified ? 'Revoke Badge' : 'Verify'}
-                                    </button>
-                                    <button onClick={() => openPointEditor(u)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100">
-                                        Adjust Points
-                                    </button>
-                                    <button onClick={() => handleBan(u)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${u.banned ? 'bg-green-50 text-green-600 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                                        {u.banned ? 'Unban' : 'Ban'}
-                                    </button>
-                                    <button onClick={() => handleDelete(u.uid)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200">
-                                        <i className="fas fa-trash"></i>
-                                    </button>
+                                    <button onClick={() => handleVerify(u)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${u.isVerified ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>{u.isVerified ? 'Revoke Badge' : 'Verify'}</button>
+                                    <button onClick={() => openPointEditor(u)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100">Adjust Points</button>
+                                    <button onClick={() => handleBan(u)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${u.banned ? 'bg-green-50 text-green-600 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}>{u.banned ? 'Unban' : 'Ban'}</button>
+                                    <button onClick={() => handleDelete(u.uid)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 hover:bg-red-50 hover:text-red-500"><i className="fas fa-trash"></i></button>
                                 </div>
                             </div>
                         ))}
@@ -233,51 +211,63 @@ export const SupportDashboard: React.FC = () => {
                 </div>
             )}
 
-            {/* MATCHES TAB */}
             {activeTab === 'matches' && (
                 <div className="animate__animated animate__fadeIn grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {matches.length === 0 && (
-                        <div className="col-span-full text-center py-20 text-slate-400">
-                            <i className="fas fa-gamepad text-4xl mb-4"></i>
-                            <p>No active matches right now.</p>
-                        </div>
-                    )}
+                    {matches.length === 0 && <div className="col-span-full text-center py-20 text-slate-400"><i className="fas fa-gamepad text-4xl mb-4"></i><p>No active matches.</p></div>}
                     {matches.map(m => {
                         const pIds = Object.keys(m.players || {});
                         const p1 = m.players?.[pIds[0]];
                         const p2 = m.players?.[pIds[1]];
-                        const scores = m.scores || {}; // Safeguard
+                        const scores = m.scores || {};
+                        const specs = m.spectators || {};
                         
                         return (
-                            <div key={m.matchId} className="bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-lg border border-slate-200 dark:border-slate-700 relative overflow-hidden group hover:border-game-primary transition-colors">
-                                <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl">
-                                    LIVE Q{m.currentQ+1}
+                            <div key={m.matchId} className="bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-lg border-2 border-slate-100 dark:border-slate-700 relative overflow-hidden group hover:border-game-primary transition-all">
+                                <div className="absolute top-0 left-0 bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-br-xl uppercase flex items-center gap-1">
+                                    <i className="fas fa-satellite-dish animate-pulse"></i> Live Arena
                                 </div>
-                                <div className="text-center mb-4">
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{m.subjectTitle}</div>
+                                <div className="absolute top-0 right-0 bg-slate-100 dark:bg-slate-700 text-[9px] font-black px-3 py-1 rounded-bl-xl uppercase text-slate-500 dark:text-slate-300">
+                                    Q{m.currentQ+1} / 10
                                 </div>
-                                
-                                <div className="flex justify-between items-center mb-6">
-                                    <div className="text-center">
-                                        <Avatar src={p1?.avatar} size="sm" className="mx-auto mb-2" />
-                                        <div className="font-bold text-xs truncate w-20">{p1?.name}</div>
-                                        <div className="font-black text-lg text-game-primary">{scores[pIds[0]] ?? 0}</div>
-                                    </div>
-                                    <div className="text-xl font-black text-slate-300 italic">VS</div>
-                                    <div className="text-center">
-                                        <Avatar src={p2?.avatar} size="sm" className="mx-auto mb-2" />
-                                        <div className="font-bold text-xs truncate w-20">{p2?.name}</div>
-                                        <div className="font-black text-lg text-red-500">{scores[pIds[1]] ?? 0}</div>
-                                    </div>
+
+                                <div className="text-center mt-6 mb-6">
+                                    <div className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/30 inline-block px-3 py-1 rounded-full">{m.subjectTitle}</div>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={() => spectateMatch(m.matchId)} className="bg-slate-100 dark:bg-slate-700 hover:bg-game-primary hover:text-white text-slate-600 dark:text-slate-300 py-2 rounded-xl text-xs font-bold transition-colors">
-                                        <i className="fas fa-eye mr-1"></i> Spectate
-                                    </button>
-                                    <button onClick={() => terminateMatch(m.matchId)} className="bg-red-50 dark:bg-red-900/20 hover:bg-red-500 hover:text-white text-red-600 dark:text-red-400 py-2 rounded-xl text-xs font-bold transition-colors">
-                                        <i className="fas fa-stop mr-1"></i> End
-                                    </button>
+                                <div className="flex justify-between items-center mb-8 relative">
+                                    <div className="text-center flex-1">
+                                        <div className="relative inline-block">
+                                            <Avatar src={p1?.avatar} size="md" className="border-2 border-orange-400" />
+                                            <div className="absolute -bottom-1 -right-1 bg-orange-400 text-white text-[8px] font-bold px-1.5 rounded-full">L{p1?.level || 1}</div>
+                                        </div>
+                                        <div className="font-black text-[11px] mt-2 text-slate-700 dark:text-slate-200 truncate px-2">{p1?.name}</div>
+                                        <div className="text-2xl font-black text-orange-500 mt-1">{scores[pIds[0]] ?? 0}</div>
+                                    </div>
+
+                                    <div className="flex flex-col items-center gap-1 px-4">
+                                        <div className="text-xl font-black text-slate-300 dark:text-slate-600 italic">VS</div>
+                                        <div className="flex items-center gap-1 text-[9px] font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full">
+                                            <i className="fas fa-eye"></i> {Object.keys(specs).length}
+                                        </div>
+                                    </div>
+
+                                    <div className="text-center flex-1">
+                                        <div className="relative inline-block">
+                                            <Avatar src={p2?.avatar} size="md" className="border-2 border-indigo-400" />
+                                            <div className="absolute -bottom-1 -right-1 bg-indigo-400 text-white text-[8px] font-bold px-1.5 rounded-full">L{p2?.level || 1}</div>
+                                        </div>
+                                        <div className="font-black text-[11px] mt-2 text-slate-700 dark:text-slate-200 truncate px-2">{p2?.name}</div>
+                                        <div className="text-2xl font-black text-indigo-500 mt-1">{scores[pIds[1]] ?? 0}</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Button size="sm" variant="outline" onClick={() => spectateMatch(m.matchId)} className="!rounded-xl !text-[10px]">
+                                        <i className="fas fa-glasses mr-1"></i> Watch
+                                    </Button>
+                                    <Button size="sm" variant="danger" onClick={() => terminateMatch(m.matchId)} className="!rounded-xl !text-[10px]">
+                                        <i className="fas fa-times-circle mr-1"></i> Kill
+                                    </Button>
                                 </div>
                             </div>
                         );
@@ -286,16 +276,10 @@ export const SupportDashboard: React.FC = () => {
             )}
         </div>
 
-        {/* Edit Points Modal */}
         <Modal isOpen={!!editingPointsUser} title="Edit Points" onClose={() => setEditingPointsUser(null)}>
             <div className="space-y-4">
                 <p className="text-sm text-slate-500">Adjusting points for <b>{editingPointsUser?.name}</b></p>
-                <Input 
-                    type="number" 
-                    value={newPoints} 
-                    onChange={e => setNewPoints(e.target.value)} 
-                    placeholder="Enter points value" 
-                />
+                <Input type="number" value={newPoints} onChange={e => setNewPoints(e.target.value)} placeholder="Enter points value" />
                 <Button fullWidth onClick={savePoints}>Save Changes</Button>
             </div>
         </Modal>
