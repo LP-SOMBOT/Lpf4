@@ -1,15 +1,15 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { ref, onValue, update, serverTimestamp, onDisconnect } from 'firebase/database';
+import { ref, onValue, update, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { auth, db } from './firebase';
 import { UserProfile } from './types';
 import { Navbar } from './components/Navbar';
 import { LPAssistant } from './components/LPAssistant';
 import { UsernamePrompt } from './components/UsernamePrompt';
 import { UserContext, ThemeContext } from './contexts';
-import { showAlert } from './services/alert';
+import { showAlert, showToast } from './services/alert';
 import confetti from 'canvas-confetti';
 import { playSound } from './services/audioService';
 import { Button, Modal } from './components/UI';
@@ -29,6 +29,9 @@ import DownloadPage from './pages/DownloadPage';
 import SocialPage from './pages/SocialPage';
 import ChatPage from './pages/ChatPage';
 import { SupportDashboard } from './pages/SupportDashboard';
+
+// Store the time the app was loaded to compare with update signals
+const APP_LOAD_TIME = Date.now();
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
@@ -83,7 +86,24 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 1. Setup Auth Listener (Runs Once)
+  // 1. App Update Listener - Force Refresh for all users
+  useEffect(() => {
+    const updateRef = ref(db, 'settings/lastAppUpdate');
+    const unsubscribe = onValue(updateRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const updateTime = snapshot.val();
+        // If there's an update time in DB that is newer than when this app session started
+        if (updateTime > APP_LOAD_TIME) {
+          console.log("App update detected, reloading...");
+          // We could show a toast here, but user asked for automatic refresh
+          window.location.reload();
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Setup Auth Listener (Runs Once)
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -96,7 +116,7 @@ const AppContent: React.FC = () => {
     return () => unsubscribeAuth();
   }, []);
 
-  // 2. Setup User Profile & Presence Listener (Runs when User changes)
+  // 3. Setup User Profile & Presence Listener (Runs when User changes)
   useEffect(() => {
     if (!user) return;
 
@@ -149,7 +169,7 @@ const AppContent: React.FC = () => {
     };
   }, [user]);
 
-  // 3. Navigation Logic (Runs when profile or location changes)
+  // 4. Navigation Logic (Runs when profile or location changes)
   useEffect(() => {
       if (profile?.activeMatch && !location.pathname.includes('/game') && !profile.isSupport) {
           navigate(`/game/${profile.activeMatch}`);
