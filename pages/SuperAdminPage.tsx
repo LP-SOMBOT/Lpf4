@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ref, update, onValue, off, set, remove, get } from 'firebase/database';
+import { ref, update, onValue, off, set, remove, get, push } from 'firebase/database';
 import { db } from '../firebase';
 import { UserProfile, Subject, Chapter, Question, MatchState, QuestionReport } from '../types';
 import { Button, Card, Input, Modal, Avatar } from '../components/UI';
@@ -11,7 +11,7 @@ const SuperAdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'quizzes' | 'matches' | 'reports'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'quizzes' | 'matches' | 'reports' | 'reactions'>('users');
   const navigate = useNavigate();
   
   // --- USER MANAGEMENT STATE ---
@@ -35,6 +35,12 @@ const SuperAdminPage: React.FC = () => {
   // --- REPORT MANAGEMENT STATE ---
   const [reports, setReports] = useState<QuestionReport[]>([]);
   
+  // --- REACTION MANAGEMENT STATE ---
+  const [emojis, setEmojis] = useState<{id: string, value: string}[]>([]);
+  const [messages, setMessages] = useState<{id: string, value: string}[]>([]);
+  const [newEmoji, setNewEmoji] = useState('');
+  const [newMessage, setNewMessage] = useState('');
+
   // Editing Question
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
 
@@ -140,6 +146,27 @@ const SuperAdminPage: React.FC = () => {
       }
   }, [isAuthenticated, activeTab]);
 
+  // FETCH REACTIONS
+  useEffect(() => {
+      if (isAuthenticated && activeTab === 'reactions') {
+          const rRef = ref(db, 'settings/reactions');
+          const unsub = onValue(rRef, snap => {
+              if (snap.exists()) {
+                  const val = snap.val();
+                  if (val.emojis) {
+                      setEmojis(Object.entries(val.emojis).map(([k, v]) => ({id: k, value: v as string})));
+                  } else { setEmojis([]); }
+                  if (val.messages) {
+                      setMessages(Object.entries(val.messages).map(([k, v]) => ({id: k, value: v as string})));
+                  } else { setMessages([]); }
+              } else {
+                  setEmojis([]); setMessages([]);
+              }
+          });
+          return () => off(rRef);
+      }
+  }, [isAuthenticated, activeTab]);
+
   // FETCH CHAPTERS
   useEffect(() => {
       if (selectedSubject) {
@@ -180,6 +207,45 @@ const SuperAdminPage: React.FC = () => {
     if (pin === '1234') { setIsAuthenticated(true); } else {
         showAlert('Access Denied', 'Incorrect PIN', 'error');
     }
+  };
+
+  // --- REACTION ACTIONS ---
+  const handleAddReaction = async (type: 'emojis' | 'messages') => {
+      const val = type === 'emojis' ? newEmoji.trim() : newMessage.trim();
+      if (!val) return;
+      try {
+          await push(ref(db, `settings/reactions/${type}`), val);
+          showToast('Added', 'success');
+          if (type === 'emojis') setNewEmoji(''); else setNewMessage('');
+      } catch(e) { showAlert('Error', 'Failed to add', 'error'); }
+  };
+
+  const handleDeleteReaction = async (type: 'emojis' | 'messages', id: string) => {
+      const confirmed = await showConfirm('Delete Reaction?', 'This will remove it from the game for everyone.');
+      if (!confirmed) return;
+      try {
+          await remove(ref(db, `settings/reactions/${type}/${id}`));
+          showToast('Deleted', 'success');
+      } catch(e) { showAlert('Error', 'Failed to delete', 'error'); }
+  };
+
+  const handleSeedDefaults = async () => {
+      const DEFAULT_EMOJIS = ['😂', '😡', '👏', '😱', '🥲', '🔥', '🏆', '🤯'];
+      const DEFAULT_MESSAGES = ['Nasiib wacan!', 'Aad u fiican', 'Iska jir!', 'Hala soo baxo!', 'Mahadsanid'];
+      
+      try {
+          const updates: any = {};
+          DEFAULT_EMOJIS.forEach(e => {
+              const key = push(ref(db, 'settings/reactions/emojis')).key;
+              updates[`settings/reactions/emojis/${key}`] = e;
+          });
+          DEFAULT_MESSAGES.forEach(m => {
+              const key = push(ref(db, 'settings/reactions/messages')).key;
+              updates[`settings/reactions/messages/${key}`] = m;
+          });
+          await update(ref(db), updates);
+          showToast('Defaults Initialized', 'success');
+      } catch(e) { showAlert('Error', 'Failed to seed defaults', 'error'); }
   };
 
   // --- USER ACTIONS ---
@@ -449,6 +515,7 @@ const SuperAdminPage: React.FC = () => {
                     Reports
                     {reports.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-black animate-pulse">{reports.length}</span>}
                 </button>
+                <button onClick={() => setActiveTab('reactions')} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'reactions' ? 'bg-white dark:bg-gray-700 shadow text-game-primary' : 'text-gray-500 hover:text-gray-700'}`}>Reactions</button>
             </div>
         </div>
 
@@ -726,6 +793,90 @@ const SuperAdminPage: React.FC = () => {
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* --- REACTION MANAGEMENT TAB --- */}
+            {activeTab === 'reactions' && (
+                <div className="animate__animated animate__fadeIn">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        {/* Emojis Section */}
+                        <Card className="!bg-white dark:!bg-gray-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">Reaction Emojis</h3>
+                                <span className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-xs font-bold text-slate-500">{emojis.length}</span>
+                            </div>
+                            <div className="flex gap-2 mb-6">
+                                <Input 
+                                    placeholder="Enter emoji (e.g. 🔥)" 
+                                    value={newEmoji} 
+                                    onChange={e => setNewEmoji(e.target.value)} 
+                                    className="!mb-0 flex-1"
+                                />
+                                <Button onClick={() => handleAddReaction('emojis')} disabled={!newEmoji.trim()}>Add</Button>
+                            </div>
+                            
+                            {emojis.length === 0 && (
+                                <div className="text-center py-8">
+                                    <p className="text-sm text-gray-400 mb-4">No emojis configured.</p>
+                                    <Button size="sm" variant="outline" onClick={handleSeedDefaults}>Load Defaults</Button>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-4 gap-4">
+                                {emojis.map(e => (
+                                    <div key={e.id} className="relative group bg-slate-50 dark:bg-slate-900 rounded-xl p-4 flex items-center justify-center text-3xl border border-slate-100 dark:border-slate-700 hover:border-game-primary transition-colors">
+                                        {e.value}
+                                        <button 
+                                            onClick={() => handleDeleteReaction('emojis', e.id)}
+                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                                        >
+                                            <i className="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+
+                        {/* Messages Section */}
+                        <Card className="!bg-white dark:!bg-gray-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">Quick Messages</h3>
+                                <span className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-xs font-bold text-slate-500">{messages.length}</span>
+                            </div>
+                            <div className="flex gap-2 mb-6">
+                                <Input 
+                                    placeholder="Enter message..." 
+                                    value={newMessage} 
+                                    onChange={e => setNewMessage(e.target.value)} 
+                                    className="!mb-0 flex-1"
+                                />
+                                <Button onClick={() => handleAddReaction('messages')} disabled={!newMessage.trim()}>Add</Button>
+                            </div>
+
+                            {messages.length === 0 && (
+                                <div className="text-center py-8">
+                                    <p className="text-sm text-gray-400 mb-4">No messages configured.</p>
+                                    <Button size="sm" variant="outline" onClick={handleSeedDefaults}>Load Defaults</Button>
+                                </div>
+                            )}
+
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+                                {messages.map(m => (
+                                    <div key={m.id} className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-700 group hover:border-game-primary transition-colors">
+                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{m.value}</span>
+                                        <button 
+                                            onClick={() => handleDeleteReaction('messages', m.id)}
+                                            className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                        >
+                                            <i className="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </div>
                 </div>
             )}
         </div>

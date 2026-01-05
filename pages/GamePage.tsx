@@ -12,8 +12,8 @@ import { showToast, showConfirm, showAlert } from '../services/alert';
 import confetti from 'canvas-confetti';
 import Swal from 'sweetalert2';
 
-const REACTION_EMOJIS = ['😂', '😡', '👏', '😱', '🥲', '🔥', '🏆', '🤯'];
-const REACTION_MESSAGES = ['Nasiib wacan!', 'Aad u fiican', 'Iska jir!', 'Hala soo baxo!', 'Mahadsanid'];
+const DEFAULT_EMOJIS = ['😂', '😡', '👏', '😱', '🥲', '🔥', '🏆', '🤯'];
+const DEFAULT_MESSAGES = ['Nasiib wacan!', 'Aad u fiican', 'Iska jir!', 'Hala soo baxo!', 'Mahadsanid'];
 
 const createSeededRandom = (seedStr: string) => {
     let hash = 0;
@@ -67,12 +67,29 @@ const GamePage: React.FC = () => {
   const [activeReactions, setActiveReactions] = useState<{id: number, senderId: string, value: string}[]>([]);
   const reactionCounter = useRef(0);
   const lastProcessedReactionTime = useRef(0);
+  
+  // Dynamic Reactions from DB
+  const [reactionEmojis, setReactionEmojis] = useState<string[]>(DEFAULT_EMOJIS);
+  const [reactionMessages, setReactionMessages] = useState<string[]>(DEFAULT_MESSAGES);
 
   // Loading State
   const [isLoadingError, setIsLoadingError] = useState(false);
   
   const processingRef = useRef(false);
   const questionsLoadedRef = useRef(false);
+
+  // Fetch Reactions Settings
+  useEffect(() => {
+      const reactionsRef = ref(db, 'settings/reactions');
+      const unsub = onValue(reactionsRef, (snap) => {
+          if (snap.exists()) {
+              const data = snap.val();
+              if (data.emojis) setReactionEmojis(Object.values(data.emojis));
+              if (data.messages) setReactionMessages(Object.values(data.messages));
+          }
+      });
+      return () => unsub();
+  }, []);
 
   // 1. Sync Match Data
   useEffect(() => {
@@ -760,12 +777,12 @@ const GamePage: React.FC = () => {
                {showReactionMenu && (
                    <div className="absolute bottom-20 right-0 w-64 p-4 bg-white/95 rounded-3xl shadow-2xl border-2 border-slate-100 animate__animated animate__bounceIn">
                        <div className="grid grid-cols-4 gap-3 mb-4">
-                           {REACTION_EMOJIS.map(emoji => (
+                           {reactionEmojis.map(emoji => (
                                <button key={emoji} onClick={() => sendReaction(emoji)} className="text-3xl hover:scale-125 transition-transform p-1">{emoji}</button>
                            ))}
                        </div>
                        <div className="space-y-2 border-t border-slate-100 pt-3">
-                           {REACTION_MESSAGES.map(msg => (
+                           {reactionMessages.map(msg => (
                                <button key={msg} onClick={() => sendReaction(msg)} className="w-full text-left px-4 py-2 rounded-xl bg-slate-50 text-[11px] font-black text-slate-600 uppercase tracking-wide hover:bg-game-primary hover:text-white transition-colors">{msg}</button>
                            ))}
                        </div>
