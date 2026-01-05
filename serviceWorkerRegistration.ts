@@ -1,3 +1,4 @@
+
 // This optional code is used to register a service worker.
 // register() is not called by default.
 
@@ -22,7 +23,8 @@ export function register(config?: Config) {
     }
 
     window.addEventListener('load', () => {
-      const swUrl = `/service-worker.ts`; // In a real build, this often points to service-worker.js compiled output
+      // Use relative path to compiled JS file to avoid origin/redirect issues
+      const swUrl = `./service-worker.js`;
 
       if (isLocalhost) {
         // This is running on localhost. Let's check if a service worker still exists or not.
