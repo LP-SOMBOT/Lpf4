@@ -57,6 +57,7 @@ const GamePage: React.FC = () => {
   // Animation State
   const [showIntro, setShowIntro] = useState(false);
   const [introShownOnce, setIntroShownOnce] = useState(false);
+  const [showTurnAlert, setShowTurnAlert] = useState(false);
   
   // Opponent Details Modal
   const [showOpponentModal, setShowOpponentModal] = useState(false);
@@ -243,6 +244,17 @@ const GamePage: React.FC = () => {
       }
   }, [questions.length, leftProfile, rightProfile, match?.matchId, introShownOnce, isSpectator]);
 
+  // Turn Notification Logic
+  useEffect(() => {
+      if (match?.turn === user?.uid && !match.winner && !isSpectator && !showIntro) {
+          setShowTurnAlert(true);
+          const timer = setTimeout(() => setShowTurnAlert(false), 2000);
+          return () => clearTimeout(timer);
+      } else {
+          setShowTurnAlert(false);
+      }
+  }, [match?.turn, user?.uid, match?.winner, isSpectator, showIntro]);
+
   // Auto-dismiss VS screen
   useEffect(() => {
       if (showIntro) {
@@ -329,7 +341,7 @@ const GamePage: React.FC = () => {
         });
 
         setSelectedOption(null); setShowFeedback(null); processingRef.current = false;
-    }, 400); 
+    }, 1000); 
   };
 
   const handleReport = async () => {
@@ -441,6 +453,18 @@ const GamePage: React.FC = () => {
   return (
     <div className="min-h-screen relative flex flex-col font-sans overflow-hidden transition-colors pt-24">
        
+      <style>{`
+        @keyframes turnAlert {
+            0% { transform: translateY(-200%); opacity: 0; }
+            15% { transform: translateY(0); opacity: 1; }
+            85% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-200%); opacity: 0; }
+        }
+        .animate-turn-alert {
+            animation: turnAlert 2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+      `}</style>
+       
       {/* VS Screen Animation */}
       {showIntro && !isSpectator && (
           <div className="fixed inset-0 z-[60] flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
@@ -472,6 +496,16 @@ const GamePage: React.FC = () => {
                   </div>
               </div>
           </div>
+      )}
+
+      {/* Turn Alert */}
+      {showTurnAlert && (
+        <div className="fixed top-24 left-0 right-0 z-[70] flex justify-center pointer-events-none">
+            <div className="animate-turn-alert bg-gradient-to-r from-orange-500 to-red-600 text-white px-8 py-3 rounded-full shadow-[0_10px_30px_rgba(249,115,22,0.5)] border-4 border-white dark:border-slate-800 flex items-center gap-3 transform">
+                <i className="fas fa-bolt text-yellow-300 animate-pulse text-xl"></i>
+                <span className="font-black text-xl uppercase tracking-widest italic drop-shadow-md">Your Turn!</span>
+            </div>
+        </div>
       )}
 
       {/* Exit Button Pill - Fixed Top Center */}
@@ -656,10 +690,20 @@ const GamePage: React.FC = () => {
 
                      {currentQuestion && currentQuestion.options.map((opt, idx) => {
                         let bgClass = "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200";
+                        let animateClass = "";
+                        
                         if (showFeedback) {
-                            if (idx === showFeedback.answer) bgClass = "bg-green-500 text-white border-green-500";
-                            else if (selectedOption === idx) bgClass = "bg-red-500 text-white border-red-500";
-                            else bgClass = "opacity-50 grayscale";
+                            if (idx === showFeedback.answer) {
+                                bgClass = "bg-green-500 text-white border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.6)] z-10 scale-[1.02]";
+                                animateClass = "animate__animated animate__shakeY animate__faster";
+                            }
+                            else if (selectedOption === idx) {
+                                bgClass = "bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] z-10 scale-[1.02]";
+                                animateClass = "animate__animated animate__shakeX animate__faster";
+                            }
+                            else {
+                                bgClass = "opacity-50 grayscale blur-[1px] scale-95";
+                            }
                         }
 
                         return (
@@ -667,7 +711,7 @@ const GamePage: React.FC = () => {
                                 key={idx} 
                                 disabled={!isMyTurn || selectedOption !== null} 
                                 onClick={() => handleOptionClick(idx)} 
-                                className={`w-full p-4 rounded-2xl text-left transition-all duration-100 flex items-center gap-4 border-2 shadow-sm ${bgClass}`}
+                                className={`w-full p-4 rounded-2xl text-left transition-all duration-200 flex items-center gap-4 border-2 shadow-sm ${bgClass} ${animateClass}`}
                             >
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 bg-slate-50 dark:bg-slate-700 text-slate-400 ${showFeedback ? 'bg-white/20 text-white' : ''}`}>
                                     {String.fromCharCode(65 + idx)}
