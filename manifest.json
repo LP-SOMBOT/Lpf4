@@ -1,7 +1,7 @@
 
 {
   "short_name": "LP-F4",
-  "name": "LP-F4 Battle Arena",
+  "name": "LP-F4",
   "icons": [
     {
       "src": "logo.png",
@@ -15,5 +15,5 @@
   "background_color": "#0f172a",
   "orientation": "portrait",
   "scope": "/",
-  "description": "The ultimate multiplayer quiz arena for Somali students."
+  "description": "The ultimate multiplayer quiz Game for class F4 students."
 }
