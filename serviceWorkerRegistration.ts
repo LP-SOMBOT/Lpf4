@@ -27,10 +27,9 @@ export function register(config?: Config) {
     }
 
     window.addEventListener('load', () => {
-      // Point to the root service-worker.js file.
-      // Using /service-worker.js relative to the domain root is usually safest 
-      // for PWA scope unless the app is in a subdirectory.
-      const swUrl = `/service-worker.js`;
+      // Point to the service-worker.js file relative to the current page.
+      // This fixes issues where the app is served from a subdirectory or preview URL.
+      const swUrl = './service-worker.js';
 
       if (isLocalhost) {
         // This is running on localhost. Let's check if a service worker still exists or not.
