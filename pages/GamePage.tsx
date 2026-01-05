@@ -671,7 +671,7 @@ const GamePage: React.FC = () => {
   const isRightSpeaking = match.players?.[rightProfile.uid]?.isSpeaking || false;
 
   return (
-    <div className="min-h-screen relative flex flex-col font-sans overflow-hidden transition-colors pt-24">
+    <div className="min-h-screen relative flex flex-col font-sans overflow-y-auto transition-colors pt-24">
        
       <style>{`
         @keyframes turnAlert {
@@ -817,7 +817,7 @@ const GamePage: React.FC = () => {
          </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 w-full max-w-3xl mx-auto z-10">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 pb-32 w-full max-w-3xl mx-auto z-10">
         {isGameOver ? (
            /* REDESIGNED RESULT UI */
            <div className="w-full max-w-lg animate__animated animate__zoomIn">
@@ -971,7 +971,7 @@ const GamePage: React.FC = () => {
 
       {/* Push-to-Talk Button */}
       {!isGameOver && !isSpectator && (
-          <div className="fixed bottom-24 left-4 z-[60]">
+          <div className="fixed bottom-8 left-4 z-[60]">
               <button
                   onMouseDown={handlePTTStart}
                   onMouseUp={stopTalking}
@@ -998,7 +998,7 @@ const GamePage: React.FC = () => {
 
       {/* Reaction Toggle Button */}
       {!isGameOver && !isSpectator && (
-          <div className="fixed bottom-24 right-4 z-[60]">
+          <div className="fixed bottom-8 right-4 z-[60]">
                <button 
                 onClick={() => setShowReactionMenu(!showReactionMenu)}
                 className="w-16 h-16 rounded-full bg-white shadow-2xl border-4 border-[#f97316] text-3xl flex items-center justify-center transition-all active:scale-95 hover:bg-orange-50"
