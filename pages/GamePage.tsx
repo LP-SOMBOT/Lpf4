@@ -283,25 +283,28 @@ const GamePage: React.FC = () => {
 
   // --- VOICE CHAT IMPLEMENTATION ---
   
-  // A. Initialize Audio & Permissions
+  // A. Initialize Audio & Permissions (Callable)
+  const initAudio = async () => {
+      if (hasMicPermission) return true;
+      try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          localStreamRef.current = stream;
+          // Mute initially for PTT
+          stream.getAudioTracks().forEach(track => track.enabled = false);
+          setHasMicPermission(true);
+          return true;
+      } catch (e) {
+          console.warn("Microphone permission denied or not available", e);
+          setHasMicPermission(false);
+          // Optional: showToast("Access needed for voice", "info");
+          return false;
+      }
+  };
+
+  // Auto-init on load
   useEffect(() => {
       if (isSpectator || !user || !matchId) return;
-
-      const initAudio = async () => {
-          try {
-              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-              localStreamRef.current = stream;
-              // Mute initially for PTT
-              stream.getAudioTracks().forEach(track => track.enabled = false);
-              setHasMicPermission(true);
-          } catch (e) {
-              console.warn("Microphone permission denied or not available", e);
-              setHasMicPermission(false);
-          }
-      };
-
       initAudio();
-
       return () => {
           if (localStreamRef.current) {
               localStreamRef.current.getTracks().forEach(track => track.stop());
@@ -359,8 +362,7 @@ const GamePage: React.FC = () => {
       };
 
       if (isOfferer) {
-          // Trigger offer if not already done (check presence of remote peer logic could be added for robustness)
-          // For simplicity, we trigger shortly after both present
+          // Trigger offer if not already done
           createOffer();
       }
 
@@ -411,17 +413,25 @@ const GamePage: React.FC = () => {
   }, [user, rightProfile, matchId, hasMicPermission, isSpectator]);
 
   // C. Push-To-Talk Handlers
-  const startTalking = () => {
+  const handlePTTStart = async (e: React.SyntheticEvent) => {
+      e.preventDefault();
+      // Auto-request permission if not present
+      if (!hasMicPermission) {
+          const granted = await initAudio();
+          if (!granted) return;
+      }
+
       if (localStreamRef.current) {
           localStreamRef.current.getAudioTracks()[0].enabled = true;
           setIsTalking(true);
           update(ref(db, `matches/${matchId}/players/${user?.uid}`), { isSpeaking: true });
-          playSound('click'); // Subtle feedback
+          playSound('click'); 
       }
   };
 
-  const stopTalking = () => {
-      if (localStreamRef.current) {
+  const stopTalking = (e?: React.SyntheticEvent) => {
+      if(e) e.preventDefault();
+      if (localStreamRef.current && isTalking) {
           localStreamRef.current.getAudioTracks()[0].enabled = false;
           setIsTalking(false);
           update(ref(db, `matches/${matchId}/players/${user?.uid}`), { isSpeaking: false });
@@ -960,21 +970,23 @@ const GamePage: React.FC = () => {
       </div>
 
       {/* Push-to-Talk Button */}
-      {!isGameOver && !isSpectator && hasMicPermission && (
+      {!isGameOver && !isSpectator && (
           <div className="fixed bottom-24 left-4 z-[60]">
               <button
-                  onMouseDown={startTalking}
+                  onMouseDown={handlePTTStart}
                   onMouseUp={stopTalking}
                   onMouseLeave={stopTalking}
-                  onTouchStart={startTalking}
+                  onTouchStart={handlePTTStart}
                   onTouchEnd={stopTalking}
                   className={`w-16 h-16 rounded-full shadow-2xl border-4 transition-all duration-200 flex items-center justify-center transform active:scale-95 ${
                       isTalking 
                       ? 'bg-green-500 border-green-400 scale-110 shadow-[0_0_30px_rgba(34,197,94,0.6)]' 
-                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                      : hasMicPermission 
+                        ? 'bg-white border-game-accent hover:bg-slate-50'
+                        : 'bg-slate-100 border-slate-300 opacity-80'
                   }`}
               >
-                  <i className={`fas fa-microphone text-2xl ${isTalking ? 'text-white animate-pulse' : 'text-slate-400'}`}></i>
+                  <i className={`fas ${hasMicPermission ? 'fa-microphone' : 'fa-microphone-slash'} text-2xl ${isTalking ? 'text-white animate-pulse' : 'text-slate-400'}`}></i>
                   {isTalking && (
                       <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-sm whitespace-nowrap">
                           Speaking
