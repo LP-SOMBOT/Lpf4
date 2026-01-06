@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp, push, onChildAdded } from 'firebase/database';
+import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp, push, onChildAdded, off, query, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { POINTS_PER_QUESTION } from '../constants';
@@ -76,7 +76,6 @@ const GamePage: React.FC = () => {
   const [showReactionMenu, setShowReactionMenu] = useState(false);
   const [activeReactions, setActiveReactions] = useState<{id: number, senderId: string, value: string}[]>([]);
   const reactionCounter = useRef(0);
-  const lastProcessedReactionTime = useRef(0);
   
   // Dynamic Reactions from DB
   const [reactionEmojis, setReactionEmojis] = useState<string[]>(DEFAULT_EMOJIS);
@@ -92,12 +91,20 @@ const GamePage: React.FC = () => {
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const remoteCandidatesQueue = useRef<RTCIceCandidateInit[]>([]);
   
   // Ref to track if user is holding the PTT button (handling async permission delay)
   const isHoldingButtonRef = useRef(false);
   
   const processingRef = useRef(false);
   const questionsLoadedRef = useRef(false);
+
+  // Helper to unlock audio context on interactions
+  const unlockAudio = () => {
+      if (remoteAudioRef.current) {
+          remoteAudioRef.current.play().catch(() => {});
+      }
+  };
 
   // Fetch Reactions Settings
   useEffect(() => {
@@ -128,12 +135,6 @@ const GamePage: React.FC = () => {
       
       setMatch(data);
 
-      // Handle Reactions
-      if (data.lastReaction && data.lastReaction.timestamp > lastProcessedReactionTime.current) {
-          lastProcessedReactionTime.current = data.lastReaction.timestamp;
-          triggerReactionAnimation(data.lastReaction);
-      }
-
       // Determine Role
       const pIds = Object.keys(data.players || {});
       const userIsPlayer = pIds.includes(user.uid);
@@ -161,6 +162,60 @@ const GamePage: React.FC = () => {
         unsubscribe(); 
     };
   }, [matchId, user, navigate, profile?.isSupport, isSpectator]); 
+
+  // --- NEW REALTIME REACTIONS IMPLEMENTATION ---
+  useEffect(() => {
+      if (!matchId) return;
+      const reactionsRef = query(ref(db, `matches/${matchId}/reactions`), limitToLast(3));
+      
+      const unsub = onChildAdded(reactionsRef, (snapshot) => {
+          const data = snapshot.val();
+          if (!data) return;
+          
+          // Ignore own reactions here because we handle them optimistically for 0-latency feel
+          if (data.senderId === user?.uid) return;
+
+          // Only show recent reactions (within 5 seconds) to prevent flood on load
+          if (Date.now() - data.timestamp < 5000) {
+              triggerReactionAnimation(data);
+          }
+      });
+
+      return () => off(reactionsRef);
+  }, [matchId, user?.uid]);
+
+  const triggerReactionAnimation = (reaction: MatchReaction) => {
+    const id = ++reactionCounter.current;
+    setActiveReactions(prev => {
+        // Limit active reactions on screen to prevent crash
+        const filtered = prev.length > 5 ? prev.slice(1) : prev;
+        return [...filtered, { id, senderId: reaction.senderId, value: reaction.value }];
+    });
+    playSound('reaction');
+    setTimeout(() => {
+        setActiveReactions(prev => prev.filter(r => r.id !== id));
+    }, 4000);
+  };
+
+  const sendReaction = async (val: string) => {
+      if (!user || !matchId) return;
+      setShowReactionMenu(false);
+      unlockAudio();
+      playSound('click'); // Local sound immediately
+
+      // 1. Optimistic Update (Instant)
+      const reaction: MatchReaction = {
+          senderId: user.uid,
+          value: val,
+          timestamp: Date.now()
+      };
+      triggerReactionAnimation(reaction);
+
+      // 2. Send to DB (Push for list structure)
+      const reactionsListRef = ref(db, `matches/${matchId}/reactions`);
+      await push(reactionsListRef, reaction);
+  };
+  // ---------------------------------------------
 
   // 2. Presence Logic (Game specific)
   useEffect(() => {
@@ -301,17 +356,25 @@ const GamePage: React.FC = () => {
       } catch (e) {
           console.warn("Microphone permission denied or not available", e);
           setHasMicPermission(false);
-          // Optional: showToast("Access needed for voice", "info");
           return false;
       }
   };
 
-  // Removed Auto-init on load to prevent VS screen blocking
-  // Permission will be requested when user presses the button
+  // Helper to drain queued candidates once connection is ready
+  const processCandidateQueue = async () => {
+      if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) return;
+      while (remoteCandidatesQueue.current.length > 0) {
+          const candidate = remoteCandidatesQueue.current.shift();
+          if (candidate) {
+              try {
+                  await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+              } catch (e) { console.error("Error adding queued candidate", e); }
+          }
+      }
+  };
 
   // B. WebRTC Signaling Logic
   // IMPORTANT: This effect initializes the connection IMMEDIATELY (Receive Only)
-  // It does NOT wait for 'hasMicPermission'.
   useEffect(() => {
       if (isSpectator || !user || !rightProfile || !matchId) return;
 
@@ -330,7 +393,7 @@ const GamePage: React.FC = () => {
               if (remoteAudioRef.current) {
                   remoteAudioRef.current.srcObject = event.streams[0];
                   remoteStreamRef.current = event.streams[0];
-                  // Attempt autoplay fix
+                  // Force play on track reception
                   remoteAudioRef.current.play().catch(e => console.log("Audio play blocked", e));
               }
           };
@@ -365,8 +428,6 @@ const GamePage: React.FC = () => {
 
       // Initial Offer on connection start
       if (isOfferer) {
-          // Check if offer already exists to prevent overwrite loop on mount?
-          // For simplicity, we just offer. Firebase handles consistency.
           createOffer();
       }
 
@@ -376,23 +437,11 @@ const GamePage: React.FC = () => {
           const data = snapshot.val();
 
           // Handle Offer (Callee side) OR Renegotiation Offer
-          // We removed !pc.currentRemoteDescription to allow Renegotiation
           if (data.offer && data.offer.sender !== user.uid) {
-              // Ensure we don't process the same offer multiple times if possible, 
-              // but setRemoteDescription is idempotent enough for simple cases.
-              // Note: If signalingState is not stable, this might fail, wrap in try/catch
-              
               const processOffer = async () => {
                   try {
-                      // Avoid race condition: If we are offering, and they offer (glare)
-                      // We stick to "Impolite peer" if needed, but here simply accepting usually works
-                      if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
-                          // If we are in have-remote-offer, we update?
-                          // WebRTC Perfect Negotiation is safer, but complex.
-                          // Fallback: Just try setting it.
-                      }
-                      
                       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                      await processCandidateQueue(); // Process any queued candidates
                       const answer = await pc.createAnswer();
                       await pc.setLocalDescription(answer);
                       await set(ref(db, `matches/${matchId}/webrtc/answer`), {
@@ -402,7 +451,7 @@ const GamePage: React.FC = () => {
                           ts: Date.now()
                       });
                   } catch(e) {
-                      console.warn("Signaling State Error (Ignored)", e);
+                      console.warn("Signaling Error", e);
                   }
               };
               processOffer();
@@ -413,6 +462,7 @@ const GamePage: React.FC = () => {
               try {
                   if (pc.signalingState === 'have-local-offer') {
                       pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                      processCandidateQueue(); // Process any queued candidates
                   }
               } catch(e) {}
           }
@@ -424,13 +474,15 @@ const GamePage: React.FC = () => {
       const candidatesRef = ref(db, `matches/${matchId}/webrtc/candidates/${rightProfile.uid}`);
       const unsubCandidates = onChildAdded(candidatesRef, (snapshot) => {
           if (snapshot.exists()) {
-              try {
-                  // Add candidate even if remote desc not set yet (queueing logic handled by browser or simple delay)
-                  // Best practice: check remoteDescription
-                  if(pc.remoteDescription) {
-                      pc.addIceCandidate(new RTCIceCandidate(snapshot.val()));
-                  }
-              } catch (e) { console.error("Error adding candidate", e); }
+              const candidate = snapshot.val();
+              if (pc.remoteDescription) {
+                  try {
+                      pc.addIceCandidate(new RTCIceCandidate(candidate));
+                  } catch (e) { console.error("Error adding candidate", e); }
+              } else {
+                  // Queue candidate if remote description not yet set
+                  remoteCandidatesQueue.current.push(candidate);
+              }
           }
       });
 
@@ -442,7 +494,7 @@ const GamePage: React.FC = () => {
               peerConnectionRef.current = null;
           }
       };
-  }, [user, rightProfile, matchId, isSpectator]); // Removed hasMicPermission dependency
+  }, [user, rightProfile, matchId, isSpectator]); 
 
   // C. Watch Mic Permission for "Upgrade" to Audio Sender
   useEffect(() => {
@@ -450,41 +502,43 @@ const GamePage: React.FC = () => {
           const pc = peerConnectionRef.current;
           
           // 1. Add Tracks if not already added
+          let tracksAdded = false;
           localStreamRef.current.getTracks().forEach(track => {
               const senders = pc.getSenders();
               const alreadyHas = senders.find(s => s.track === track);
               if (!alreadyHas) {
                   pc.addTrack(track, localStreamRef.current!);
+                  tracksAdded = true;
               }
           });
 
-          // 2. Trigger Renegotiation (Send new Offer)
-          // This enables the other peer to hear us
-          const renegotiate = async () => {
-              try {
-                  const offer = await pc.createOffer();
-                  await pc.setLocalDescription(offer);
-                  await set(ref(db, `matches/${matchId}/webrtc/offer`), {
-                      type: 'offer',
-                      sdp: offer.sdp,
-                      sender: user?.uid,
-                      ts: Date.now() // Timestamp to force onValue update
-                  });
-              } catch(e) { console.error("Renegotiation failed", e); }
-          };
-          renegotiate();
+          // 2. Trigger Renegotiation (Send new Offer) if we added new tracks
+          if (tracksAdded) {
+              const renegotiate = async () => {
+                  try {
+                      const offer = await pc.createOffer();
+                      await pc.setLocalDescription(offer);
+                      await set(ref(db, `matches/${matchId}/webrtc/offer`), {
+                          type: 'offer',
+                          sdp: offer.sdp,
+                          sender: user?.uid,
+                          ts: Date.now()
+                      });
+                  } catch(e) { console.error("Renegotiation failed", e); }
+              };
+              renegotiate();
+          }
       }
   }, [hasMicPermission, matchId, user?.uid]);
 
   // D. Push-To-Talk Handlers
   const handlePTTStart = async (e: React.SyntheticEvent) => {
       e.preventDefault();
-      isHoldingButtonRef.current = true; // Mark as holding
+      unlockAudio(); // Unlock receive audio context just in case
+      isHoldingButtonRef.current = true;
 
-      // Auto-request permission if not present
       if (!hasMicPermission) {
           const granted = await initAudio();
-          // If permission denied or user stopped holding button during prompt
           if (!granted || !isHoldingButtonRef.current) return;
       }
 
@@ -498,7 +552,7 @@ const GamePage: React.FC = () => {
 
   const stopTalking = (e?: React.SyntheticEvent) => {
       if(e) e.preventDefault();
-      isHoldingButtonRef.current = false; // Mark as released
+      isHoldingButtonRef.current = false;
 
       if (localStreamRef.current && isTalking) {
           localStreamRef.current.getAudioTracks()[0].enabled = false;
@@ -522,8 +576,6 @@ const GamePage: React.FC = () => {
           match.answersCount === 0 && 
           !isSpectator
       ) {
-          // Only trigger the intro state. The timeout logic is handled in a separate effect
-          // to prevent cleanup issues if dependencies change during the timeout.
           setShowIntro(true);
           setIntroShownOnce(true);
           playSound('click');
@@ -533,11 +585,10 @@ const GamePage: React.FC = () => {
   // Handle Intro Timeout & Transition
   useEffect(() => {
       if (showIntro) {
-          // Set timeout to dismiss VS screen and start countdown
           const timer = setTimeout(() => {
               setShowIntro(false);
               startCountdown();
-          }, 3500); // 3.5s for VS screen duration
+          }, 3500); 
           
           return () => clearTimeout(timer);
       }
@@ -578,41 +629,17 @@ const GamePage: React.FC = () => {
   useEffect(() => {
       if (showIntro) {
           const timer = setTimeout(() => {
-              // setShowIntro(false); // Handled in startCountdown sequence now
+              // setShowIntro(false); 
           }, 3500);
           return () => clearTimeout(timer);
       }
   }, [showIntro]);
 
-  const triggerReactionAnimation = (reaction: MatchReaction) => {
-    const id = ++reactionCounter.current;
-    setActiveReactions(prev => {
-        const filtered = prev.filter(r => r.senderId !== reaction.senderId);
-        return [...filtered, { id, senderId: reaction.senderId, value: reaction.value }];
-    });
-    playSound('reaction');
-    setTimeout(() => {
-        setActiveReactions(prev => prev.filter(r => r.id !== id));
-    }, 4000);
-  };
-
-  const sendReaction = async (val: string) => {
-      if (!user || !matchId) return;
-      setShowReactionMenu(false);
-      playSound('click');
-      await update(ref(db, `matches/${matchId}`), {
-          lastReaction: {
-              senderId: user.uid,
-              value: val,
-              timestamp: Date.now()
-          }
-      });
-  };
-
   const handleOptionClick = async (index: number) => {
     if (isSpectator) return;
     if (!match || !user || !isMyTurn || selectedOption !== null || processingRef.current || !currentQuestion) return;
     
+    unlockAudio(); // Ensure audio context is active on interactions
     const currentScores = match.scores || {};
     setSelectedOption(index);
     playSound('click');
@@ -677,7 +704,6 @@ const GamePage: React.FC = () => {
           inputPlaceholder: 'Dooro sababta...',
           showCancelButton: true,
           confirmButtonText: 'Dir (Send)',
-          // Validation: Disable send until valid selection
           inputValidator: (value) => {
               return !value && 'Fadlan dooro sababta (Please select a reason)';
           },
@@ -711,7 +737,6 @@ const GamePage: React.FC = () => {
   const handleLeave = async () => {
       if(!user || !matchId) return;
       
-      // Stop WebRTC audio if active
       if (localStreamRef.current) {
           localStreamRef.current.getTracks().forEach(t => t.stop());
       }
@@ -779,7 +804,6 @@ const GamePage: React.FC = () => {
   const safeScores = match.scores || {};
   const winnerUid = match.winner;
   
-  // Real-time Speaking Status from DB
   const isLeftSpeaking = match.players?.[leftProfile.uid]?.isSpeaking || false;
   const isRightSpeaking = match.players?.[rightProfile.uid]?.isSpeaking || false;
 
@@ -814,7 +838,6 @@ const GamePage: React.FC = () => {
       {/* IMPROVED VS Screen Animation */}
       {showIntro && !isSpectator && (
           <div className="fixed inset-0 z-[60] flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
-              {/* Background Particle Effects */}
               <div className="absolute inset-0 z-0">
                   <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-orange-600/20 to-transparent"></div>
                   <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-blue-600/20 to-transparent"></div>
@@ -828,11 +851,9 @@ const GamePage: React.FC = () => {
                       </h2>
                       <div className="inline-block bg-black/40 px-4 py-1.5 rounded-full text-white font-black mt-2 text-sm backdrop-blur-sm border border-white/20 shadow-lg">LVL {leftLevel}</div>
                   </div>
-                  {/* Decorative */}
                   <i className="fas fa-bolt text-9xl absolute -left-10 bottom-0 text-white/10 rotate-12"></i>
               </div>
               
-              {/* VS Badge */}
               <div className="absolute z-30 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate__animated animate__zoomIn animate__delay-1s">
                   <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-8 border-slate-900 shadow-[0_0_50px_rgba(255,255,255,0.5)]">
                       <span className="font-black text-5xl italic text-slate-900 transform -skew-x-12">VS</span>
@@ -847,7 +868,6 @@ const GamePage: React.FC = () => {
                       </h2>
                       <div className="inline-block bg-black/40 px-4 py-1.5 rounded-full text-white font-black mt-2 text-sm backdrop-blur-sm border border-white/20 shadow-lg">LVL {rightLevel}</div>
                   </div>
-                  {/* Decorative */}
                   <i className="fas fa-gamepad text-9xl absolute -right-10 top-0 text-white/10 -rotate-12"></i>
               </div>
           </div>
@@ -877,7 +897,7 @@ const GamePage: React.FC = () => {
         </div>
       )}
 
-      {/* Exit Button Pill - Fixed Top Center */}
+      {/* Exit Button Pill */}
       {!isGameOver && (
           <div className="fixed top-28 left-1/2 -translate-x-1/2 z-[40]">
               <button onClick={handleSurrender} className="bg-[#e74c3c]/90 hover:bg-red-600 text-white px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-tighter shadow-sm border border-white/20 transition-all flex items-center gap-1 active:scale-95 backdrop-blur-sm">
@@ -893,17 +913,14 @@ const GamePage: React.FC = () => {
             {/* Left Player (Me) */}
             <div className={`flex items-center gap-3 transition-all duration-500 ${leftIsActive && !isGameOver ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'}`}>
                  <div className="relative">
-                     {/* Speaking Indicator - Enhanced */}
                      {isLeftSpeaking && (
                         <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
                      )}
                      
-                     {/* Active Turn Ring */}
                      <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${leftIsActive ? 'bg-gradient-to-r from-orange-500 to-yellow-500 shadow-[0_0_20px_rgba(249,115,22,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isLeftSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : ''}`}>
                         <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="md" className="border-2 border-white dark:border-slate-800" />
                      </div>
 
-                     {/* Speaking Icon Badge */}
                      {isLeftSpeaking && (
                          <div className="absolute -top-1 -right-1 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
                              <i className="fas fa-microphone text-xs"></i>
@@ -914,11 +931,10 @@ const GamePage: React.FC = () => {
                         LVL {leftLevel}
                      </div>
                      
-                     {/* REACTIONS FOR LEFT - WHITE PILL STYLE (ADJUSTED POSITION) */}
+                     {/* REACTIONS FOR LEFT */}
                      {activeReactions.filter(r => r.senderId === leftProfile.uid).map(r => (
                          <div key={r.id} className="absolute top-[78px] left-0 z-[100] animate__animated animate__bounceIn">
                              <div className="relative bg-white px-3 py-1.5 rounded-full border-2 border-orange-500 shadow-[0_4px_15px_rgba(249,115,22,0.3)] min-w-[50px] text-center whitespace-nowrap flex items-center justify-center">
-                                {/* Tail */}
                                 <div className="absolute -top-2 left-8 -translate-x-1/2 w-3 h-3 bg-white border-t-2 border-l-2 border-orange-500 transform rotate-45"></div>
                                 <span className={`text-orange-600 font-black uppercase tracking-wider ${r.value.length > 2 ? 'text-[10px] md:text-xs' : 'text-2xl md:text-3xl leading-none'}`}>{r.value}</span>
                              </div>
@@ -949,17 +965,14 @@ const GamePage: React.FC = () => {
             {/* Right Player (Opponent) */}
             <div className={`flex flex-row-reverse items-center gap-3 transition-all duration-500 ${rightIsActive && !isGameOver ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'}`}>
                  <div className="relative">
-                    {/* Speaking Indicator - Enhanced */}
                     {isRightSpeaking && (
                         <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
                     )}
 
-                    {/* Active Turn Ring */}
                     <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${rightIsActive ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isRightSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : ''}`}>
                         <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="md" className="border-2 border-white dark:border-slate-800" />
                     </div>
 
-                    {/* Speaking Icon Badge */}
                     {isRightSpeaking && (
                          <div className="absolute -top-1 -left-1 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
                              <i className="fas fa-microphone text-xs"></i>
@@ -970,11 +983,10 @@ const GamePage: React.FC = () => {
                         LVL {rightLevel}
                     </div>
 
-                    {/* REACTIONS FOR RIGHT - BLUE PILL STYLE (ADJUSTED POSITION) */}
+                    {/* REACTIONS FOR RIGHT */}
                     {activeReactions.filter(r => r.senderId === rightProfile.uid).map(r => (
                          <div key={r.id} className="absolute top-[78px] right-0 z-[100] animate__animated animate__bounceIn">
                              <div className="relative bg-white px-3 py-1.5 rounded-full border-2 border-blue-500 shadow-[0_4px_15px_rgba(59,130,246,0.3)] min-w-[50px] text-center whitespace-nowrap flex items-center justify-center">
-                                {/* Tail */}
                                 <div className="absolute -top-2 right-8 translate-x-1/2 w-3 h-3 bg-white border-t-2 border-l-2 border-blue-500 transform rotate-45"></div>
                                 <span className={`text-blue-600 font-black uppercase tracking-wider ${r.value.length > 2 ? 'text-[10px] md:text-xs' : 'text-2xl md:text-3xl leading-none'}`}>{r.value}</span>
                              </div>
