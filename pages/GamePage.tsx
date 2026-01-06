@@ -828,18 +828,18 @@ const GamePage: React.FC = () => {
                  <div className="relative">
                      {/* Speaking Indicator - Enhanced */}
                      {isLeftSpeaking && (
-                        <div className="absolute -inset-2 rounded-full border-2 border-green-500 animate-ping opacity-75"></div>
+                        <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
                      )}
                      
                      {/* Active Turn Ring */}
-                     <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${leftIsActive ? 'bg-gradient-to-r from-orange-500 to-yellow-500 shadow-[0_0_20px_rgba(249,115,22,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isLeftSpeaking ? 'ring-4 ring-green-500/30' : ''}`}>
+                     <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${leftIsActive ? 'bg-gradient-to-r from-orange-500 to-yellow-500 shadow-[0_0_20px_rgba(249,115,22,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isLeftSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : ''}`}>
                         <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="md" className="border-2 border-white dark:border-slate-800" />
                      </div>
 
                      {/* Speaking Icon Badge */}
                      {isLeftSpeaking && (
-                         <div className="absolute -top-1 -right-1 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
-                             <i className="fas fa-microphone text-[10px]"></i>
+                         <div className="absolute -top-1 -right-1 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
+                             <i className="fas fa-microphone text-xs"></i>
                          </div>
                      )}
 
@@ -847,11 +847,15 @@ const GamePage: React.FC = () => {
                         LVL {leftLevel}
                      </div>
                      
-                     {/* REACTIONS FOR LEFT - Improved */}
+                     {/* REACTIONS FOR LEFT - Restored Bubbles */}
                      {activeReactions.filter(r => r.senderId === leftProfile.uid).map(r => (
-                         <div key={r.id} className="absolute -bottom-16 -left-2 z-[60] animate__animated animate__bounceIn animate__faster origin-top-left">
-                             <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl px-3 py-2 rounded-2xl rounded-tl-none shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-slate-100 dark:border-slate-700 whitespace-nowrap flex flex-col items-center relative transform rotate-2">
-                                <span className={r.value.length > 2 ? "text-[10px] font-black text-slate-800 dark:text-white uppercase tracking-wide px-1" : "text-3xl filter drop-shadow-sm"}>{r.value}</span>
+                         <div key={r.id} className="absolute top-full mt-3 left-1/2 -translate-x-1/2 z-[60] animate__animated animate__bounceIn">
+                             <div className="relative bg-white dark:bg-slate-800 px-3 py-2 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 min-w-[50px] text-center flex flex-col items-center">
+                                {/* Tail */}
+                                <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-slate-800 border-t border-l border-slate-100 dark:border-slate-700 transform rotate-45"></div>
+                                <span className={r.value.length > 2 ? "text-[10px] font-black uppercase text-slate-800 dark:text-white relative z-10" : "text-2xl relative z-10"}>
+                                    {r.value}
+                                </span>
                              </div>
                          </div>
                      ))}
@@ -882,18 +886,18 @@ const GamePage: React.FC = () => {
                  <div className="relative">
                     {/* Speaking Indicator - Enhanced */}
                     {isRightSpeaking && (
-                        <div className="absolute -inset-2 rounded-full border-2 border-green-500 animate-ping opacity-75"></div>
+                        <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
                     )}
 
                     {/* Active Turn Ring */}
-                    <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${rightIsActive ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isRightSpeaking ? 'ring-4 ring-green-500/30' : ''}`}>
+                    <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${rightIsActive ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isRightSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : ''}`}>
                         <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="md" className="border-2 border-white dark:border-slate-800" />
                     </div>
 
                     {/* Speaking Icon Badge */}
                     {isRightSpeaking && (
-                         <div className="absolute -top-1 -left-1 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
-                             <i className="fas fa-microphone text-[10px]"></i>
+                         <div className="absolute -top-1 -left-1 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
+                             <i className="fas fa-microphone text-xs"></i>
                          </div>
                      )}
 
@@ -901,11 +905,15 @@ const GamePage: React.FC = () => {
                         LVL {rightLevel}
                     </div>
 
-                    {/* REACTIONS FOR RIGHT - Improved */}
+                    {/* REACTIONS FOR RIGHT - Restored Bubbles */}
                     {activeReactions.filter(r => r.senderId === rightProfile.uid).map(r => (
-                         <div key={r.id} className="absolute -bottom-16 -right-2 z-[60] animate__animated animate__bounceIn animate__faster origin-top-right">
-                             <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl px-3 py-2 rounded-2xl rounded-tr-none shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-slate-100 dark:border-slate-700 whitespace-nowrap flex flex-col items-center relative transform -rotate-2">
-                                <span className={r.value.length > 2 ? "text-[10px] font-black text-slate-800 dark:text-white uppercase tracking-wide px-1" : "text-3xl filter drop-shadow-sm"}>{r.value}</span>
+                         <div key={r.id} className="absolute top-full mt-3 left-1/2 -translate-x-1/2 z-[60] animate__animated animate__bounceIn">
+                             <div className="relative bg-white dark:bg-slate-800 px-3 py-2 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 min-w-[50px] text-center flex flex-col items-center">
+                                {/* Tail */}
+                                <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-slate-800 border-t border-l border-slate-100 dark:border-slate-700 transform rotate-45"></div>
+                                <span className={r.value.length > 2 ? "text-[10px] font-black uppercase text-slate-800 dark:text-white relative z-10" : "text-2xl relative z-10"}>
+                                    {r.value}
+                                </span>
                              </div>
                          </div>
                      ))}
