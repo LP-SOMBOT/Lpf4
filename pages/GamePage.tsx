@@ -1084,7 +1084,7 @@ const GamePage: React.FC = () => {
 
       {/* Push-to-Talk Button */}
       {showGameControls && (
-          <div className="fixed bottom-8 left-4 z-[60]">
+          <div className="fixed bottom-8 right-4 z-[60]">
               <button
                   onMouseDown={handlePTTStart}
                   onMouseUp={stopTalking}
@@ -1111,7 +1111,7 @@ const GamePage: React.FC = () => {
 
       {/* Reaction Toggle Button */}
       {showGameControls && (
-          <div className="fixed bottom-8 right-4 z-[60]">
+          <div className="fixed bottom-8 left-4 z-[60]">
                <button 
                 onClick={() => setShowReactionMenu(!showReactionMenu)}
                 className="w-16 h-16 rounded-full bg-white shadow-2xl border-4 border-[#f97316] text-3xl flex items-center justify-center transition-all active:scale-95 hover:bg-orange-50"
@@ -1120,7 +1120,7 @@ const GamePage: React.FC = () => {
                </button>
                
                {showReactionMenu && (
-                   <div className="absolute bottom-20 right-0 w-64 p-4 bg-white/95 rounded-3xl shadow-2xl border-2 border-slate-100 animate__animated animate__bounceIn">
+                   <div className="absolute bottom-20 left-0 w-64 p-4 bg-white/95 rounded-3xl shadow-2xl border-2 border-slate-100 animate__animated animate__bounceIn">
                        <div className="grid grid-cols-4 gap-3 mb-4">
                            {reactionEmojis.map(emoji => (
                                <button key={emoji} onClick={() => sendReaction(emoji)} className="text-3xl hover:scale-125 transition-transform p-1">{emoji}</button>
