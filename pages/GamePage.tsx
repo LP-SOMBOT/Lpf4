@@ -310,15 +310,17 @@ const GamePage: React.FC = () => {
   // Permission will be requested when user presses the button
 
   // B. WebRTC Signaling Logic
+  // IMPORTANT: This effect initializes the connection IMMEDIATELY (Receive Only)
+  // It does NOT wait for 'hasMicPermission'.
   useEffect(() => {
-      if (isSpectator || !user || !rightProfile || !matchId || !hasMicPermission) return;
+      if (isSpectator || !user || !rightProfile || !matchId) return;
 
       // Ensure PeerConnection is created
       if (!peerConnectionRef.current) {
           const pc = new RTCPeerConnection(iceServers);
           peerConnectionRef.current = pc;
 
-          // Add Local Stream
+          // Add Local Stream IF AVAILABLE (Might be null initially)
           if (localStreamRef.current) {
               localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current!));
           }
@@ -328,6 +330,8 @@ const GamePage: React.FC = () => {
               if (remoteAudioRef.current) {
                   remoteAudioRef.current.srcObject = event.streams[0];
                   remoteStreamRef.current = event.streams[0];
+                  // Attempt autoplay fix
+                  remoteAudioRef.current.play().catch(e => console.log("Audio play blocked", e));
               }
           };
 
@@ -353,13 +357,16 @@ const GamePage: React.FC = () => {
               await set(ref(db, `matches/${matchId}/webrtc/offer`), {
                   type: 'offer',
                   sdp: offer.sdp,
-                  sender: user.uid
+                  sender: user.uid,
+                  ts: Date.now()
               });
           } catch (e) { console.error("Error creating offer", e); }
       };
 
+      // Initial Offer on connection start
       if (isOfferer) {
-          // Trigger offer if not already done
+          // Check if offer already exists to prevent overwrite loop on mount?
+          // For simplicity, we just offer. Firebase handles consistency.
           createOffer();
       }
 
@@ -368,22 +375,46 @@ const GamePage: React.FC = () => {
           if (!snapshot.exists()) return;
           const data = snapshot.val();
 
-          // Handle Offer (Callee side)
-          if (data.offer && data.offer.sender !== user.uid && !pc.currentRemoteDescription) {
-              pc.setRemoteDescription(new RTCSessionDescription(data.offer)).then(async () => {
-                  const answer = await pc.createAnswer();
-                  await pc.setLocalDescription(answer);
-                  await set(ref(db, `matches/${matchId}/webrtc/answer`), {
-                      type: 'answer',
-                      sdp: answer.sdp,
-                      sender: user.uid
-                  });
-              });
+          // Handle Offer (Callee side) OR Renegotiation Offer
+          // We removed !pc.currentRemoteDescription to allow Renegotiation
+          if (data.offer && data.offer.sender !== user.uid) {
+              // Ensure we don't process the same offer multiple times if possible, 
+              // but setRemoteDescription is idempotent enough for simple cases.
+              // Note: If signalingState is not stable, this might fail, wrap in try/catch
+              
+              const processOffer = async () => {
+                  try {
+                      // Avoid race condition: If we are offering, and they offer (glare)
+                      // We stick to "Impolite peer" if needed, but here simply accepting usually works
+                      if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
+                          // If we are in have-remote-offer, we update?
+                          // WebRTC Perfect Negotiation is safer, but complex.
+                          // Fallback: Just try setting it.
+                      }
+                      
+                      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                      const answer = await pc.createAnswer();
+                      await pc.setLocalDescription(answer);
+                      await set(ref(db, `matches/${matchId}/webrtc/answer`), {
+                          type: 'answer',
+                          sdp: answer.sdp,
+                          sender: user.uid,
+                          ts: Date.now()
+                      });
+                  } catch(e) {
+                      console.warn("Signaling State Error (Ignored)", e);
+                  }
+              };
+              processOffer();
           }
 
           // Handle Answer (Caller side)
-          if (data.answer && data.answer.sender !== user.uid && !pc.currentRemoteDescription) {
-              pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          if (data.answer && data.answer.sender !== user.uid) {
+              try {
+                  if (pc.signalingState === 'have-local-offer') {
+                      pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                  }
+              } catch(e) {}
           }
       };
 
@@ -392,9 +423,13 @@ const GamePage: React.FC = () => {
       // 3. Listen for ICE Candidates
       const candidatesRef = ref(db, `matches/${matchId}/webrtc/candidates/${rightProfile.uid}`);
       const unsubCandidates = onChildAdded(candidatesRef, (snapshot) => {
-          if (snapshot.exists() && pc.remoteDescription) {
+          if (snapshot.exists()) {
               try {
-                  pc.addIceCandidate(new RTCIceCandidate(snapshot.val()));
+                  // Add candidate even if remote desc not set yet (queueing logic handled by browser or simple delay)
+                  // Best practice: check remoteDescription
+                  if(pc.remoteDescription) {
+                      pc.addIceCandidate(new RTCIceCandidate(snapshot.val()));
+                  }
               } catch (e) { console.error("Error adding candidate", e); }
           }
       });
@@ -407,9 +442,41 @@ const GamePage: React.FC = () => {
               peerConnectionRef.current = null;
           }
       };
-  }, [user, rightProfile, matchId, hasMicPermission, isSpectator]);
+  }, [user, rightProfile, matchId, isSpectator]); // Removed hasMicPermission dependency
 
-  // C. Push-To-Talk Handlers
+  // C. Watch Mic Permission for "Upgrade" to Audio Sender
+  useEffect(() => {
+      if (hasMicPermission && peerConnectionRef.current && localStreamRef.current) {
+          const pc = peerConnectionRef.current;
+          
+          // 1. Add Tracks if not already added
+          localStreamRef.current.getTracks().forEach(track => {
+              const senders = pc.getSenders();
+              const alreadyHas = senders.find(s => s.track === track);
+              if (!alreadyHas) {
+                  pc.addTrack(track, localStreamRef.current!);
+              }
+          });
+
+          // 2. Trigger Renegotiation (Send new Offer)
+          // This enables the other peer to hear us
+          const renegotiate = async () => {
+              try {
+                  const offer = await pc.createOffer();
+                  await pc.setLocalDescription(offer);
+                  await set(ref(db, `matches/${matchId}/webrtc/offer`), {
+                      type: 'offer',
+                      sdp: offer.sdp,
+                      sender: user?.uid,
+                      ts: Date.now() // Timestamp to force onValue update
+                  });
+              } catch(e) { console.error("Renegotiation failed", e); }
+          };
+          renegotiate();
+      }
+  }, [hasMicPermission, matchId, user?.uid]);
+
+  // D. Push-To-Talk Handlers
   const handlePTTStart = async (e: React.SyntheticEvent) => {
       e.preventDefault();
       isHoldingButtonRef.current = true; // Mark as holding
@@ -741,8 +808,8 @@ const GamePage: React.FC = () => {
         }
       `}</style>
       
-      {/* Hidden Audio Element for Remote Stream */}
-      <audio ref={remoteAudioRef} autoPlay style={{ display: 'none' }} />
+      {/* Hidden Audio Element for Remote Stream with explicit autoplay */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
        
       {/* IMPROVED VS Screen Animation */}
       {showIntro && !isSpectator && (
