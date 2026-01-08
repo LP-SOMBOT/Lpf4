@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useContext, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, push, set, serverTimestamp, update, get, runTransaction, query, limitToLast, onChildAdded, off } from 'firebase/database';
+import { ref, onValue, push, serverTimestamp, update, get, query, limitToLast, onChildAdded, off, increment } from 'firebase/database';
 import { Howler } from 'howler';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
@@ -315,6 +315,7 @@ const ChatPage: React.FC = () => {
       chatCache.saveMessage(msgData);
       
       try {
+          // Create reference first to get ID
           const newRef = push(ref(db, `chats/${chatId}/messages`));
           const realId = newRef.key!;
           
@@ -331,21 +332,28 @@ const ChatPage: React.FC = () => {
               }
           });
 
-          await set(newRef, finalMsg);
+          // ATOMIC UPDATE FOR ZERO DELAY
+          const updates: any = {};
+          
+          // 1. Add Message
+          updates[`chats/${chatId}/messages/${realId}`] = finalMsg;
+          
+          // 2. Update Chat Metadata
+          updates[`chats/${chatId}/lastMessage`] = msgData.text;
+          updates[`chats/${chatId}/lastTimestamp`] = serverTimestamp();
+          updates[`chats/${chatId}/lastMessageSender`] = user.uid;
+          updates[`chats/${chatId}/lastMessageStatus`] = 'sent';
+          updates[`chats/${chatId}/participants/${user.uid}`] = true;
+          updates[`chats/${chatId}/participants/${uid!}`] = true;
+          
+          // 3. Increment Unread Count for Recipient (Atomic)
+          updates[`chats/${chatId}/unread/${uid!}/count`] = increment(1);
+
+          // Execute all as one packet
+          await update(ref(db), updates);
+
           chatCache.saveMessage({ ...finalMsg, chatId });
-
           setMessages(prev => prev.map(m => m.tempId === tempId ? { ...finalMsg, chatId } : m));
-
-          await update(ref(db, `chats/${chatId}`), {
-              lastMessage: msgData.text,
-              lastTimestamp: serverTimestamp(),
-              lastMessageSender: user.uid, 
-              lastMessageStatus: 'sent',   
-              participants: { [user.uid]: true, [uid!]: true }
-          });
-
-          const recipientUnreadRef = ref(db, `chats/${chatId}/unread/${uid}/count`);
-          runTransaction(recipientUnreadRef, (c) => (c || 0) + 1);
 
       } catch (err) {
           console.error("SendMessage Error:", err);
@@ -368,21 +376,13 @@ const ChatPage: React.FC = () => {
       try {
           const subjectName = subjects.find(s => s.id === selectedSubject)?.name || "Unknown Subject";
           const code = Math.floor(1000 + Math.random() * 9000).toString();
-          const newRef = push(ref(db, `chats/${chatId}/messages`));
-          const msgId = newRef.key;
-
-          await set(ref(db, `rooms/${code}`), { 
-              host: user.uid, 
-              sid: selectedSubject, 
-              lid: selectedChapter, 
-              questionLimit: 10, 
-              createdAt: Date.now(),
-              linkedChatPath: `chats/${chatId}/messages/${msgId}` 
-          });
           
+          const newRef = push(ref(db, `chats/${chatId}/messages`));
+          const msgId = newRef.key!;
+
           const timestamp = Date.now();
           const msgData: ChatMessage = {
-              id: msgId!,
+              id: msgId,
               chatId,
               sender: user.uid,
               text: 'CHALLENGE_INVITE',
@@ -393,19 +393,35 @@ const ChatPage: React.FC = () => {
               status: 'waiting',
               msgStatus: 'sent'
           };
-          
-          await set(newRef, msgData);
-          
-          await update(ref(db, `chats/${chatId}`), {
-              lastMessage: 'CHALLENGE_INVITE',
-              lastTimestamp: serverTimestamp(),
-              lastMessageSender: user.uid, 
-              lastMessageStatus: 'sent',   
-              participants: { [user.uid]: true, [uid!]: true }
-          });
 
-          const recipientUnreadRef = ref(db, `chats/${chatId}/unread/${uid}/count`);
-          runTransaction(recipientUnreadRef, (c) => (c || 0) + 1);
+          // ATOMIC UPDATE FOR INVITE
+          const updates: any = {};
+          
+          // 1. Create Room
+          updates[`rooms/${code}`] = { 
+              host: user.uid, 
+              sid: selectedSubject, 
+              lid: selectedChapter, 
+              questionLimit: 10, 
+              createdAt: serverTimestamp(),
+              linkedChatPath: `chats/${chatId}/messages/${msgId}` 
+          };
+
+          // 2. Add Message
+          updates[`chats/${chatId}/messages/${msgId}`] = msgData;
+
+          // 3. Update Chat Metadata
+          updates[`chats/${chatId}/lastMessage`] = 'CHALLENGE_INVITE';
+          updates[`chats/${chatId}/lastTimestamp`] = serverTimestamp();
+          updates[`chats/${chatId}/lastMessageSender`] = user.uid;
+          updates[`chats/${chatId}/lastMessageStatus`] = 'sent';
+          updates[`chats/${chatId}/participants/${user.uid}`] = true;
+          updates[`chats/${chatId}/participants/${uid!}`] = true;
+
+          // 4. Increment Unread
+          updates[`chats/${chatId}/unread/${uid!}/count`] = increment(1);
+
+          await update(ref(db), updates);
 
           setShowGameSetup(false);
           playSound('sent');
