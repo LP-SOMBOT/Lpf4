@@ -6,15 +6,17 @@ const sounds = {
   wrong: new Howl({ src: ['https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3'] }), // Buzzer
   click: new Howl({ src: ['https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'] }), // Click
   win: new Howl({ src: ['https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'] }), // Cheering
-  // Updated Chat Sounds - Using reliable notification sounds
+  
+  // FIX: Switched back to active_storage URLs which are reliable and CORS-friendly
   message: new Howl({ 
-    src: ['https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3'], 
+    src: ['https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'], // Smartphone Notification Ping
     volume: 0.8 
-  }), // Crisp Notification
+  }), 
   sent: new Howl({ 
-    src: ['https://assets.mixkit.co/sfx/preview/mixkit-message-pop-alert-2354.mp3'], 
+    src: ['https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'], // Bubble Pop
     volume: 0.6 
-  }), // Pop Sound
+  }), 
+  
   // Reaction Sound
   reaction: new Howl({ src: ['https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'], volume: 0.6 }), 
   // distinct "Your Turn" notification
