@@ -1,14 +1,14 @@
 
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ref, push, get, remove, set, onValue, update, serverTimestamp, onDisconnect } from 'firebase/database';
+import { ref, push, get, remove, set, onValue, update, serverTimestamp } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { Button, Input, Avatar, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { showToast, showAlert } from '../services/alert';
 import { MATCH_TIMEOUT_MS, PRIVATE_ROOM_TIMEOUT_MS } from '../constants';
-import { Subject, Chapter, Room } from '../types';
+import { Subject, Chapter } from '../types';
 
 const LobbyPage: React.FC = () => {
   const { user, profile } = useContext(UserContext);
@@ -16,7 +16,7 @@ const LobbyPage: React.FC = () => {
   const location = useLocation();
   
   // Navigation States
-  const [viewMode, setViewMode] = useState<'selection' | 'auto' | 'custom' | '4p'>('selection');
+  const [viewMode, setViewMode] = useState<'selection' | 'auto' | 'custom'>('selection');
   const [customSubMode, setCustomSubMode] = useState<'menu' | 'join' | 'create'>('menu');
 
   // Data States
@@ -33,33 +33,26 @@ const LobbyPage: React.FC = () => {
   const [hostedCode, setHostedCode] = useState<string | null>(null);
   const [queueKey, setQueueKey] = useState<string | null>(null);
   
-  // 4P Logic States
-  const [lobbyPlayers, setLobbyPlayers] = useState<Room['players']>({});
-  
   const timerRef = useRef<any>(null);
   const hostTimerRef = useRef<any>(null);
   const linkedChatPathRef = useRef<string | null>(null);
 
-  // Handle Incoming Navigation State
+  // Handle Incoming Navigation State (Seamless from Chat)
   useEffect(() => {
       if (location.state) {
           const { hostedCode: incomingHostCode, autoJoinCode } = location.state;
+          
+          // Case 1: Host coming from Chat
           if (incomingHostCode) {
               setHostedCode(incomingHostCode);
-              // We need to fetch the room to know if it is 4p or custom
-              get(ref(db, `rooms/${incomingHostCode}`)).then(snap => {
-                  if(snap.exists()) {
-                      const rData = snap.val();
-                      if(rData.mode === '4p') setViewMode('4p');
-                      else setViewMode('custom');
-                  } else {
-                      setViewMode('custom'); // Default fallback
-                  }
-              });
+              setViewMode('custom');
+              // Listen for join is handled by the useEffect below for hostedCode
           } 
+          // Case 2: Guest coming from Chat
           else if (autoJoinCode) {
               setRoomCode(autoJoinCode);
-              // Attempt join immediately
+              setViewMode('custom');
+              // Trigger join immediately
               joinRoom(autoJoinCode);
           }
       }
@@ -89,101 +82,72 @@ const LobbyPage: React.FC = () => {
     });
   }, [selectedSubject]);
 
-  // Listener for Hosted Room 
+  // Listener for Hosted Room (Waiting for someone to delete room & start match)
   useEffect(() => {
-      if (hostedCode && user) {
+      if (hostedCode) {
          const roomRef = ref(db, `rooms/${hostedCode}`);
          
-         // Timeout Logic: 2 Minutes for expiration if Host doesn't start
-         // Only apply timeout if I am the host
-         if (hostTimerRef.current) clearTimeout(hostTimerRef.current);
-         
-         hostTimerRef.current = setTimeout(async () => {
-             // Check if I am host before deleting
-             const snap = await get(roomRef);
-             if (snap.exists() && snap.val().host === user.uid) {
-                 if (linkedChatPathRef.current) {
-                     update(ref(db, linkedChatPathRef.current), { status: 'expired' });
-                     linkedChatPathRef.current = null;
-                 }
-                 remove(roomRef);
-                 setHostedCode(null);
-                 showAlert("Room Expired", "Room closed after 2 minutes of inactivity.", "info");
+         // Start 15s Timeout for Social/Private Room
+         hostTimerRef.current = setTimeout(() => {
+             // Timeout reached - Mark as Expired
+             if (linkedChatPathRef.current) {
+                 update(ref(db, linkedChatPathRef.current), { status: 'expired' });
+                 linkedChatPathRef.current = null;
              }
-         }, PRIVATE_ROOM_TIMEOUT_MS); 
+             
+             remove(ref(db, `rooms/${hostedCode}`));
+             setHostedCode(null);
+             // Clear history state
+             window.history.replaceState({}, document.title);
+             showAlert("Room Expired", "No opponent joined in time (15s).", "info");
+         }, 15000); // 15 Seconds hardcoded as per request
 
          const unsub = onValue(roomRef, (snap) => {
+             // Store linked chat path if available to update later
              if (snap.exists()) {
-                 const val: Room = snap.val();
+                 const val = snap.val();
                  if (val.linkedChatPath) linkedChatPathRef.current = val.linkedChatPath;
-                 
-                 // 4P Logic: Sync Lobby Players
-                 if (val.mode === '4p') {
-                     // Safety check: ensure players object exists
-                     setLobbyPlayers(val.players || {});
-                     
-                     // Auto-Start Logic for Host
-                     const playerCount = Object.keys(val.players || {}).length;
-                     if (val.host === user.uid && playerCount === 4) {
-                         start4PMatch(val);
-                     }
-                 }
-             } else {
-                 // Room deleted (Match started or Host left)
+             }
+
+             // If room is gone, it means someone joined (which deletes the room and creates match)
+             // or it was aborted/expired. 
+             if (!snap.exists()) {
+                 // Clear timeout if match started or expired
                  if (hostTimerRef.current) clearTimeout(hostTimerRef.current);
-                 // Clear state
-                 setHostedCode(null);
-                 setLobbyPlayers({});
              }
          });
-         
-         // Clean up on disconnect 
-         // Guest: remove self. Host: room removal handled in creation.
-         // We add a listener here just in case, but usually handled by create logic.
-         // Just to be safe for guests:
-         const userInRoomRef = ref(db, `rooms/${hostedCode}/players/${user.uid}`);
-         onDisconnect(userInRoomRef).remove(); 
-
          return () => {
              unsub();
              if (hostTimerRef.current) clearTimeout(hostTimerRef.current);
          };
       }
-  }, [hostedCode, user]);
+  }, [hostedCode]);
 
-  const handleBack = async () => {
+  const handleBack = () => {
     playSound('click');
     
-    if (hostedCode && user) {
-        const roomRef = ref(db, `rooms/${hostedCode}`);
-        const snap = await get(roomRef);
-        
-        if (snap.exists()) {
-            const rData = snap.val();
-            
-            if (rData.host === user.uid) {
-                // I am Host -> Kill Room
-                if (linkedChatPathRef.current) {
-                    update(ref(db, linkedChatPathRef.current), { status: 'canceled' });
-                    linkedChatPathRef.current = null;
-                }
-                await remove(roomRef);
-                showToast("Room closed", "info");
-            } else {
-                // I am Guest -> Leave Room
-                await remove(ref(db, `rooms/${hostedCode}/players/${user.uid}`));
-                showToast("Left room", "info");
-            }
+    // If hosting a room, abort it first
+    if (hostedCode) {
+        // If there was a linked chat message, mark it as canceled
+        if (linkedChatPathRef.current) {
+            update(ref(db, linkedChatPathRef.current), { status: 'canceled' });
+            linkedChatPathRef.current = null;
         }
 
+        remove(ref(db, `rooms/${hostedCode}`));
         setHostedCode(null);
-        setLobbyPlayers({});
+        // Clear history state to prevent re-triggering
         window.history.replaceState({}, document.title);
         return;
     }
 
-    if (viewMode !== 'selection') {
-        if (isSearching) cancelSearch();
+    if (viewMode === 'auto') {
+        if (isSearching) {
+            cancelSearch();
+        } else {
+            setViewMode('selection');
+        }
+    } else if (viewMode === 'custom') {
         if (customSubMode !== 'menu') {
             setCustomSubMode('menu');
             setRoomCode('');
@@ -195,7 +159,6 @@ const LobbyPage: React.FC = () => {
     }
   };
 
-  // --- 1v1 LOGIC ---
   const handleAutoMatch = async () => {
     if (!user || !selectedChapter) { showToast("Select a chapter", "error"); return; }
     setIsSearching(true); setMatchStatus('Scanning...'); playSound('click');
@@ -209,10 +172,15 @@ const LobbyPage: React.FC = () => {
       const oppKey = Object.keys(qData).find(k => qData[k].uid !== user.uid);
       if (oppKey) {
           const oppUid = qData[oppKey].uid;
+          
+          // ATOMIC UPDATE FOR AUTO MATCH
           const matchId = `match_${Date.now()}`;
           const updates: any = {};
           
+          // Remove opponent from queue
           updates[`queue/${selectedChapter}/${oppKey}`] = null;
+          
+          // Create Match
           updates[`matches/${matchId}`] = {
             matchId, status: 'active', mode: 'auto', turn: user.uid, currentQ: 0, answersCount: 0, scores: { [user.uid]: 0, [oppUid]: 0 },
             subject: selectedChapter, 
@@ -220,6 +188,8 @@ const LobbyPage: React.FC = () => {
             questionLimit: Math.floor(Math.random() * 11) + 10,
             players: { [user.uid]: { name: user.displayName, avatar: '' }, [oppUid]: { name: 'Opponent', avatar: '' } }, createdAt: serverTimestamp()
           };
+          
+          // Set Active Match for Both
           updates[`users/${user.uid}/activeMatch`] = matchId;
           updates[`users/${oppUid}/activeMatch`] = matchId;
           
@@ -232,6 +202,7 @@ const LobbyPage: React.FC = () => {
     await set(newRef, { uid: user.uid });
     setMatchStatus('In Queue...');
     
+    // Set 10s Timeout for Ranked/Auto
     timerRef.current = setTimeout(async () => {
         if (isSearching) {
           await remove(newRef); 
@@ -249,85 +220,31 @@ const LobbyPage: React.FC = () => {
     if (queueKey && selectedChapter) { await remove(ref(db, `queue/${selectedChapter}/${queueKey}`)); setQueueKey(null); }
   };
 
-  // --- 4P LOGIC ---
-  const create4PRoom = async () => {
-      if(!user || !selectedChapter) return;
-      const code = Math.floor(1000 + Math.random() * 9000).toString();
-      
-      const roomData: Room = {
-          host: user.uid,
-          sid: selectedSubject,
-          lid: selectedChapter,
-          code,
-          mode: '4p',
-          questionLimit: quizLimit,
-          createdAt: Date.now(),
-          players: {
-              [user.uid]: { name: profile?.name || 'Host', avatar: profile?.avatar || '' }
-          }
-      };
-      
-      // Set room first
-      await set(ref(db, `rooms/${code}`), roomData);
-      
-      // Host Disconnect Logic: Destroy Room (Attached to room root)
-      onDisconnect(ref(db, `rooms/${code}`)).remove();
-
-      setHostedCode(code);
-      playSound('click');
-      showToast("Squad Room Created!", "success");
+  const createRoom = async () => {
+    if(!user || !selectedChapter) return;
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setHostedCode(code);
+    await set(ref(db, `rooms/${code}`), { host: user.uid, sid: selectedSubject, lid: selectedChapter, questionLimit: quizLimit, createdAt: Date.now() });
+    playSound('click');
+    showToast("Room Created!", "success");
   };
 
   const joinRoom = async (codeOverride?: string) => {
-    let codeToJoin = codeOverride || roomCode;
-    if (!codeToJoin) return;
-    codeToJoin = codeToJoin.trim(); 
+    const codeToJoin = codeOverride || roomCode;
+    if (!user || !codeToJoin) return;
     
-    if (!user) return;
+    // Only play sound if manual click
     if (!codeOverride) playSound('click');
     
     const roomRef = ref(db, `rooms/${codeToJoin}`);
     const snapshot = await get(roomRef);
-    
     if (snapshot.exists()) {
-      const rData: Room = snapshot.val();
-      
-      // IF 4P MODE
-      if (rData.mode === '4p') {
-          // Robust check for players object
-          const players = rData.players || {};
-          
-          if (Object.keys(players).length >= 4 && !players[user.uid]) {
-              showAlert("Full", "Room is full (4/4)", "error");
-              return;
-          }
-          
-          // Already in? (Re-joining)
-          if (players[user.uid]) {
-              setHostedCode(codeToJoin);
-              setViewMode('4p');
-              return;
-          }
-
-          // Add self to lobby
-          await update(ref(db, `rooms/${codeToJoin}/players/${user.uid}`), {
-              name: profile?.name || 'Player',
-              avatar: profile?.avatar || ''
-          });
-          
-          // Guest Disconnect Logic: Remove Self Only
-          onDisconnect(ref(db, `rooms/${codeToJoin}/players/${user.uid}`)).remove();
-          
-          setHostedCode(codeToJoin);
-          setViewMode('4p');
-          showToast("Joined Lobby", "success");
-          return;
-      }
-
-      // EXISTING 1v1 LOGIC
+      const rData = snapshot.val();
       if (rData.host === user.uid) { showToast("Your Room", "error"); return; }
       
       const matchId = `match_${Date.now()}`;
+      
+      // FETCH SUBJECT NAME for Title
       let subjectTitle = 'Battle Arena';
       try {
           if(rData.sid) {
@@ -336,77 +253,56 @@ const LobbyPage: React.FC = () => {
           }
       } catch(e) {}
 
+      // ATOMIC UPDATE FOR JOINING ROOM
+      // This prevents race conditions where one user updates and the other fails/lags
       const updates: any = {};
-      updates[`rooms/${codeToJoin}`] = null; // Delete 1v1 room on join
+      
+      // 1. Delete Room
+      updates[`rooms/${codeToJoin}`] = null;
+      
+      // 2. Create Match
       updates[`matches/${matchId}`] = {
-        matchId, status: 'active', mode: 'custom', 
+        matchId, 
+        status: 'active', 
+        mode: 'custom', 
         questionLimit: rData.questionLimit || 10, 
-        turn: rData.host, currentQ: 0, answersCount: 0,
+        turn: rData.host, 
+        currentQ: 0, 
+        answersCount: 0,
         scores: { [rData.host]: 0, [user.uid]: 0 }, 
-        subject: rData.lid, subjectTitle: subjectTitle,
+        subject: rData.lid,
+        subjectTitle: subjectTitle,
         players: { 
-            [rData.host]: { name: 'Host', avatar: '' },
+            [rData.host]: { name: 'Host', avatar: '' }, // Avatars fetched in GamePage
             [user.uid]: { name: user.displayName, avatar: '' } 
-        }, createdAt: serverTimestamp()
+        },
+        createdAt: serverTimestamp()
       };
+      
+      // 3. Set Active Match (Redirects users via App.tsx listener)
       updates[`users/${rData.host}/activeMatch`] = matchId;
       updates[`users/${user.uid}/activeMatch`] = matchId;
-      if (rData.linkedChatPath) updates[rData.linkedChatPath + '/status'] = 'played';
 
-      try { await update(ref(db), updates); } 
-      catch(e) { showAlert("Error", "Failed to join room.", "error"); }
+      // 4. Update Chat Message if linked
+      if (rData.linkedChatPath) {
+          updates[rData.linkedChatPath + '/status'] = 'played';
+      }
+
+      try {
+          await update(ref(db), updates);
+      } catch(e) {
+          console.error("Join Room Error", e);
+          showAlert("Error", "Failed to join room.", "error");
+      }
       
     } else {
-        showAlert("Error", "Room not found or expired.", "error");
-        setRoomCode('');
+        if (!codeOverride) showToast("Invalid Code", "error");
+        // If auto-join failed, clear code
+        if (codeOverride) {
+            showAlert("Error", "Room not found or expired.", "error");
+            setRoomCode('');
+        }
     }
-  };
-
-  const start4PMatch = async (roomData: Room) => {
-      if (!user || !roomData.players) return;
-      const matchId = `match_${Date.now()}`;
-      
-      // Build Players Object & Scores
-      const matchPlayers: any = {};
-      const scores: any = {};
-      const responseTimes: any = {};
-      
-      Object.entries(roomData.players).forEach(([uid, pData]) => {
-          matchPlayers[uid] = { name: pData.name, avatar: pData.avatar };
-          scores[uid] = 0;
-          responseTimes[uid] = 0;
-      });
-
-      let subjectTitle = 'Squad Battle';
-      try {
-          if(roomData.sid) {
-             const sSnap = await get(ref(db, `subjects/${roomData.sid}`));
-             if(sSnap.exists()) subjectTitle = sSnap.val().name;
-          }
-      } catch(e) {}
-
-      const updates: any = {};
-      updates[`rooms/${roomData.code}`] = null; // Delete room when starting
-      updates[`matches/${matchId}`] = {
-          matchId,
-          status: 'active',
-          mode: '4p',
-          currentQ: 0,
-          questionLimit: roomData.questionLimit,
-          subject: roomData.lid,
-          subjectTitle,
-          players: matchPlayers,
-          scores,
-          totalResponseTime: responseTimes,
-          createdAt: serverTimestamp()
-      };
-
-      // Redirect all players
-      Object.keys(roomData.players).forEach(uid => {
-          updates[`users/${uid}/activeMatch`] = matchId;
-      });
-
-      await update(ref(db), updates);
   };
 
   const copyRoomCode = () => {
@@ -417,34 +313,17 @@ const LobbyPage: React.FC = () => {
       }
   };
 
-  // 1v1 Create Room Helper
-  const createRoom = async () => {
-      if(!user || !selectedChapter) return;
-      const code = Math.floor(1000 + Math.random() * 9000).toString();
-      
-      // Create room in DB first to avoid race condition with listener
-      await set(ref(db, `rooms/${code}`), { 
-          host: user.uid, 
-          sid: selectedSubject, 
-          lid: selectedChapter, 
-          questionLimit: quizLimit, 
-          createdAt: Date.now(), 
-          mode: '1v1' 
-      });
-      
-      // Add disconnect logic for 1v1
-      onDisconnect(ref(db, `rooms/${code}`)).remove();
-      
-      // Update state AFTER creation
-      setHostedCode(code);
-      
-      playSound('click');
-      showToast("Room Created!", "success");
-  };
+  useEffect(() => () => {
+     if (timerRef.current) clearTimeout(timerRef.current);
+     if (hostTimerRef.current) clearTimeout(hostTimerRef.current);
+     // Note: We do NOT remove hostedCode on unmount if navigating to Game, 
+     // but we should if navigating back. handled by handleBack.
+     if (queueKey && selectedChapter) remove(ref(db, `queue/${selectedChapter}/${queueKey}`));
+  }, [queueKey, selectedChapter]);
 
-  // UI HELPERS
-  const showSelectors = (viewMode === 'auto' && !isSearching) || (viewMode === 'custom' && customSubMode === 'create' && !hostedCode) || (viewMode === '4p' && customSubMode === 'create' && !hostedCode);
-  const pageTitle = viewMode === 'auto' ? 'Ranked Match' : viewMode === '4p' ? 'Squad Battle' : customSubMode === 'join' ? 'Join' : customSubMode === 'create' ? 'Create Room' : 'Private Mode';
+  // Determine if Subject/Chapter Selection should be shown
+  const showSelectors = (viewMode === 'auto' && !isSearching) || (viewMode === 'custom' && customSubMode === 'create' && !hostedCode);
+  const pageTitle = viewMode === 'auto' ? 'Ranked Match' : customSubMode === 'join' ? 'Join' : customSubMode === 'create' ? 'Create Room' : 'Private Mode';
 
   return (
     <div className="min-h-full flex flex-col p-4 pb-24 pt-24 max-w-4xl mx-auto w-full">
@@ -459,7 +338,7 @@ const LobbyPage: React.FC = () => {
           </div>
       )}
 
-      {/* Main Selection Header */}
+      {/* Main Selection Header - Fixed */}
       {viewMode === 'selection' && (
           <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 shadow-sm flex items-center gap-4 px-4 py-3 transition-colors duration-300">
                  <button onClick={() => navigate('/')} className="text-gray-600 dark:text-gray-300 hover:text-game-primary dark:hover:text-blue-400 transition-colors">
@@ -470,36 +349,27 @@ const LobbyPage: React.FC = () => {
       )}
 
       {viewMode === 'selection' && (
-        <div className="flex flex-col gap-4 animate__animated animate__fadeIn">
-             <div onClick={() => { playSound('click'); setViewMode('auto'); }} className="bg-game-primary rounded-3xl p-6 text-white relative overflow-hidden cursor-pointer shadow-xl shadow-indigo-500/30 group hover:scale-[1.02] transition-transform">
+        <div className="flex flex-col gap-6 animate__animated animate__fadeIn">
+             <div className="text-center mb-2">
+                <p className="text-slate-500 dark:text-slate-400 font-bold text-sm tracking-wide uppercase">Choose your path</p>
+             </div>
+
+             <div onClick={() => { playSound('click'); setViewMode('auto'); }} className="bg-game-primary rounded-3xl p-8 text-white relative overflow-hidden cursor-pointer shadow-xl shadow-indigo-500/30 group hover:scale-[1.02] transition-transform">
                  <div className="relative z-10">
-                     <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-black uppercase mb-3 inline-block">1 vs 1</span>
+                     <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-black uppercase mb-3 inline-block">Ranked</span>
                      <h2 className="text-3xl font-black italic">QUICK MATCH</h2>
-                     <p className="opacity-90 font-bold max-w-xs mt-2 text-xs">Find an opponent instantly.</p>
+                     <p className="opacity-90 font-bold max-w-xs mt-2">Find an opponent instantly and play for points.</p>
                  </div>
-                 <i className="fas fa-bolt text-8xl absolute -right-4 -bottom-6 opacity-20 rotate-12 group-hover:scale-110 transition-transform"></i>
+                 <i className="fas fa-bolt text-9xl absolute -right-4 -bottom-8 opacity-20 rotate-12 group-hover:scale-110 transition-transform"></i>
              </div>
 
-             <div onClick={() => { playSound('click'); setViewMode('custom'); setCustomSubMode('menu'); }} className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-3xl p-6 relative overflow-hidden cursor-pointer shadow-lg group hover:scale-[1.02] transition-transform">
+             <div onClick={() => { playSound('click'); setViewMode('custom'); setCustomSubMode('menu'); }} className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-3xl p-8 relative overflow-hidden cursor-pointer shadow-lg group hover:scale-[1.02] transition-transform">
                  <div className="relative z-10">
-                     <span className="bg-game-accent text-white px-3 py-1 rounded-full text-xs font-black uppercase mb-3 inline-block">1 vs 1</span>
-                     <h2 className="text-3xl font-black italic text-slate-800 dark:text-white">PRIVATE DUEL</h2>
-                     <p className="text-slate-500 dark:text-slate-400 font-bold max-w-xs mt-2 text-xs">Challenge a friend with a code.</p>
+                     <span className="bg-game-accent text-white px-3 py-1 rounded-full text-xs font-black uppercase mb-3 inline-block">Custom</span>
+                     <h2 className="text-3xl font-black italic text-slate-800 dark:text-white">PRIVATE ROOM</h2>
+                     <p className="text-slate-500 dark:text-slate-400 font-bold max-w-xs mt-2">Create a lobby code or join a friend's game.</p>
                  </div>
-                 <i className="fas fa-user-friends text-8xl absolute -right-4 -bottom-6 text-slate-100 dark:text-slate-700 rotate-12 group-hover:scale-110 transition-transform"></i>
-             </div>
-
-             {/* NEW 4P MODE - COMING SOON */}
-             <div onClick={() => { playSound('click'); showToast("Coming Soon!", "info"); }} className="bg-slate-100 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-3xl p-6 relative overflow-hidden cursor-not-allowed opacity-80">
-                 <div className="relative z-10 opacity-50 grayscale">
-                     <span className="bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-3 py-1 rounded-full text-xs font-black uppercase mb-3 inline-block">4 Players</span>
-                     <h2 className="text-3xl font-black italic text-slate-400 dark:text-slate-500">SQUAD BATTLE</h2>
-                     <p className="text-slate-400 dark:text-slate-500 font-bold max-w-xs mt-2 text-xs">4-Player Free For All. Fastest wins.</p>
-                 </div>
-                 <div className="absolute inset-0 flex items-center justify-center z-20">
-                     <span className="bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-widest text-sm shadow-lg transform -rotate-6">Coming Soon</span>
-                 </div>
-                 <i className="fas fa-users text-8xl absolute -right-4 -bottom-6 opacity-10 rotate-12 grayscale"></i>
+                 <i className="fas fa-key text-9xl absolute -right-4 -bottom-8 text-slate-100 dark:text-slate-700 rotate-12 group-hover:scale-110 transition-transform"></i>
              </div>
         </div>
       )}
@@ -507,136 +377,7 @@ const LobbyPage: React.FC = () => {
       {viewMode !== 'selection' && (
           <div className="animate__animated animate__fadeInRight">
               
-              {/* 4P LOBBY WAITING ROOM */}
-              {viewMode === '4p' && hostedCode && (
-                  <Card className="text-center py-8 animate__animated animate__zoomIn border-4 border-purple-500 !bg-slate-50 dark:!bg-slate-900">
-                      <div className="inline-block bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-4 py-1 rounded-full text-xs font-black uppercase mb-4 animate-pulse">
-                          Waiting for players ({Object.keys(lobbyPlayers).length}/4)
-                      </div>
-                      
-                      <div onClick={copyRoomCode} className="bg-white dark:bg-black p-6 rounded-3xl mb-8 relative cursor-pointer group border-4 border-dashed border-slate-300 dark:border-slate-700 mx-auto max-w-xs hover:border-purple-500 transition-colors">
-                         <div className="text-6xl font-black text-slate-800 dark:text-white tracking-[0.1em]">{hostedCode}</div>
-                         <div className="absolute bottom-2 w-full left-0 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tap Code to Copy</div>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 px-4">
-                          {Array.from({length: 4}).map((_, i) => {
-                              const pIds = Object.keys(lobbyPlayers);
-                              const player = pIds[i] ? lobbyPlayers[pIds[i]] : null;
-                              return (
-                                  <div key={i} className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all ${player ? 'bg-white dark:bg-slate-800 border-purple-500 scale-105 shadow-lg' : 'border-slate-200 dark:border-slate-700 border-dashed opacity-50'}`}>
-                                      {player ? (
-                                          <>
-                                            <Avatar src={player.avatar} size="md" className="mb-2" />
-                                            <span className="font-bold text-xs truncate w-full">{player.name}</span>
-                                          </>
-                                      ) : (
-                                          <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-2 animate-pulse">
-                                              <i className="fas fa-plus text-slate-400"></i>
-                                          </div>
-                                      )}
-                                  </div>
-                              );
-                          })}
-                      </div>
-
-                      {user && lobbyPlayers[user.uid] && (Object.keys(lobbyPlayers)[0] === user.uid || lobbyPlayers[user.uid].name === (profile?.name || 'Host')) ? (
-                          <Button 
-                            fullWidth 
-                            size="lg" 
-                            onClick={() => start4PMatch({ code: hostedCode, players: lobbyPlayers, questionLimit: quizLimit, sid: selectedSubject, lid: selectedChapter, host: user.uid, createdAt: 0 })}
-                            disabled={Object.keys(lobbyPlayers).length < 2}
-                            className="bg-purple-600 hover:bg-purple-700 border-purple-800"
-                          >
-                              {Object.keys(lobbyPlayers).length < 2 ? 'Need 2+ Players' : 'START BATTLE'}
-                          </Button>
-                      ) : (
-                          <div className="text-slate-500 dark:text-slate-400 font-bold text-sm animate-pulse">
-                              Waiting for host to start...
-                          </div>
-                      )}
-                  </Card>
-              )}
-
-              {/* 1v1 HOST WAITING UI */}
-              {hostedCode && viewMode === 'custom' && (
-                  <Card className="text-center py-10 animate__animated animate__zoomIn border-4 border-game-accent">
-                      <h3 className="text-xl font-black text-slate-500 dark:text-slate-400 mb-4 uppercase">Room Code</h3>
-                      <div onClick={copyRoomCode} className="bg-slate-100 dark:bg-slate-900 p-6 rounded-3xl mb-6 relative cursor-pointer group hover:bg-slate-200 dark:hover:bg-black transition-colors border-4 border-dashed border-slate-300 dark:border-slate-700">
-                         <div className="text-6xl font-black text-game-primary tracking-[0.2em]">{hostedCode}</div>
-                         <div className="absolute bottom-2 w-full left-0 text-[10px] text-slate-400 font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">Tap to Copy</div>
-                      </div>
-                      <div className="flex items-center justify-center gap-2 mb-8">
-                         <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                         <p className="text-slate-500 dark:text-slate-300 font-bold">Waiting for opponent to join...</p>
-                      </div>
-                      <Button variant="danger" fullWidth onClick={handleBack}>CANCEL ROOM</Button>
-                  </Card>
-              )}
-
-              {/* SHARED: MENU SELECTION (JOIN/CREATE) */}
-              {(viewMode === 'custom' || viewMode === '4p') && customSubMode === 'menu' && !hostedCode && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 animate__animated animate__fadeInUp">
-                      <div onClick={() => { playSound('click'); setCustomSubMode('join'); }} className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 p-6 rounded-[2rem] cursor-pointer hover:border-game-primary group transition-all shadow-sm hover:shadow-xl relative overflow-hidden">
-                          <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-game-primary flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform"><i className="fas fa-door-open"></i></div>
-                          <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase italic">Join Room</h3>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-2">Enter code to join.</p>
-                      </div>
-                      <div onClick={() => { playSound('click'); setCustomSubMode('create'); }} className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 p-6 rounded-[2rem] cursor-pointer hover:border-purple-500 group transition-all shadow-sm hover:shadow-xl relative overflow-hidden">
-                          <div className="w-14 h-14 rounded-2xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform"><i className="fas fa-plus"></i></div>
-                          <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase italic">Create Room</h3>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-2">Host a new game.</p>
-                      </div>
-                  </div>
-              )}
-
-              {/* SHARED: JOIN INPUT */}
-              {(viewMode === 'custom' || viewMode === '4p') && customSubMode === 'join' && !hostedCode && (
-                  <div className="max-w-md mx-auto mt-8 animate__animated animate__fadeInUp">
-                      <Card className="!p-8 text-center bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700">
-                          <h3 className="text-xl font-black text-slate-800 dark:text-white mb-6 uppercase">Enter Room Code</h3>
-                          <input value={roomCode} onChange={e => setRoomCode(e.target.value)} placeholder="0000" className="w-full bg-slate-100 dark:bg-slate-900 border-4 border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-4 text-center font-black uppercase text-4xl text-slate-900 dark:text-white focus:border-game-primary focus:outline-none transition-all mb-6 tracking-[0.5em]" maxLength={4} type="tel"/>
-                          <Button fullWidth size="lg" onClick={() => joinRoom()} disabled={roomCode.length !== 4} className="shadow-xl">Join</Button>
-                      </Card>
-                  </div>
-              )}
-
-              {/* SELECTORS FOR CREATE & AUTO */}
-              {showSelectors && (
-                    <div className="space-y-6 animate__animated animate__fadeInUp">
-                        <div className="grid grid-cols-1 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 ml-1">Subject</label>
-                                <div className="relative">
-                                    <select value={selectedSubject} onChange={(e) => { setSelectedSubject(e.target.value); playSound('click'); }} className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-white appearance-none cursor-pointer focus:border-game-primary shadow-sm">
-                                        <option value="">-- Choose Subject --</option>
-                                        {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                    </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500"><i className="fas fa-chevron-down"></i></div>
-                                </div>
-                            </div>
-                            <div className={!selectedSubject ? 'opacity-50 pointer-events-none' : ''}>
-                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 ml-1">Chapter</label>
-                                <div className="relative">
-                                    <select value={selectedChapter} onChange={(e) => { setSelectedChapter(e.target.value); playSound('click'); }} className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-white appearance-none cursor-pointer focus:border-game-primary shadow-sm" disabled={!selectedSubject}>
-                                        <option value="">-- Choose Chapter --</option>
-                                        {chapters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500"><i className="fas fa-chevron-down"></i></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {viewMode === 'auto' ? (
-                            <Button fullWidth size="lg" onClick={handleAutoMatch} disabled={!selectedChapter} className="shadow-xl">FIND MATCH</Button>
-                        ) : viewMode === '4p' ? (
-                            <Button fullWidth size="lg" onClick={create4PRoom} disabled={!selectedChapter} className="shadow-xl bg-purple-600 border-purple-800 hover:bg-purple-700">CREATE SQUAD ROOM</Button>
-                        ) : (
-                            <Button fullWidth size="lg" onClick={createRoom} disabled={!selectedChapter} className="shadow-xl bg-indigo-600 border-indigo-800 hover:bg-indigo-700">CREATE DUEL ROOM</Button>
-                        )}
-                    </div>
-              )}
-              
+              {/* AUTO MATCH SEARCHING UI */}
               {viewMode === 'auto' && isSearching && (
                  <div className="flex flex-col items-center justify-center py-20">
                      <div className="w-32 h-32 relative mb-8">
@@ -648,6 +389,141 @@ const LobbyPage: React.FC = () => {
                      <h3 className="text-2xl font-black text-slate-800 dark:text-white animate-pulse mb-2">{matchStatus}</h3>
                      <Button variant="danger" onClick={cancelSearch}>Cancel</Button>
                  </div>
+              )}
+
+              {/* HOSTED ROOM WAITING UI */}
+              {hostedCode && (
+                  <Card className="text-center py-10 animate__animated animate__zoomIn border-4 border-game-accent">
+                      <h3 className="text-xl font-black text-slate-500 dark:text-slate-400 mb-4 uppercase">Room Code</h3>
+                      <div 
+                        onClick={copyRoomCode}
+                        className="bg-slate-100 dark:bg-slate-900 p-6 rounded-3xl mb-6 relative cursor-pointer group hover:bg-slate-200 dark:hover:bg-black transition-colors border-4 border-dashed border-slate-300 dark:border-slate-700"
+                      >
+                         <div className="text-6xl font-black text-game-primary tracking-[0.2em]">{hostedCode}</div>
+                         <div className="absolute top-2 right-2 text-slate-400 group-hover:text-game-primary transition-colors">
+                             <i className="fas fa-copy text-xl"></i>
+                         </div>
+                         <div className="absolute bottom-2 w-full left-0 text-[10px] text-slate-400 font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">Tap to Copy</div>
+                      </div>
+                      
+                      <div className="flex items-center justify-center gap-2 mb-8">
+                         <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                         <p className="text-slate-500 dark:text-slate-300 font-bold">Waiting for opponent to join...</p>
+                      </div>
+                      
+                      <Button variant="danger" fullWidth onClick={handleBack}>
+                          CANCEL ROOM
+                      </Button>
+                  </Card>
+              )}
+
+              {/* PRIVATE MENU SELECTION */}
+              {viewMode === 'custom' && customSubMode === 'menu' && !hostedCode && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 animate__animated animate__fadeInUp">
+                      <div 
+                        onClick={() => { playSound('click'); setCustomSubMode('join'); }}
+                        className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 p-6 rounded-[2rem] cursor-pointer hover:border-game-primary dark:hover:border-game-primary group transition-all shadow-sm hover:shadow-xl relative overflow-hidden"
+                      >
+                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                              <i className="fas fa-search text-8xl text-game-primary transform rotate-12"></i>
+                          </div>
+                          <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-game-primary flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                              <i className="fas fa-door-open"></i>
+                          </div>
+                          <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase italic">Join Room</h3>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-2">
+                              Have a code? Enter it here to join your friend's lobby.
+                          </p>
+                      </div>
+
+                      <div 
+                        onClick={() => { playSound('click'); setCustomSubMode('create'); }}
+                        className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 p-6 rounded-[2rem] cursor-pointer hover:border-purple-500 dark:hover:border-purple-400 group transition-all shadow-sm hover:shadow-xl relative overflow-hidden"
+                      >
+                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                              <i className="fas fa-crown text-8xl text-purple-500 transform -rotate-12"></i>
+                          </div>
+                          <div className="w-14 h-14 rounded-2xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                              <i className="fas fa-plus"></i>
+                          </div>
+                          <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase italic">Create Room</h3>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mt-2">
+                              Create a new private lobby and invite your friends to battle.
+                          </p>
+                      </div>
+                  </div>
+              )}
+
+              {/* JOIN ROOM INPUT UI */}
+              {viewMode === 'custom' && customSubMode === 'join' && !hostedCode && (
+                  <div className="max-w-md mx-auto mt-8 animate__animated animate__fadeInUp">
+                      <Card className="!p-8 text-center bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700">
+                          <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 text-game-primary rounded-full flex items-center justify-center mx-auto mb-6 text-2xl">
+                             <i className="fas fa-key"></i>
+                          </div>
+                          <h3 className="text-xl font-black text-slate-800 dark:text-white mb-6 uppercase">Enter Room Code</h3>
+                          <input 
+                              value={roomCode} 
+                              onChange={e => setRoomCode(e.target.value)} 
+                              placeholder="0000" 
+                              className="w-full bg-slate-100 dark:bg-slate-900 border-4 border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-4 text-center font-black uppercase text-4xl text-slate-900 dark:text-white placeholder-slate-300 focus:border-game-primary focus:outline-none transition-all mb-6 tracking-[0.5em]" 
+                              maxLength={4} 
+                              type="tel"
+                          />
+                          <Button fullWidth size="lg" onClick={() => joinRoom()} disabled={roomCode.length !== 4} className="shadow-xl">
+                              Join
+                          </Button>
+                      </Card>
+                  </div>
+              )}
+
+              {/* SUBJECT & CHAPTER SELECTORS (Shared by Auto & Create) */}
+              {showSelectors && (
+                    <div className="space-y-6 animate__animated animate__fadeInUp">
+                        {/* Redesigned Dropdowns */}
+                        <div className="grid grid-cols-1 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 ml-1">Subject</label>
+                                <div className="relative">
+                                    <select 
+                                        value={selectedSubject} 
+                                        onChange={(e) => { setSelectedSubject(e.target.value); playSound('click'); }}
+                                        className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-white appearance-none cursor-pointer focus:border-game-primary focus:ring-4 focus:ring-game-primary/20 transition-all shadow-sm"
+                                    >
+                                        <option value="">-- Choose Subject --</option>
+                                        {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                                        <i className="fas fa-chevron-down"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className={!selectedSubject ? 'opacity-50 pointer-events-none' : ''}>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 ml-1">Chapter</label>
+                                <div className="relative">
+                                    <select 
+                                        value={selectedChapter} 
+                                        onChange={(e) => { setSelectedChapter(e.target.value); playSound('click'); }}
+                                        className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-white appearance-none cursor-pointer focus:border-game-primary focus:ring-4 focus:ring-game-primary/20 transition-all shadow-sm"
+                                        disabled={!selectedSubject}
+                                    >
+                                        <option value="">-- Choose Chapter --</option>
+                                        {chapters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                                        <i className="fas fa-chevron-down"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {viewMode === 'auto' ? (
+                            <Button fullWidth size="lg" onClick={handleAutoMatch} disabled={!selectedChapter} className="shadow-xl">FIND MATCH</Button>
+                        ) : (
+                            <Button fullWidth size="lg" onClick={createRoom} disabled={!selectedChapter} className="shadow-xl bg-purple-600 border-purple-800 hover:bg-purple-700">CREATE ROOM</Button>
+                        )}
+                    </div>
               )}
           </div>
       )}

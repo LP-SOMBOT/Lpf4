@@ -61,23 +61,13 @@ export interface MatchReaction {
 export interface MatchState {
   matchId: string;
   status: 'active' | 'completed' | 'cancelled';
-  mode: 'auto' | 'custom' | '4p'; // Added 4p
-  turn?: string; // 1v1 Only
+  mode: 'auto' | 'custom';
+  turn: string; // uid of current player
   currentQ: number; // index of DEMO_DATA
-  answersCount?: number; // 1v1 Only
-  
-  // 4P Specific: Track who answered current Q
-  currentAnswers?: { [uid: string]: boolean }; 
-  
+  answersCount?: number; // 0 = 1st player needs to answer, 1 = 2nd player needs to answer
   scores: {
     [uid: string]: number;
   };
-  
-  // Tie-breaker for 4P
-  totalResponseTime?: {
-      [uid: string]: number; 
-  };
-
   players: {
     [uid: string]: {
       name: string;
@@ -85,44 +75,36 @@ export interface MatchState {
       level?: number;
       status?: 'online' | 'offline';
       lastSeen?: number;
-      isSpeaking?: boolean; 
+      isSpeaking?: boolean; // New field for PTT visualization
     }
   };
   winner?: string | null; // 'draw', 'disconnect', or uid
   subject: string;
-  subjectTitle?: string; 
-  questionLimit?: number; 
+  subjectTitle?: string; // Friendly Name of the subject (e.g. Mathematics)
+  questionLimit?: number; // Total quizzes to play
   lastReaction?: MatchReaction;
 }
 
 export interface Room {
   host: string;
   sid: string; // Subject ID
-  lid: string; // Chapter ID 
+  lid: string; // Chapter ID (lid was used in LobbyPage)
   code: string;
-  mode?: '1v1' | '4p';
   questionLimit: number;
   createdAt: number;
   linkedChatPath?: string;
-  // Track players in Lobby for 4P
-  players?: {
-      [uid: string]: {
-          name: string;
-          avatar: string;
-      }
-  }
 }
 
 export interface ChatMessage {
   id: string;
-  tempId?: string; 
-  chatId?: string; 
+  tempId?: string; // For local optimistic updates
+  chatId?: string; // Used for indexing in local cache
   sender: string;
   text: string;
   timestamp: number;
-  type?: 'text' | 'invite'; 
-  msgStatus?: 'sending' | 'sent' | 'delivered' | 'read'; 
-  inviteCode?: string; 
-  subjectName?: string; 
-  status?: 'waiting' | 'played' | 'canceled' | 'expired';
+  type?: 'text' | 'invite'; // Invite for match
+  msgStatus?: 'sending' | 'sent' | 'delivered' | 'read'; // Added 'sending'
+  inviteCode?: string; // Room code if type is invite
+  subjectName?: string; // Subject name for the invite
+  status?: 'waiting' | 'played' | 'canceled';
 }
