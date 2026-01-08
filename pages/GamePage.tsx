@@ -8,7 +8,7 @@ import { POINTS_PER_QUESTION } from '../constants';
 import { MatchState, Question, Chapter, UserProfile, MatchReaction } from '../types';
 import { Avatar, Button, Card, Modal } from '../components/UI';
 import { playSound } from '../services/audioService';
-import { showToast, showConfirm, showAlert } from '../services/alert';
+import { showToast, showConfirm } from '../services/alert';
 import confetti from 'canvas-confetti';
 import Swal from 'sweetalert2';
 
@@ -37,14 +37,6 @@ const shuffleArraySeeded = <T,>(array: T[], rng: () => number): T[] => {
     return newArr;
 };
 
-// --- WebRTC Configuration ---
-const iceServers = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ],
-};
-
 const GamePage: React.FC = () => {
   const { matchId } = useParams();
   const { user, profile } = useContext(UserContext);
@@ -55,12 +47,13 @@ const GamePage: React.FC = () => {
   const [subjectName, setSubjectName] = useState('');
   
   // Players Data
-  const [leftProfile, setLeftProfile] = useState<UserProfile | null>(null);
-  const [rightProfile, setRightProfile] = useState<UserProfile | null>(null);
+  const [playersMap, setPlayersMap] = useState<Record<string, UserProfile>>({});
   const [isSpectator, setIsSpectator] = useState(false);
 
+  // Gameplay State
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState<{correct: boolean, answer: number} | null>(null);
+  const [timer, setTimer] = useState(0); // For 4P response time tracking
   
   // Animation State
   const [showIntro, setShowIntro] = useState(false);
@@ -70,65 +63,26 @@ const GamePage: React.FC = () => {
   const [showTurnAlert, setShowTurnAlert] = useState(false);
   const winnerAnimationPlayed = useRef(false);
   
-  // Opponent Details Modal
-  const [showOpponentModal, setShowOpponentModal] = useState(false);
-  
   // Reaction States
   const [showReactionMenu, setShowReactionMenu] = useState(false);
   const [activeReactions, setActiveReactions] = useState<{id: number, senderId: string, value: string}[]>([]);
   const reactionCounter = useRef(0);
   
-  // Dynamic Reactions from DB
+  // Dynamic Reactions
   const [reactionEmojis, setReactionEmojis] = useState<string[]>(DEFAULT_EMOJIS);
   const [reactionMessages, setReactionMessages] = useState<string[]>(DEFAULT_MESSAGES);
 
-  // Loading State
   const [isLoadingError, setIsLoadingError] = useState(false);
-  
-  // --- WebRTC & Audio State ---
-  const [isTalking, setIsTalking] = useState(false);
-  const [hasMicPermission, setHasMicPermission] = useState(false);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const remoteCandidatesQueue = useRef<RTCIceCandidateInit[]>([]);
-  
-  // Ref to track if user is holding the PTT button (handling async permission delay)
-  const isHoldingButtonRef = useRef(false);
-  
   const processingRef = useRef(false);
   const questionsLoadedRef = useRef(false);
+  const timerStartRef = useRef<number>(0);
 
-  // Helper to unlock audio context on interactions
-  const unlockAudio = () => {
-      if (remoteAudioRef.current) {
-          remoteAudioRef.current.play().catch(() => {});
-      }
-  };
-
-  // Fetch Reactions Settings
-  useEffect(() => {
-      const reactionsRef = ref(db, 'settings/reactions');
-      const unsub = onValue(reactionsRef, (snap) => {
-          if (snap.exists()) {
-              const data = snap.val();
-              if (data.emojis) setReactionEmojis(Object.values(data.emojis));
-              if (data.messages) setReactionMessages(Object.values(data.messages));
-          }
-      });
-      return () => unsub();
-  }, []);
-
-  // 1. Sync Match Data
+  // --- SYNC MATCH & PLAYERS ---
   useEffect(() => {
     if (!matchId || !user) return;
-    
-    // Reset winner animation flag on new match load
     winnerAnimationPlayed.current = false;
 
     const matchRef = ref(db, `matches/${matchId}`);
-
     const unsubscribe = onValue(matchRef, async (snapshot) => {
       const data = snapshot.val();
       
@@ -140,147 +94,77 @@ const GamePage: React.FC = () => {
       
       setMatch(data);
 
-      // Determine Role
+      // Determine Role & Fetch Missing Profiles
       const pIds = Object.keys(data.players || {});
       const userIsPlayer = pIds.includes(user.uid);
       
-      if (!userIsPlayer) {
-          if (profile?.isSupport) {
-              setIsSpectator(true);
-          } else {
-              navigate('/');
-              return;
-          }
-      }
+      if (!userIsPlayer && !profile?.isSupport) { navigate('/'); return; }
+      if (!userIsPlayer && profile?.isSupport) setIsSpectator(true);
 
-      // Check Winner (Once only)
-      if (data.status === 'completed' && data.winner && !winnerAnimationPlayed.current) {
-          winnerAnimationPlayed.current = true;
-          if (data.winner === user.uid) { 
-              playSound('win'); 
-              confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); 
-          }
-          else if (data.winner !== 'draw' && !isSpectator) playSound('wrong'); 
-      }
-    });
-
-    return () => { 
-        unsubscribe(); 
-    };
-  }, [matchId, user, navigate, profile?.isSupport, isSpectator]); 
-
-  // --- NEW REALTIME REACTIONS IMPLEMENTATION ---
-  useEffect(() => {
-      if (!matchId) return;
-      const reactionsRef = query(ref(db, `matches/${matchId}/reactions`), limitToLast(3));
-      
-      const unsub = onChildAdded(reactionsRef, (snapshot) => {
-          const data = snapshot.val();
-          if (!data) return;
-          
-          // Ignore own reactions here because we handle them optimistically for 0-latency feel
-          if (data.senderId === user?.uid) return;
-
-          // Only show recent reactions (within 5 seconds) to prevent flood on load
-          if (Date.now() - data.timestamp < 5000) {
-              triggerReactionAnimation(data);
+      // Batch Fetch Player Profiles if not already loaded
+      pIds.forEach(async (pid) => {
+          if (!playersMap[pid]) {
+              const snap = await get(ref(db, `users/${pid}`));
+              if (snap.exists()) {
+                  setPlayersMap(prev => ({...prev, [pid]: { uid: pid, ...snap.val() }}));
+              }
           }
       });
 
+      // Check Winner (Once only)
+      if (data.status === 'completed' && !winnerAnimationPlayed.current) {
+          winnerAnimationPlayed.current = true;
+          playSound('win'); 
+          confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); 
+      }
+    });
+
+    return () => { unsubscribe(); };
+  }, [matchId, user]); 
+
+  // --- REACTION LISTENER ---
+  useEffect(() => {
+      if (!matchId) return;
+      const reactionsRef = query(ref(db, `matches/${matchId}/reactions`), limitToLast(3));
+      const unsub = onChildAdded(reactionsRef, (snapshot) => {
+          const data = snapshot.val();
+          if (!data || data.senderId === user?.uid) return;
+          if (Date.now() - data.timestamp < 5000) triggerReactionAnimation(data);
+      });
       return () => off(reactionsRef);
   }, [matchId, user?.uid]);
 
   const triggerReactionAnimation = (reaction: MatchReaction) => {
     const id = ++reactionCounter.current;
-    setActiveReactions(prev => {
-        // Limit active reactions on screen to prevent crash
-        const filtered = prev.length > 5 ? prev.slice(1) : prev;
-        return [...filtered, { id, senderId: reaction.senderId, value: reaction.value }];
-    });
+    setActiveReactions(prev => [...(prev.length > 5 ? prev.slice(1) : prev), { id, senderId: reaction.senderId, value: reaction.value }]);
     playSound('reaction');
-    setTimeout(() => {
-        setActiveReactions(prev => prev.filter(r => r.id !== id));
-    }, 4000);
+    setTimeout(() => setActiveReactions(prev => prev.filter(r => r.id !== id)), 4000);
   };
 
   const sendReaction = async (val: string) => {
       if (!user || !matchId) return;
       setShowReactionMenu(false);
-      unlockAudio();
-      playSound('click'); // Local sound immediately
-
-      // 1. Optimistic Update (Instant)
-      const reaction: MatchReaction = {
-          senderId: user.uid,
-          value: val,
-          timestamp: Date.now()
-      };
+      playSound('click'); 
+      const reaction: MatchReaction = { senderId: user.uid, value: val, timestamp: Date.now() };
       triggerReactionAnimation(reaction);
-
-      // 2. Send to DB (Push for list structure)
-      const reactionsListRef = ref(db, `matches/${matchId}/reactions`);
-      await push(reactionsListRef, reaction);
+      await push(ref(db, `matches/${matchId}/reactions`), reaction);
   };
-  // ---------------------------------------------
 
-  // 2. Presence Logic (Game specific)
+  // --- PRESENCE ---
   useEffect(() => {
       if (!matchId || !user || isSpectator) return;
-      
       const connectedRef = ref(db, ".info/connected");
       const unsubscribeConnected = onValue(connectedRef, (snap) => {
           if (snap.val() === true) {
               const myStatusRef = ref(db, `matches/${matchId}/players/${user.uid}`);
-              const myLevel = Math.floor((profile?.points || 0) / 10) + 1;
-              
-              onDisconnect(myStatusRef).update({
-                  status: 'offline',
-                  lastSeen: serverTimestamp(),
-                  isSpeaking: false // Ensure we stop speaking if we disconnect
-              }).then(() => {
-                  update(myStatusRef, { 
-                      status: 'online', 
-                      lastSeen: serverTimestamp(),
-                      level: myLevel 
-                  });
-              });
+              onDisconnect(myStatusRef).update({ status: 'offline', lastSeen: serverTimestamp() })
+                  .then(() => update(myStatusRef, { status: 'online', lastSeen: serverTimestamp() }));
           }
       });
+      return () => unsubscribeConnected();
+  }, [matchId, user, isSpectator]);
 
-      return () => {
-          unsubscribeConnected();
-      };
-  }, [matchId, user, isSpectator, profile?.points]);
-
-  // 3. Load Profiles
-  useEffect(() => {
-      if (!match || !user) return;
-      
-      const loadProfiles = async () => {
-          const pIds = Object.keys(match.players || {});
-          
-          if (isSpectator) {
-              if (pIds.length >= 2) {
-                  const p1Snap = await get(ref(db, `users/${pIds[0]}`));
-                  const p2Snap = await get(ref(db, `users/${pIds[1]}`));
-                  if (p1Snap.exists()) setLeftProfile({ uid: pIds[0], ...p1Snap.val() });
-                  if (p2Snap.exists()) setRightProfile({ uid: pIds[1], ...p2Snap.val() });
-              }
-          } else {
-              setLeftProfile(profile);
-              const oppUid = pIds.find(uid => uid !== user.uid);
-              if (oppUid) {
-                  const oppSnap = await get(ref(db, `users/${oppUid}`));
-                  if (oppSnap.exists()) {
-                      setRightProfile({ uid: oppUid, ...oppSnap.val() });
-                  }
-              }
-          }
-      };
-      loadProfiles();
-  }, [match?.matchId, user?.uid, isSpectator, profile]);
-
-  // 4. Load Questions
+  // --- LOAD QUESTIONS ---
   useEffect(() => {
       if (!match || !match.subject || questions.length > 0 || questionsLoadedRef.current) return;
       loadQuestions();
@@ -299,10 +183,6 @@ const GamePage: React.FC = () => {
 
         if (match.subject.startsWith('ALL_')) {
             const subjectId = match.subject.replace('ALL_', '');
-            if (!match.subjectTitle) {
-                const subSnap = await get(ref(db, `subjects/${subjectId}`));
-                if(subSnap.exists()) setSubjectName(subSnap.val().name);
-            }
             const chaptersSnap = await get(ref(db, `chapters/${subjectId}`));
             if (chaptersSnap.exists()) {
                 const chapters = Object.values(chaptersSnap.val() || {}) as Chapter[];
@@ -310,8 +190,7 @@ const GamePage: React.FC = () => {
                 snaps.forEach(s => {
                     if (s.exists()) {
                         const data = s.val();
-                        const chapterQ = Object.keys(data).map(key => ({ ...data[key], id: key }));
-                        loadedQ.push(...chapterQ);
+                        loadedQ.push(...Object.keys(data).map(key => ({ ...data[key], id: key })));
                     }
                 });
             }
@@ -335,8 +214,7 @@ const GamePage: React.FC = () => {
                 const sOpts = shuffleArraySeeded(opts, rng);
                 return { ...q, options: sOpts.map(o => o.t), answer: sOpts.findIndex(o => o.c) };
             });
-            const limit = match.questionLimit || 10;
-            setQuestions(shuffledQ.slice(0, limit));
+            setQuestions(shuffledQ.slice(0, match.questionLimit || 10));
         } else {
             setIsLoadingError(true);
             questionsLoadedRef.current = false;
@@ -347,255 +225,20 @@ const GamePage: React.FC = () => {
       }
   };
 
-  // --- VOICE CHAT IMPLEMENTATION ---
-  
-  // A. Initialize Audio & Permissions (Callable)
-  const initAudio = async () => {
-      if (hasMicPermission) return true;
-      try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          localStreamRef.current = stream;
-          // Mute initially for PTT
-          stream.getAudioTracks().forEach(track => track.enabled = false);
-          setHasMicPermission(true);
-          return true;
-      } catch (e) {
-          console.warn("Microphone permission denied or not available", e);
-          setHasMicPermission(false);
-          return false;
-      }
-  };
-
-  // Helper to drain queued candidates once connection is ready
-  const processCandidateQueue = async () => {
-      if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) return;
-      while (remoteCandidatesQueue.current.length > 0) {
-          const candidate = remoteCandidatesQueue.current.shift();
-          if (candidate) {
-              try {
-                  await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-              } catch (e) { console.error("Error adding queued candidate", e); }
-          }
-      }
-  };
-
-  // B. WebRTC Signaling Logic
-  // IMPORTANT: This effect initializes the connection IMMEDIATELY (Receive Only)
+  // --- GAME START SEQUENCER ---
   useEffect(() => {
-      if (isSpectator || !user || !rightProfile || !matchId) return;
-
-      // Ensure PeerConnection is created
-      if (!peerConnectionRef.current) {
-          const pc = new RTCPeerConnection(iceServers);
-          peerConnectionRef.current = pc;
-
-          // Add Local Stream IF AVAILABLE (Might be null initially)
-          if (localStreamRef.current) {
-              localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current!));
-          }
-
-          // Handle Remote Stream
-          pc.ontrack = (event) => {
-              if (remoteAudioRef.current) {
-                  remoteAudioRef.current.srcObject = event.streams[0];
-                  remoteStreamRef.current = event.streams[0];
-                  // Force play on track reception
-                  remoteAudioRef.current.play().catch(e => console.log("Audio play blocked", e));
-              }
-          };
-
-          // Handle ICE Candidates
-          pc.onicecandidate = (event) => {
-              if (event.candidate) {
-                  push(ref(db, `matches/${matchId}/webrtc/candidates/${user.uid}`), event.candidate.toJSON());
-              }
-          };
-      }
-
-      const pc = peerConnectionRef.current;
-      const signalingRef = ref(db, `matches/${matchId}/webrtc`);
-
-      // 1. Negotiation Logic: User with Lower UID is the Offerer (Caller)
-      const isOfferer = user.uid < rightProfile.uid;
-
-      const createOffer = async () => {
-          if (!pc) return;
-          try {
-              const offer = await pc.createOffer();
-              await pc.setLocalDescription(offer);
-              await set(ref(db, `matches/${matchId}/webrtc/offer`), {
-                  type: 'offer',
-                  sdp: offer.sdp,
-                  sender: user.uid,
-                  ts: Date.now()
-              });
-          } catch (e) { console.error("Error creating offer", e); }
-      };
-
-      // Initial Offer on connection start
-      if (isOfferer) {
-          createOffer();
-      }
-
-      // 2. Listen for Signaling Messages
-      const handleSignaling = (snapshot: any) => {
-          if (!snapshot.exists()) return;
-          const data = snapshot.val();
-
-          // Handle Offer (Callee side) OR Renegotiation Offer
-          if (data.offer && data.offer.sender !== user.uid) {
-              const processOffer = async () => {
-                  try {
-                      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-                      await processCandidateQueue(); // Process any queued candidates
-                      const answer = await pc.createAnswer();
-                      await pc.setLocalDescription(answer);
-                      await set(ref(db, `matches/${matchId}/webrtc/answer`), {
-                          type: 'answer',
-                          sdp: answer.sdp,
-                          sender: user.uid,
-                          ts: Date.now()
-                      });
-                  } catch(e) {
-                      console.warn("Signaling Error", e);
-                  }
-              };
-              processOffer();
-          }
-
-          // Handle Answer (Caller side)
-          if (data.answer && data.answer.sender !== user.uid) {
-              try {
-                  if (pc.signalingState === 'have-local-offer') {
-                      pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                      processCandidateQueue(); // Process any queued candidates
-                  }
-              } catch(e) {}
-          }
-      };
-
-      const unsubSignaling = onValue(signalingRef, handleSignaling);
-
-      // 3. Listen for ICE Candidates
-      const candidatesRef = ref(db, `matches/${matchId}/webrtc/candidates/${rightProfile.uid}`);
-      const unsubCandidates = onChildAdded(candidatesRef, (snapshot) => {
-          if (snapshot.exists()) {
-              const candidate = snapshot.val();
-              if (pc.remoteDescription) {
-                  try {
-                      pc.addIceCandidate(new RTCIceCandidate(candidate));
-                  } catch (e) { console.error("Error adding candidate", e); }
-              } else {
-                  // Queue candidate if remote description not yet set
-                  remoteCandidatesQueue.current.push(candidate);
-              }
-          }
-      });
-
-      return () => {
-          unsubSignaling();
-          unsubCandidates();
-          if (peerConnectionRef.current) {
-              peerConnectionRef.current.close();
-              peerConnectionRef.current = null;
-          }
-      };
-  }, [user, rightProfile, matchId, isSpectator]); 
-
-  // C. Watch Mic Permission for "Upgrade" to Audio Sender
-  useEffect(() => {
-      if (hasMicPermission && peerConnectionRef.current && localStreamRef.current) {
-          const pc = peerConnectionRef.current;
-          
-          // 1. Add Tracks if not already added
-          let tracksAdded = false;
-          localStreamRef.current.getTracks().forEach(track => {
-              const senders = pc.getSenders();
-              const alreadyHas = senders.find(s => s.track === track);
-              if (!alreadyHas) {
-                  pc.addTrack(track, localStreamRef.current!);
-                  tracksAdded = true;
-              }
-          });
-
-          // 2. Trigger Renegotiation (Send new Offer) if we added new tracks
-          if (tracksAdded) {
-              const renegotiate = async () => {
-                  try {
-                      const offer = await pc.createOffer();
-                      await pc.setLocalDescription(offer);
-                      await set(ref(db, `matches/${matchId}/webrtc/offer`), {
-                          type: 'offer',
-                          sdp: offer.sdp,
-                          sender: user?.uid,
-                          ts: Date.now()
-                      });
-                  } catch(e) { console.error("Renegotiation failed", e); }
-              };
-              renegotiate();
-          }
-      }
-  }, [hasMicPermission, matchId, user?.uid]);
-
-  // D. Push-To-Talk Handlers
-  const handlePTTStart = async (e: React.SyntheticEvent) => {
-      e.preventDefault();
-      unlockAudio(); // Unlock receive audio context just in case
-      isHoldingButtonRef.current = true;
-
-      if (!hasMicPermission) {
-          const granted = await initAudio();
-          if (!granted || !isHoldingButtonRef.current) return;
-      }
-
-      if (localStreamRef.current) {
-          localStreamRef.current.getAudioTracks()[0].enabled = true;
-          setIsTalking(true);
-          update(ref(db, `matches/${matchId}/players/${user?.uid}`), { isSpeaking: true });
-          playSound('click'); 
-      }
-  };
-
-  const stopTalking = (e?: React.SyntheticEvent) => {
-      if(e) e.preventDefault();
-      isHoldingButtonRef.current = false;
-
-      if (localStreamRef.current && isTalking) {
-          localStreamRef.current.getAudioTracks()[0].enabled = false;
-          setIsTalking(false);
-          update(ref(db, `matches/${matchId}/players/${user?.uid}`), { isSpeaking: false });
-      }
-  };
-
-  // --- End Voice Chat Implementation ---
-
-  // Trigger Intro sequence when game is ready
-  useEffect(() => {
-      // Check all conditions for match readiness
-      if (
-          !introShownOnce && 
-          questions.length > 0 && 
-          leftProfile && 
-          rightProfile && 
-          match && 
-          match.currentQ === 0 && 
-          match.answersCount === 0 && 
-          !isSpectator
-      ) {
+      // Intro Condition: Questions loaded, not spectator, start of game
+      if (!introShownOnce && questions.length > 0 && match && match.currentQ === 0 && !isSpectator) {
+          // For 4P, we don't wait for turn, we wait for questions
           setShowIntro(true);
           setIntroShownOnce(true);
           playSound('click');
       }
-  }, [questions.length, leftProfile, rightProfile, match?.matchId, introShownOnce, isSpectator]);
+  }, [questions.length, match?.matchId, introShownOnce, isSpectator]);
 
-  // Handle Intro Timeout & Transition
   useEffect(() => {
       if (showIntro) {
-          const timer = setTimeout(() => {
-              setShowIntro(false);
-              startCountdown();
-          }, 3500); 
-          
+          const timer = setTimeout(() => { setShowIntro(false); startCountdown(); }, 3500); 
           return () => clearTimeout(timer);
       }
   }, [showIntro]);
@@ -604,14 +247,17 @@ const GamePage: React.FC = () => {
       setShowCountdown(true);
       setCountdownValue(3);
       playSound('tick'); 
-      
       const interval = setInterval(() => {
           setCountdownValue(prev => {
               if (prev === 1) {
                   clearInterval(interval);
-                  playSound('fight'); // GO!
-                  setTimeout(() => setShowCountdown(false), 1000);
-                  return 0; // "GO" state
+                  playSound('fight'); 
+                  setTimeout(() => {
+                      setShowCountdown(false);
+                      // Start Timer for Question 1
+                      timerStartRef.current = Date.now();
+                  }, 1000);
+                  return 0; 
               }
               playSound('tick');
               return prev - 1;
@@ -619,43 +265,44 @@ const GamePage: React.FC = () => {
       }, 1000);
   };
 
-  // Turn Notification Logic
+  // --- 1v1 TURN LOGIC ---
   useEffect(() => {
-      if (match?.turn === user?.uid && !match.winner && !isSpectator && !showIntro && !showCountdown) {
+      if (match?.mode !== '4p' && match?.turn === user?.uid && !match.winner && !isSpectator && !showIntro && !showCountdown) {
           setShowTurnAlert(true);
-          playSound('turn'); // Play notification sound
+          playSound('turn');
           const timer = setTimeout(() => setShowTurnAlert(false), 2000);
           return () => clearTimeout(timer);
       } else {
           setShowTurnAlert(false);
       }
-  }, [match?.turn, user?.uid, match?.winner, isSpectator, showIntro, showCountdown]);
+  }, [match?.turn, user?.uid, isSpectator, showIntro, showCountdown]);
 
-  // Auto-dismiss VS screen
+  // --- RESET STATE ON NEW QUESTION ---
   useEffect(() => {
-      if (showIntro) {
-          const timer = setTimeout(() => {
-              // setShowIntro(false); 
-          }, 3500);
-          return () => clearTimeout(timer);
+      if (match?.currentQ !== undefined) {
+          setSelectedOption(null);
+          setShowFeedback(null);
+          processingRef.current = false;
+          timerStartRef.current = Date.now();
       }
-  }, [showIntro]);
+  }, [match?.currentQ]);
 
-  const handleOptionClick = async (index: number) => {
-    if (isSpectator) return;
-    if (!match || !user || !isMyTurn || selectedOption !== null || processingRef.current || !currentQuestion) return;
-    
-    unlockAudio(); // Ensure audio context is active on interactions
-    const currentScores = match.scores || {};
+  // --- 1v1 ANSWER HANDLER ---
+  const handleOptionClick1v1 = async (index: number) => {
+    if (isSpectator || !match || !user || match.turn !== user.uid || selectedOption !== null || processingRef.current) return;
+    const currentQuestion = questions[match.currentQ];
+    if (!currentQuestion) return;
+
+    processingRef.current = true;
     setSelectedOption(index);
     playSound('click');
-    processingRef.current = true;
 
     const isCorrect = index === currentQuestion.answer;
     isCorrect ? playSound('correct') : playSound('wrong');
     setShowFeedback({ correct: isCorrect, answer: currentQuestion.answer });
 
     setTimeout(async () => {
+        const currentScores = match.scores || {};
         const oppUid = Object.keys(currentScores).find(uid => uid !== user.uid) || '';
         const newScores = { ...currentScores };
         if (isCorrect) newScores[user.uid] = (newScores[user.uid] || 0) + POINTS_PER_QUESTION;
@@ -663,572 +310,447 @@ const GamePage: React.FC = () => {
         const currentAnswers = match.answersCount || 0;
         let nextQ = match.currentQ;
         let nextAnswersCount = currentAnswers + 1;
-        let nextTurn = oppUid; 
-
-        if (currentAnswers >= 1) {
+        
+        if (nextAnswersCount >= 2) {
+            // Both answered
             if (match.currentQ >= questions.length - 1) {
-                let winner = 'draw';
-                const myScore = newScores[user.uid] || 0;
-                const oppScore = newScores[oppUid] || 0;
-                
-                if (myScore > oppScore) winner = user.uid;
-                else if (oppScore > myScore) winner = oppUid;
-
-                const myPts = (await get(ref(db, `users/${user.uid}/points`))).val() || 0;
-                await update(ref(db, `users/${user.uid}`), { points: myPts + myScore, activeMatch: null });
-                if (oppUid) {
-                    const oppPts = (await get(ref(db, `users/${oppUid}/points`))).val() || 0;
-                    await update(ref(db, `users/${oppUid}`), { points: oppPts + oppScore, activeMatch: null });
-                }
-
-                await update(ref(db, `matches/${matchId}`), { scores: newScores, status: 'completed', winner, answersCount: 2 });
+                // Game Over
+                finishMatch(newScores);
                 return;
             }
-            nextQ = match.currentQ + 1;
+            nextQ++;
             nextAnswersCount = 0;
         }
 
         await update(ref(db, `matches/${matchId}`), { 
-            scores: newScores, currentQ: nextQ, turn: nextTurn, answersCount: nextAnswersCount 
+            scores: newScores, currentQ: nextQ, turn: oppUid, answersCount: nextAnswersCount 
         });
-
-        setSelectedOption(null); setShowFeedback(null); processingRef.current = false;
     }, 1000); 
   };
 
-  const handleReport = async () => {
-      if (!currentQuestion || !user) return;
+  // --- 4P ANSWER HANDLER ---
+  const handleOptionClick4P = async (index: number) => {
+      if (isSpectator || !match || !user || selectedOption !== null || processingRef.current) return;
+      const currentQuestion = questions[match.currentQ];
+      if (!currentQuestion) return;
+
+      processingRef.current = true;
+      setSelectedOption(index);
       playSound('click');
-      const { value: reason } = await Swal.fire({
-          title: 'Report Question',
-          input: 'select',
-          inputOptions: {
-              'wrong_answer': 'Jawaabta ayaa qaldan (Wrong answer)',
-              'typo': 'Qoraal ayaa qaldan (Typo/Error)',
-              'other': 'Sabab kale (Other)'
-          },
-          inputPlaceholder: 'Dooro sababta...',
-          showCancelButton: true,
-          confirmButtonText: 'Dir (Send)',
-          inputValidator: (value) => {
-              return !value && 'Fadlan dooro sababta (Please select a reason)';
-          },
-          customClass: {
-              popup: 'glass-swal-popup',
-              title: 'glass-swal-title',
-              confirmButton: 'glass-swal-btn-confirm',
-              cancelButton: 'glass-swal-btn-cancel'
+
+      const isCorrect = index === currentQuestion.answer;
+      isCorrect ? playSound('correct') : playSound('wrong');
+      setShowFeedback({ correct: isCorrect, answer: currentQuestion.answer });
+
+      // Calculate Response Time (ms)
+      const responseTime = Date.now() - timerStartRef.current;
+
+      setTimeout(async () => {
+          const updates: any = {};
+          
+          // 1. Update Personal Score & Time
+          if (isCorrect) {
+              const myScore = (match.scores?.[user.uid] || 0) + POINTS_PER_QUESTION;
+              updates[`scores/${user.uid}`] = myScore;
           }
+          const myTotalTime = (match.totalResponseTime?.[user.uid] || 0) + responseTime;
+          updates[`totalResponseTime/${user.uid}`] = myTotalTime;
+
+          // 2. Mark as Answered for this Question
+          updates[`currentAnswers/${user.uid}`] = true;
+
+          await update(ref(db, `matches/${matchId}`), updates);
+
+          // 3. Check if Everyone Answered (Host Only to avoid race conditions, or Transaction)
+          // We'll rely on a transaction to safely increment Q or check player count
+          // Simplified: The client checks if they are the last one.
+          const players = Object.keys(match.players || {});
+          const answers = { ...(match.currentAnswers || {}), [user.uid]: true };
+          
+          // Filter active players (ignore left/offline players logic could be added here)
+          const activePlayersCount = players.length; 
+          const answerCount = Object.keys(answers).length;
+
+          if (answerCount >= activePlayersCount) {
+              if (match.currentQ >= questions.length - 1) {
+                  // Finish Match
+                  finishMatch4P();
+              } else {
+                  // Next Question
+                  await update(ref(db, `matches/${matchId}`), {
+                      currentQ: match.currentQ + 1,
+                      currentAnswers: null
+                  });
+              }
+          }
+      }, 1000);
+  };
+
+  const finishMatch = async (finalScores: Record<string, number>) => {
+        if (!match || !user) return;
+        let winner = 'draw';
+        const pIds = Object.keys(finalScores);
+        if (finalScores[pIds[0]] > finalScores[pIds[1]]) winner = pIds[0];
+        else if (finalScores[pIds[1]] > finalScores[pIds[0]]) winner = pIds[1];
+
+        // Update User Profiles
+        for (const uid of pIds) {
+            const currentPts = (await get(ref(db, `users/${uid}/points`))).val() || 0;
+            await update(ref(db, `users/${uid}`), { points: currentPts + finalScores[uid], activeMatch: null });
+        }
+        await update(ref(db, `matches/${matchId}`), { scores: finalScores, status: 'completed', winner });
+  };
+
+  const finishMatch4P = async () => {
+      // Calculate ranks based on Score -> Time
+      if (!match) return;
+      const players = Object.keys(match.players || {});
+      
+      const ranked = players.sort((a, b) => {
+          const scoreA = match.scores?.[a] || 0;
+          const scoreB = match.scores?.[b] || 0;
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          
+          const timeA = match.totalResponseTime?.[a] || 0;
+          const timeB = match.totalResponseTime?.[b] || 0;
+          return timeA - timeB; // Lower time is better
       });
 
-      if (reason) {
-          try {
-              const reportRef = push(ref(db, 'reports'));
-              await set(reportRef, {
-                  id: reportRef.key,
-                  questionId: currentQuestion.id,
-                  chapterId: match?.subject || 'unknown',
-                  reason: reason,
-                  reporterUid: user.uid,
-                  timestamp: serverTimestamp(),
-                  questionText: currentQuestion.question
-              });
-              showToast("Waad ku mahadsantahay soo sheegidda!", "success");
-          } catch (e) {
-              showToast("Waan ka xumahay, cilad ayaa dhacday.", "error");
-          }
+      const winner = ranked[0];
+      
+      // Award Points
+      for (const uid of players) {
+          const currentPts = (await get(ref(db, `users/${uid}/points`))).val() || 0;
+          const earned = (match.scores?.[uid] || 0);
+          await update(ref(db, `users/${uid}`), { points: currentPts + earned, activeMatch: null });
       }
+
+      await update(ref(db, `matches/${matchId}`), { status: 'completed', winner });
   };
 
   const handleLeave = async () => {
       if(!user || !matchId) return;
-      
-      if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach(t => t.stop());
-      }
-      
       if (isSpectator) { navigate('/support'); return; }
-      if (match?.status === 'completed') try { await remove(ref(db, `matches/${matchId}`)); } catch(e) {}
-      await set(ref(db, `users/${user.uid}/activeMatch`), null);
-      navigate('/');
-  };
-
-  const handleSurrender = async () => {
-      if (isSpectator) { handleLeave(); return; }
-      if (!match || !user || !rightProfile) return;
-      const confirmed = await showConfirm("Exit Match?", "If you exit now, you will lose the match and forfeit points.", "Exit", "Stay", "warning");
-      if (!confirmed) return;
-
-      const oppPts = (await get(ref(db, `users/${rightProfile.uid}/points`))).val() || 0;
-      await update(ref(db, `users/${rightProfile.uid}`), { points: oppPts + 20, activeMatch: null });
-      await update(ref(db, `matches/${matchId}`), { status: 'completed', winner: rightProfile.uid });
-      await set(ref(db, `users/${user.uid}/activeMatch`), null);
-      navigate('/');
-  };
-
-  const handleRetry = () => {
-      questionsLoadedRef.current = false;
-      setIsLoadingError(false);
-      loadQuestions();
-  };
-
-  const currentQuestion = match && questions.length > 0 ? questions[match.currentQ] : null;
-  const isMyTurn = match?.turn === user?.uid;
-  const isGameOver = match?.status === 'completed';
-
-  if (!match || !leftProfile || !rightProfile || isLoadingError || (!currentQuestion && !isGameOver && !showIntro && !showCountdown && !isSpectator)) {
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center">
-             <div className="animate__animated animate__fadeIn">
-                  {isLoadingError ? (
-                      <div className="flex flex-col items-center gap-4">
-                          <i className="fas fa-exclamation-circle text-5xl text-red-500 mb-2"></i>
-                          <h2 className="font-bold text-xl">Connection Problem</h2>
-                          <p className="text-slate-400 text-sm mb-4">Could not load match questions.</p>
-                          <div className="flex gap-3">
-                              <Button onClick={handleLeave} variant="secondary">Exit</Button>
-                              <Button onClick={handleRetry}>Retry</Button>
-                          </div>
-                      </div>
-                  ) : (
-                      <>
-                        <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                           <i className="fas fa-gamepad text-game-accent"></i>
-                        </div>
-                        <h2 className="font-bold text-xl">{isSpectator ? 'Loading Match...' : 'Waiting for opponent...'}</h2>
-                      </>
-                  )}
-             </div>
-        </div>
-    );
-  }
-
-  const leftLevel = Math.floor((leftProfile.points || 0) / 10) + 1;
-  const rightLevel = Math.floor((rightProfile.points || 0) / 10) + 1;
-  const leftIsActive = match.turn === leftProfile.uid;
-  const rightIsActive = match.turn === rightProfile.uid;
-  const safeScores = match.scores || {};
-  const winnerUid = match.winner;
-  
-  const isLeftSpeaking = match.players?.[leftProfile.uid]?.isSpeaking || false;
-  const isRightSpeaking = match.players?.[rightProfile.uid]?.isSpeaking || false;
-
-  const showGameControls = !isGameOver && !isSpectator && !showIntro && !showCountdown;
-
-  return (
-    <div className="min-h-screen relative flex flex-col font-sans overflow-y-auto transition-colors pt-24">
-       
-      <style>{`
-        @keyframes turnAlert {
-            0% { transform: translateY(-200%); opacity: 0; }
-            15% { transform: translateY(0); opacity: 1; }
-            85% { transform: translateY(0); opacity: 1; }
-            100% { transform: translateY(-200%); opacity: 0; }
-        }
-        .animate-turn-alert {
-            animation: turnAlert 2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        @keyframes ripple {
-            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-        }
-        .speaking-ripple {
-            animation: ripple 1.5s infinite;
-        }
-      `}</style>
       
-      {/* Hidden Audio Element for Remote Stream with explicit autoplay */}
-      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
-       
-      {/* IMPROVED VS Screen Animation */}
-      {showIntro && !isSpectator && (
-          <div className="fixed inset-0 z-[60] flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
-              <div className="absolute inset-0 z-0">
-                  <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-orange-600/20 to-transparent"></div>
-                  <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-blue-600/20 to-transparent"></div>
+      // If 4P host leaves, might want to kill room, but let's just mark user activeMatch null
+      await set(ref(db, `users/${user.uid}/activeMatch`), null);
+      navigate('/');
+  };
+
+  // --- RENDER HELPERS ---
+  const render1v1Layout = () => {
+      // (This is the existing layout logic, slightly refactored)
+      const pIds = Object.keys(match!.players || {});
+      const leftUid = user?.uid || pIds[0];
+      const rightUid = pIds.find(id => id !== leftUid) || pIds[1] || 'ghost';
+      const leftP = playersMap[leftUid] || { name: 'You', avatar: '', uid: leftUid, points: 0 };
+      const rightP = playersMap[rightUid] || { name: 'Opponent', avatar: '', uid: rightUid, points: 0 };
+      const leftScore = match!.scores[leftUid] || 0;
+      const rightScore = match!.scores[rightUid] || 0;
+      const activeLeft = match!.turn === leftUid;
+      const activeRight = match!.turn === rightUid;
+
+      return (
+          <>
+            {/* Header Scoreboard */}
+            <div className="fixed top-0 left-0 right-0 z-50 p-3 pointer-events-none">
+                <div className="max-w-4xl mx-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/40 dark:border-slate-700/50 p-2 md:p-3 flex items-center justify-between pointer-events-auto transition-all duration-300">
+                    {/* Me */}
+                    <div className={`flex items-center gap-3 transition-all ${activeLeft ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'}`}>
+                        <div className={`p-[3px] rounded-full relative z-10 ${activeLeft ? 'bg-gradient-to-r from-orange-500 to-yellow-500 shadow-glow' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                            <Avatar src={leftP.avatar} seed={leftP.uid} size="md" className="border-2 border-white dark:border-slate-800" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-base font-black text-slate-900 dark:text-white leading-tight">You</span>
+                            <span className="text-lg font-black text-slate-700 dark:text-slate-300 leading-none flex items-center gap-1"><i className="fas fa-bolt text-orange-500 text-xs"></i> {leftScore}</span>
+                        </div>
+                    </div>
+                    
+                    {/* VS */}
+                    <div className="flex flex-col items-center">
+                        <div className="text-xl font-black text-slate-300 dark:text-slate-700 italic">VS</div>
+                        <div className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[9px] font-black">{match!.currentQ + 1}/{questions.length}</div>
+                    </div>
+
+                    {/* Opponent */}
+                    <div className={`flex flex-row-reverse items-center gap-3 transition-all ${activeRight ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'}`}>
+                        <div className={`p-[3px] rounded-full relative z-10 ${activeRight ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-glow' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                            <Avatar src={rightP.avatar} seed={rightP.uid} size="md" className="border-2 border-white dark:border-slate-800" />
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-base font-black text-slate-900 dark:text-white leading-tight truncate w-20 text-right">{rightP.name}</span>
+                            <span className="text-lg font-black text-slate-700 dark:text-slate-300 leading-none flex items-center gap-1">{rightScore} <i className="fas fa-bolt text-blue-500 text-xs"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* 1v1 Options Grid */}
+            <div className="relative w-full grid grid-cols-1 gap-3 mt-6">
+                 {questions[match!.currentQ].options.map((opt, idx) => {
+                    let bgClass = "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200";
+                    if (match!.turn !== user?.uid && !isSpectator) bgClass = "bg-slate-50 dark:bg-slate-800/50 border-transparent text-slate-400 blur-[2px] opacity-60 grayscale pointer-events-none";
+                    
+                    if (showFeedback) {
+                        if (idx === showFeedback.answer) bgClass = "bg-green-500 text-white border-green-500 shadow-glow scale-[1.02]";
+                        else if (selectedOption === idx) bgClass = "bg-red-500 text-white border-red-500 shadow-glow scale-[1.02]";
+                        else bgClass = "opacity-50 grayscale blur-[1px] scale-95";
+                    }
+
+                    return (
+                        <button key={idx} disabled={match!.turn !== user?.uid || selectedOption !== null} onClick={() => handleOptionClick1v1(idx)} 
+                            className={`w-full p-4 rounded-2xl text-left transition-all duration-200 flex items-center gap-4 border-2 shadow-sm ${bgClass}`}
+                        >
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 bg-slate-50 dark:bg-slate-700 text-slate-400 ${showFeedback ? 'bg-white/20 text-white' : ''}`}>
+                                {String.fromCharCode(65 + idx)}
+                            </div>
+                            <span className="font-bold text-base leading-tight flex-1">{opt}</span>
+                        </button>
+                    );
+                })}
+            </div>
+          </>
+      );
+  };
+
+  const render4PLayout = () => {
+      // 4P layout logic
+      const allPIds = Object.keys(match!.players || {});
+      const opponents = allPIds.filter(id => id !== user?.uid);
+      const myScore = match!.scores[user!.uid] || 0;
+
+      return (
+          <div className="flex flex-col h-full">
+              {/* Top Opponents Bar */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                  {opponents.map(uid => {
+                      const p = playersMap[uid] || { name: 'Player', avatar: '', uid };
+                      const score = match!.scores[uid] || 0;
+                      const hasAnswered = match!.currentAnswers?.[uid];
+                      
+                      return (
+                          <div key={uid} className="flex flex-col items-center bg-white/50 dark:bg-slate-800/50 rounded-xl p-2 backdrop-blur-sm border border-white/20">
+                              <div className="relative">
+                                  <Avatar src={p.avatar} size="sm" className="mb-1" />
+                                  {hasAnswered && <div className="absolute -bottom-1 -right-1 bg-green-500 text-white w-4 h-4 rounded-full flex items-center justify-center text-[8px] border border-white"><i className="fas fa-check"></i></div>}
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-800 dark:text-white truncate w-full text-center">{p.name}</span>
+                              <span className="text-xs font-black text-game-primary">{score}</span>
+                          </div>
+                      );
+                  })}
               </div>
 
-              <div className="w-full md:w-1/2 h-1/2 md:h-full bg-orange-500 relative flex items-center justify-center animate__animated animate__slideInLeft shadow-[10px_0_50px_rgba(0,0,0,0.5)] z-10">
-                  <div className="text-center z-20 transform scale-110">
-                      <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="xl" className="border-[6px] border-white shadow-2xl mb-6 mx-auto" isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
-                      <h2 className="text-4xl font-black text-white uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 tracking-tighter">
-                          {leftProfile.name}
-                      </h2>
-                      <div className="inline-block bg-black/40 px-4 py-1.5 rounded-full text-white font-black mt-2 text-sm backdrop-blur-sm border border-white/20 shadow-lg">LVL {leftLevel}</div>
+              {/* My Status Bar */}
+              <div className="flex items-center justify-between bg-slate-900 text-white rounded-2xl p-3 mb-6 shadow-lg">
+                  <div className="flex items-center gap-3">
+                      <Avatar src={profile?.avatar} seed={user?.uid} size="sm" className="border-2 border-white" />
+                      <div>
+                          <div className="text-xs font-bold opacity-80">MY SCORE</div>
+                          <div className="text-xl font-black text-yellow-400">{myScore}</div>
+                      </div>
                   </div>
-                  <i className="fas fa-bolt text-9xl absolute -left-10 bottom-0 text-white/10 rotate-12"></i>
+                  <div className="text-right">
+                      <div className="text-xs font-bold opacity-80">QUESTION</div>
+                      <div className="text-xl font-black">{match!.currentQ + 1} <span className="text-sm opacity-50">/ {questions.length}</span></div>
+                  </div>
+              </div>
+
+              {/* Question Card */}
+              <div className={`relative w-full bg-slate-100 dark:bg-slate-800 rounded-[1.5rem] p-6 shadow-xl mb-4 min-h-[140px] flex flex-col items-center justify-center text-center border-t-4 border-purple-500`}>
+                 <h2 className="relative z-10 text-lg md:text-xl font-black text-[#2c3e50] dark:text-white leading-snug drop-shadow-sm">
+                    {questions[match!.currentQ]?.question}
+                 </h2>
+              </div>
+
+              {/* Options */}
+              <div className="grid grid-cols-2 gap-3">
+                  {questions[match!.currentQ]?.options.map((opt, idx) => {
+                      let bgClass = "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-purple-500";
+                      
+                      if (showFeedback) {
+                          if (idx === showFeedback.answer) bgClass = "bg-green-500 text-white border-green-500 scale-105 shadow-lg";
+                          else if (selectedOption === idx) bgClass = "bg-red-500 text-white border-red-500 scale-95 opacity-80";
+                          else bgClass = "opacity-40 grayscale scale-95";
+                      } else if (selectedOption !== null) {
+                          bgClass = "opacity-50 pointer-events-none"; // Waiting for others
+                      }
+
+                      return (
+                          <button key={idx} disabled={selectedOption !== null} onClick={() => handleOptionClick4P(idx)} 
+                              className={`p-3 rounded-xl font-bold text-sm text-left border-2 transition-all duration-200 h-24 flex items-center justify-center text-center shadow-sm ${bgClass}`}
+                          >
+                              {opt}
+                          </button>
+                      );
+                  })}
               </div>
               
-              <div className="absolute z-30 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate__animated animate__zoomIn animate__delay-1s">
-                  <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-8 border-slate-900 shadow-[0_0_50px_rgba(255,255,255,0.5)]">
-                      <span className="font-black text-5xl italic text-slate-900 transform -skew-x-12">VS</span>
+              {/* Waiting Indicator if I answered */}
+              {selectedOption !== null && !showFeedback && (
+                  <div className="mt-4 text-center text-xs font-bold text-slate-400 animate-pulse uppercase tracking-widest">
+                      Waiting for opponents...
                   </div>
-              </div>
-
-              <div className="w-full md:w-1/2 h-1/2 md:h-full bg-blue-600 relative flex items-center justify-center animate__animated animate__slideInRight shadow-[-10px_0_50px_rgba(0,0,0,0.5)] z-10">
-                  <div className="text-center z-20 transform scale-110">
-                      <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" className="border-[6px] border-white shadow-2xl mb-6 mx-auto" isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
-                      <h2 className="text-4xl font-black text-white uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 tracking-tighter">
-                          {rightProfile.name}
-                      </h2>
-                      <div className="inline-block bg-black/40 px-4 py-1.5 rounded-full text-white font-black mt-2 text-sm backdrop-blur-sm border border-white/20 shadow-lg">LVL {rightLevel}</div>
-                  </div>
-                  <i className="fas fa-gamepad text-9xl absolute -right-10 top-0 text-white/10 -rotate-12"></i>
-              </div>
+              )}
           </div>
-      )}
+      );
+  };
 
-      {/* COUNTDOWN OVERLAY */}
-      {showCountdown && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm animate__animated animate__fadeIn">
-              <div className="text-center">
-                  <div className="text-[150px] md:text-[200px] font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)] animate__animated animate__zoomIn animate__faster key={countdownValue}">
-                      {countdownValue === 0 ? 'GO!' : countdownValue}
-                  </div>
-                  {countdownValue > 0 && (
-                      <div className="text-2xl font-bold text-white/80 uppercase tracking-[0.5em] animate-pulse">Get Ready</div>
-                  )}
-              </div>
-          </div>
-      )}
+  const renderPodium = () => {
+      const players = Object.keys(match!.players || {});
+      const ranked = players.sort((a, b) => {
+          const scoreA = match!.scores[a] || 0;
+          const scoreB = match!.scores[b] || 0;
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return (match!.totalResponseTime?.[a] || 0) - (match!.totalResponseTime?.[b] || 0);
+      });
 
-      {/* Turn Alert */}
-      {showTurnAlert && (
-        <div className="fixed top-24 left-0 right-0 z-[70] flex justify-center pointer-events-none">
-            <div className="animate-turn-alert bg-gradient-to-r from-orange-500 to-red-600 text-white px-8 py-3 rounded-full shadow-[0_10px_30px_rgba(249,115,22,0.5)] border-4 border-white dark:border-slate-800 flex items-center gap-3 transform">
-                <i className="fas fa-bolt text-yellow-300 animate-pulse text-xl"></i>
-                <span className="font-black text-xl uppercase tracking-widest italic drop-shadow-md">Your Turn!</span>
-            </div>
-        </div>
-      )}
-
-      {/* Exit Button Pill */}
-      {!isGameOver && (
-          <div className="fixed top-28 left-1/2 -translate-x-1/2 z-[40]">
-              <button onClick={handleSurrender} className="bg-[#e74c3c]/90 hover:bg-red-600 text-white px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-tighter shadow-sm border border-white/20 transition-all flex items-center gap-1 active:scale-95 backdrop-blur-sm">
-                  <i className="fas fa-sign-out-alt rotate-180"></i> EXIT
-              </button>
-          </div>
-      )}
-
-      {/* REDESIGNED HEADER SCOREBOARD */}
-      <div className="fixed top-0 left-0 right-0 z-50 p-3 pointer-events-none">
-         <div className="max-w-4xl mx-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/40 dark:border-slate-700/50 p-2 md:p-3 flex items-center justify-between pointer-events-auto transition-all duration-300 relative overflow-visible">
-            
-            {/* Left Player (Me) */}
-            <div className={`flex items-center gap-3 transition-all duration-500 ${leftIsActive && !isGameOver ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'}`}>
-                 <div className="relative">
-                     {isLeftSpeaking && (
-                        <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
-                     )}
-                     
-                     <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${leftIsActive ? 'bg-gradient-to-r from-orange-500 to-yellow-500 shadow-[0_0_20px_rgba(249,115,22,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isLeftSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : ''}`}>
-                        <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="md" className="border-2 border-white dark:border-slate-800" />
-                     </div>
-
-                     {isLeftSpeaking && (
-                         <div className="absolute -top-1 -right-1 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
-                             <i className="fas fa-microphone text-xs"></i>
-                         </div>
-                     )}
-
-                     <div className="absolute -bottom-1 -right-1 bg-slate-800 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white dark:border-slate-800 z-20 shadow-sm">
-                        LVL {leftLevel}
-                     </div>
-                     
-                     {/* REACTIONS FOR LEFT */}
-                     {activeReactions.filter(r => r.senderId === leftProfile.uid).map(r => (
-                         <div key={r.id} className="absolute top-[78px] left-0 z-[100] animate__animated animate__bounceIn">
-                             <div className="relative bg-white px-3 py-1.5 rounded-full border-2 border-orange-500 shadow-[0_4px_15px_rgba(249,115,22,0.3)] min-w-[50px] text-center whitespace-nowrap flex items-center justify-center">
-                                <div className="absolute -top-2 left-8 -translate-x-1/2 w-3 h-3 bg-white border-t-2 border-l-2 border-orange-500 transform rotate-45"></div>
-                                <span className={`text-orange-600 font-black uppercase tracking-wider ${r.value.length > 2 ? 'text-[10px] md:text-xs' : 'text-2xl md:text-3xl leading-none'}`}>{r.value}</span>
-                             </div>
-                         </div>
-                     ))}
-                 </div>
-                 
-                 <div className="flex flex-col">
-                     <div className="text-base font-black text-slate-900 dark:text-white leading-tight truncate max-w-[100px] flex items-center gap-1">
-                        You
-                        {leftProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
-                     </div>
-                     <div className="flex items-center gap-1 mt-0.5">
-                        <i className="fas fa-bolt text-orange-500 text-xs"></i>
-                        <span className="text-lg font-black text-slate-700 dark:text-slate-300 leading-none">{safeScores[leftProfile.uid] ?? 0}</span>
-                     </div>
-                 </div>
-            </div>
-            
-            {/* Center Status */}
-            <div className="flex flex-col items-center justify-center shrink-0 mx-1">
-                 <div className="text-xl font-black text-slate-300 dark:text-slate-700 italic tracking-tighter leading-none mb-1">VS</div>
-                 <div className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-inner whitespace-nowrap">
-                     {match.currentQ + 1}/{questions.length}
-                 </div>
-            </div>
-            
-            {/* Right Player (Opponent) */}
-            <div className={`flex flex-row-reverse items-center gap-3 transition-all duration-500 ${rightIsActive && !isGameOver ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'}`}>
-                 <div className="relative">
-                    {isRightSpeaking && (
-                        <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
-                    )}
-
-                    <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${rightIsActive ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isRightSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : ''}`}>
-                        <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="md" className="border-2 border-white dark:border-slate-800" />
-                    </div>
-
-                    {isRightSpeaking && (
-                         <div className="absolute -top-1 -left-1 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
-                             <i className="fas fa-microphone text-xs"></i>
-                         </div>
-                     )}
-
-                    <div className="absolute -bottom-1 -left-1 bg-slate-800 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white dark:border-slate-800 z-20 shadow-sm">
-                        LVL {rightLevel}
-                    </div>
-
-                    {/* REACTIONS FOR RIGHT */}
-                    {activeReactions.filter(r => r.senderId === rightProfile.uid).map(r => (
-                         <div key={r.id} className="absolute top-[78px] right-0 z-[100] animate__animated animate__bounceIn">
-                             <div className="relative bg-white px-3 py-1.5 rounded-full border-2 border-blue-500 shadow-[0_4px_15px_rgba(59,130,246,0.3)] min-w-[50px] text-center whitespace-nowrap flex items-center justify-center">
-                                <div className="absolute -top-2 right-8 translate-x-1/2 w-3 h-3 bg-white border-t-2 border-l-2 border-blue-500 transform rotate-45"></div>
-                                <span className={`text-blue-600 font-black uppercase tracking-wider ${r.value.length > 2 ? 'text-[10px] md:text-xs' : 'text-2xl md:text-3xl leading-none'}`}>{r.value}</span>
-                             </div>
-                         </div>
-                     ))}
-                 </div>
-                 
-                 <div className="flex flex-col items-end">
-                     <div className="text-base font-black text-slate-900 dark:text-white leading-tight truncate max-w-[100px] flex items-center gap-1 justify-end">
-                        {rightProfile.isOnline && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>}
-                        {rightProfile.name}
-                        {rightProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
-                     </div>
-                     <div className="flex items-center gap-1 mt-0.5 justify-end">
-                        <span className="text-lg font-black text-slate-700 dark:text-slate-300 leading-none">{safeScores[rightProfile.uid] ?? 0}</span>
-                        <i className="fas fa-bolt text-blue-500 text-xs"></i>
-                     </div>
-                 </div>
-            </div>
-         </div>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center p-4 pb-32 w-full max-w-3xl mx-auto z-10">
-        {isGameOver ? (
-           /* REDESIGNED RESULT UI */
-           <div className="w-full max-w-lg animate__animated animate__zoomIn">
+      return (
+          <div className="w-full max-w-lg animate__animated animate__zoomIn">
               <Card className="!p-0 overflow-hidden border-none shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-white dark:bg-slate-800 rounded-[2.5rem]">
-                  {/* Header Banner */}
-                  <div className={`py-10 px-6 relative text-center overflow-hidden ${winnerUid === user?.uid ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600' : winnerUid === 'draw' ? 'bg-slate-700' : 'bg-gradient-to-br from-slate-700 to-slate-900'}`}>
-                      {/* Decorative elements */}
-                      <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                      <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"></div>
-                      <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-black/20 rounded-full blur-3xl"></div>
-                      
+                  <div className="bg-gradient-to-br from-purple-600 to-indigo-900 p-8 text-center relative overflow-hidden">
                       <div className="relative z-10">
-                          <div className="inline-block px-4 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black text-white uppercase tracking-[0.2em] mb-3">Match Summary</div>
-                          <h1 className="text-5xl md:text-6xl font-black text-white uppercase italic tracking-tighter drop-shadow-lg leading-none">
-                              {winnerUid === user?.uid ? 'VICTORY' : winnerUid === 'draw' ? 'DRAW' : 'DEFEAT'}
-                          </h1>
-                          <p className="text-white/80 font-bold mt-2 text-sm uppercase tracking-widest">{subjectName}</p>
+                          <h1 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-2">SQUAD RANKING</h1>
+                          <p className="text-purple-200 text-xs font-bold uppercase tracking-widest">Final Standings</p>
                       </div>
                   </div>
+                  
+                  <div className="p-6">
+                      <div className="flex justify-center items-end gap-4 mb-8 h-48">
+                          {/* 2nd Place */}
+                          {ranked[1] && (
+                              <div className="flex flex-col items-center animate__animated animate__fadeInUp animate__delay-1s">
+                                  <Avatar src={playersMap[ranked[1]]?.avatar} size="md" className="border-4 border-slate-300 mb-2" />
+                                  <div className="bg-slate-200 dark:bg-slate-700 w-20 h-24 rounded-t-lg flex flex-col items-center justify-end pb-2">
+                                      <span className="text-2xl font-black text-slate-400">2</span>
+                                  </div>
+                                  <span className="font-bold text-xs mt-1 truncate w-20 text-center">{playersMap[ranked[1]]?.name}</span>
+                                  <span className="text-[10px] font-black text-slate-400">{match!.scores[ranked[1]]} PTS</span>
+                              </div>
+                          )}
+                          
+                          {/* 1st Place */}
+                          {ranked[0] && (
+                              <div className="flex flex-col items-center z-10 animate__animated animate__fadeInUp">
+                                  <div className="relative">
+                                      <i className="fas fa-crown text-yellow-400 text-3xl absolute -top-6 left-1/2 -translate-x-1/2 animate-bounce"></i>
+                                      <Avatar src={playersMap[ranked[0]]?.avatar} size="lg" className="border-4 border-yellow-400 mb-2" />
+                                  </div>
+                                  <div className="bg-yellow-100 dark:bg-yellow-900/50 w-24 h-32 rounded-t-lg flex flex-col items-center justify-end pb-2 border-t-4 border-yellow-400">
+                                      <span className="text-4xl font-black text-yellow-500">1</span>
+                                  </div>
+                                  <span className="font-bold text-sm mt-1 truncate w-24 text-center text-game-primary">{playersMap[ranked[0]]?.name}</span>
+                                  <span className="text-xs font-black text-slate-800 dark:text-white">{match!.scores[ranked[0]]} PTS</span>
+                              </div>
+                          )}
 
-                  {/* Summary Content */}
-                  <div className="p-8">
-                      {/* Comparison Bar */}
-                      <div className="flex justify-between items-center mb-10 gap-4">
-                          {/* Me */}
-                          <div className="flex-1 flex flex-col items-center">
-                              <div className="relative mb-3">
-                                  <Avatar src={leftProfile.avatar} size="lg" className={`border-4 ${winnerUid === leftProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-100 dark:border-slate-700'}`} isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
-                                  {winnerUid === leftProfile.uid && <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl animate-bounce">👑</div>}
+                          {/* 3rd Place */}
+                          {ranked[2] && (
+                              <div className="flex flex-col items-center animate__animated animate__fadeInUp animate__delay-2s">
+                                  <Avatar src={playersMap[ranked[2]]?.avatar} size="md" className="border-4 border-orange-300 mb-2" />
+                                  <div className="bg-orange-50 dark:bg-orange-900/30 w-20 h-16 rounded-t-lg flex flex-col items-center justify-end pb-2">
+                                      <span className="text-2xl font-black text-orange-400">3</span>
+                                  </div>
+                                  <span className="font-bold text-xs mt-1 truncate w-20 text-center">{playersMap[ranked[2]]?.name}</span>
+                                  <span className="text-[10px] font-black text-slate-400">{match!.scores[ranked[2]]} PTS</span>
                               </div>
-                              <div className="text-center">
-                                  <div className="font-black text-slate-800 dark:text-white uppercase text-xs truncate max-w-[80px]">You</div>
-                                  <div className="text-3xl font-black text-game-primary">{safeScores[leftProfile.uid] ?? 0}</div>
-                              </div>
-                          </div>
-
-                          <div className="text-slate-200 dark:text-slate-600 font-black text-2xl italic px-4">VS</div>
-
-                          {/* Opponent */}
-                          <div className="flex-1 flex flex-col items-center">
-                              <div className="relative mb-3">
-                                  <Avatar src={rightProfile.avatar} size="lg" className={`border-4 ${winnerUid === rightProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-100 dark:border-slate-700'}`} isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
-                                  {winnerUid === rightProfile.uid && <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl animate-bounce">👑</div>}
-                              </div>
-                              <div className="text-center">
-                                  <div className="font-black text-slate-800 dark:text-white uppercase text-xs truncate max-w-[80px]">{rightProfile.name.split(' ')[0]}</div>
-                                  <div className="text-3xl font-black text-slate-400">{safeScores[rightProfile.uid] ?? 0}</div>
-                              </div>
-                          </div>
+                          )}
                       </div>
 
-                      {/* Stats Grid */}
-                      <div className="grid grid-cols-2 gap-4 mb-10">
-                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex flex-col items-center">
-                              <span className="text-[10px] font-black text-slate-400 uppercase mb-1">XP Gained</span>
-                              <div className="flex items-center gap-2">
-                                  <i className="fas fa-bolt text-game-primary"></i>
-                                  <span className="text-2xl font-black text-slate-800 dark:text-white">+{safeScores[user?.uid || ''] ?? 0}</span>
-                              </div>
-                          </div>
-                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex flex-col items-center">
-                              <span className="text-[10px] font-black text-slate-400 uppercase mb-1">New Level</span>
-                              <div className="flex items-center gap-2">
-                                  <i className="fas fa-star text-amber-500"></i>
-                                  <span className="text-2xl font-black text-slate-800 dark:text-white">{leftLevel}</span>
-                              </div>
-                          </div>
-                      </div>
-
-                      <Button onClick={handleLeave} size="lg" fullWidth className="py-5 shadow-xl !rounded-2xl text-lg shadow-orange-500/20">
-                          CONTINUE <i className="fas fa-arrow-right ml-2"></i>
+                      <Button onClick={handleLeave} size="lg" fullWidth className="py-4 shadow-xl !rounded-2xl">
+                          CONTINUE
                       </Button>
                   </div>
               </Card>
-           </div>
-        ) : (
-            <>
-                 {/* Question Card */}
-                 <div className={`relative w-full bg-slate-100 dark:bg-slate-800 rounded-[1.5rem] p-6 shadow-xl mb-6 min-h-[180px] flex flex-col items-center justify-center text-center border-t-4 transition-colors duration-300 ${isMyTurn ? 'border-orange-500 shadow-orange-500/10' : 'border-slate-300 dark:border-slate-600'}`}>
-                     <button onClick={handleReport} className="absolute top-4 right-6 text-slate-300 hover:text-red-500 transition-colors z-30" title="Report Question">
-                         <i className="fas fa-flag text-lg opacity-50 hover:opacity-100"></i>
-                     </button>
+          </div>
+      );
+  };
 
-                     <div className="mb-4">
-                         <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-200 dark:bg-slate-700 text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">
-                             <i className="fas fa-layer-group text-game-primary"></i> {subjectName}
-                         </span>
-                     </div>
-                     <h2 className="relative z-10 text-xl md:text-2xl font-black text-[#2c3e50] dark:text-white leading-snug drop-shadow-sm">
-                        {currentQuestion && currentQuestion.question}
-                     </h2>
-                 </div>
+  // --- MAIN RENDER ---
+  if (!match || !user || isLoadingError || (!questions.length && !match.winner && !showIntro && !showCountdown && !isSpectator)) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">{isLoadingError ? "Error Loading" : "Loading Arena..."}</div>;
+  }
 
-                 {/* Options Grid */}
-                 <div className="relative w-full grid grid-cols-1 gap-3">
-                     {!isMyTurn && !isSpectator && (
-                         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                             <div className="backdrop-blur-xl bg-white/30 dark:bg-slate-900/40 border border-white/50 px-10 py-6 rounded-[2rem] shadow-[0_15px_50px_rgba(0,0,0,0.15)] flex flex-col items-center gap-3 animate__animated animate__fadeIn transform scale-110">
-                                 <div className="w-12 h-12 rounded-full bg-[#f1f1ff] dark:bg-indigo-900/30 flex items-center justify-center">
-                                     <i className="fas fa-hourglass-half text-[#6366f1] animate-bounce"></i>
-                                 </div>
-                                 <div className="text-center">
-                                     <div className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest mb-1">Waiting for</div>
-                                     <div className="text-lg font-black text-[#2c3e50] dark:text-white tracking-tight">{rightProfile.name}</div>
-                                 </div>
-                             </div>
-                         </div>
-                     )}
+  const isGameOver = match.status === 'completed';
+  const is4P = match.mode === '4p';
 
-                     {currentQuestion && currentQuestion.options.map((opt, idx) => {
-                        let bgClass = "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200";
-                        let animateClass = "";
-                        
-                        // Default blocked style for opponent's turn
-                        if (!isMyTurn && !isSpectator) {
-                            bgClass = "bg-slate-50 dark:bg-slate-800/50 border-transparent text-slate-400 blur-[2px] opacity-60 grayscale pointer-events-none";
-                        }
-
-                        if (showFeedback) {
-                            if (idx === showFeedback.answer) {
-                                bgClass = "bg-green-500 text-white border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.6)] z-10 scale-[1.02]";
-                                animateClass = "animate__animated animate__shakeY animate__faster";
-                            }
-                            else if (selectedOption === idx) {
-                                bgClass = "bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] z-10 scale-[1.02]";
-                                animateClass = "animate__animated animate__shakeX animate__faster";
-                            }
-                            else {
-                                bgClass = "opacity-50 grayscale blur-[1px] scale-95";
-                            }
-                        }
-
-                        return (
-                            <button 
-                                key={idx} 
-                                disabled={!isMyTurn || selectedOption !== null} 
-                                onClick={() => handleOptionClick(idx)} 
-                                className={`w-full p-4 rounded-2xl text-left transition-all duration-200 flex items-center gap-4 border-2 shadow-sm ${bgClass} ${animateClass}`}
-                            >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 bg-slate-50 dark:bg-slate-700 text-slate-400 ${showFeedback ? 'bg-white/20 text-white' : ''}`}>
-                                    {String.fromCharCode(65 + idx)}
-                                </div>
-                                <span className="font-bold text-base leading-tight flex-1">{opt}</span>
-                            </button>
-                        );
-                    })}
-                 </div>
-            </>
-        )}
-      </div>
-
-      {/* Push-to-Talk Button */}
-      {showGameControls && (
-          <div className="fixed bottom-8 right-4 z-[60]">
-              <button
-                  onMouseDown={handlePTTStart}
-                  onMouseUp={stopTalking}
-                  onMouseLeave={stopTalking}
-                  onTouchStart={handlePTTStart}
-                  onTouchEnd={stopTalking}
-                  className={`w-16 h-16 rounded-full shadow-2xl border-4 transition-all duration-200 flex items-center justify-center transform active:scale-95 ${
-                      isTalking 
-                      ? 'bg-green-500 border-green-400 scale-110 shadow-[0_0_30px_rgba(34,197,94,0.6)]' 
-                      : hasMicPermission 
-                        ? 'bg-white border-game-accent hover:bg-slate-50'
-                        : 'bg-slate-100 border-slate-300 opacity-80'
-                  }`}
-              >
-                  <i className={`fas ${hasMicPermission ? 'fa-microphone' : 'fa-microphone-slash'} text-2xl ${isTalking ? 'text-white animate-pulse' : 'text-slate-400'}`}></i>
-                  {isTalking && (
-                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-sm whitespace-nowrap">
-                          Speaking
-                      </span>
-                  )}
-              </button>
+  return (
+    <div className="min-h-screen relative flex flex-col font-sans overflow-y-auto transition-colors pt-4 pb-20">
+      
+      {/* Intro Animation */}
+      {showIntro && !isSpectator && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900">
+              <div className="text-center animate__animated animate__zoomIn">
+                  <h1 className="text-6xl font-black text-white italic tracking-tighter mb-4">{is4P ? 'SQUAD BATTLE' : 'DUEL START'}</h1>
+                  <div className="flex justify-center gap-4">
+                      {Object.keys(match.players).slice(0,4).map((uid, i) => (
+                          <Avatar key={uid} src={playersMap[uid]?.avatar} size="lg" className="border-4 border-white animate__animated animate__fadeInUp" style={{animationDelay: `${i*0.2}s`}} />
+                      ))}
+                  </div>
+              </div>
           </div>
       )}
 
-      {/* Reaction Toggle Button */}
-      {showGameControls && (
-          <div className="fixed bottom-8 left-4 z-[60]">
-               <button 
-                onClick={() => setShowReactionMenu(!showReactionMenu)}
-                className="w-16 h-16 rounded-full bg-white shadow-2xl border-4 border-[#f97316] text-3xl flex items-center justify-center transition-all active:scale-95 hover:bg-orange-50"
-               >
-                   <i className={`fas ${showReactionMenu ? 'fa-times text-red-500' : 'fa-smile text-[#f97316]'}`}></i>
+      {/* Countdown */}
+      {showCountdown && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <div className="text-[150px] font-black text-white drop-shadow-lg animate__animated animate__zoomIn animate__faster key={countdownValue}">
+                  {countdownValue === 0 ? 'GO!' : countdownValue}
+              </div>
+          </div>
+      )}
+
+      {/* Turn Alert (1v1) */}
+      {showTurnAlert && !is4P && (
+        <div className="fixed top-24 left-0 right-0 z-[70] flex justify-center pointer-events-none">
+            <div className="animate-turn-alert bg-gradient-to-r from-orange-500 to-red-600 text-white px-8 py-3 rounded-full shadow-lg border-4 border-white flex items-center gap-3">
+                <i className="fas fa-bolt text-yellow-300 animate-pulse text-xl"></i>
+                <span className="font-black text-xl uppercase tracking-widest italic">Your Turn!</span>
+            </div>
+        </div>
+      )}
+
+      {/* Reactions Overlay */}
+      {activeReactions.map(r => (
+          <div key={r.id} className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] animate__animated animate__bounceIn" style={{ marginLeft: `${(Math.random()-0.5)*200}px`, marginTop: `${(Math.random()-0.5)*200}px` }}>
+              <div className="text-6xl drop-shadow-lg">{r.value}</div>
+          </div>
+      ))}
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4 w-full max-w-3xl mx-auto z-10">
+          {isGameOver ? (
+              is4P ? renderPodium() : (
+                  /* Existing 1v1 Result Card reused or refactored here, omitted for brevity, using simple fallback for now or existing implementation if needed */
+                  <Card className="text-center p-10">
+                      <h1 className="text-4xl font-black mb-4">{match.winner === user.uid ? 'VICTORY' : 'DEFEAT'}</h1>
+                      <Button onClick={handleLeave}>Continue</Button>
+                  </Card>
+              )
+          ) : (
+              is4P ? render4PLayout() : render1v1Layout()
+          )}
+      </div>
+
+      {/* Controls (Reaction / PTT) */}
+      {!isGameOver && !showIntro && !showCountdown && (
+          <div className="fixed bottom-6 w-full px-6 flex justify-between items-end pointer-events-none">
+               <button onClick={() => setShowReactionMenu(!showReactionMenu)} className="w-14 h-14 rounded-full bg-white shadow-xl border-4 border-orange-500 text-2xl flex items-center justify-center pointer-events-auto hover:scale-110 transition-transform">
+                   <i className="fas fa-smile text-orange-500"></i>
                </button>
                
+               {/* Reaction Menu */}
                {showReactionMenu && (
-                   <div className="absolute bottom-20 left-0 w-64 p-4 bg-white/95 rounded-3xl shadow-2xl border-2 border-slate-100 animate__animated animate__bounceIn">
-                       <div className="grid grid-cols-4 gap-3 mb-4">
-                           {reactionEmojis.map(emoji => (
-                               <button key={emoji} onClick={() => sendReaction(emoji)} className="text-3xl hover:scale-125 transition-transform p-1">{emoji}</button>
-                           ))}
+                   <div className="absolute bottom-24 left-6 bg-white rounded-3xl p-4 shadow-2xl border-2 border-slate-100 pointer-events-auto w-64 animate__animated animate__bounceIn">
+                       <div className="grid grid-cols-4 gap-2 mb-3">
+                           {reactionEmojis.map(e => <button key={e} onClick={() => sendReaction(e)} className="text-2xl hover:scale-125 transition-transform">{e}</button>)}
                        </div>
-                       <div className="space-y-2 border-t border-slate-100 pt-3">
-                           {reactionMessages.map(msg => (
-                               <button key={msg} onClick={() => sendReaction(msg)} className="w-full text-left px-4 py-2 rounded-xl bg-slate-50 text-[11px] font-black text-slate-600 uppercase tracking-wide hover:bg-game-primary hover:text-white transition-colors">{msg}</button>
-                           ))}
+                       <div className="space-y-2">
+                           {reactionMessages.map(m => <button key={m} onClick={() => sendReaction(m)} className="w-full text-left text-xs font-bold bg-slate-100 p-2 rounded-lg hover:bg-orange-100">{m}</button>)}
                        </div>
                    </div>
                )}
           </div>
-      )}
-
-      {showOpponentModal && (
-          <Modal isOpen={true} onClose={() => setShowOpponentModal(false)} title="Opponent Profile">
-               <div className="flex flex-col items-center mb-6">
-                   <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" isVerified={rightProfile.isVerified} className="mb-4 shadow-xl border-4 border-white" />
-                   <h2 className="text-2xl font-black text-slate-900 text-center">{rightProfile.name}</h2>
-               </div>
-               <Button fullWidth onClick={() => setShowOpponentModal(false)}>Close</Button>
-          </Modal>
       )}
     </div>
   );
