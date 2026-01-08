@@ -60,7 +60,6 @@ const LobbyPage: React.FC = () => {
           else if (autoJoinCode) {
               setRoomCode(autoJoinCode);
               // Attempt join immediately
-              // We don't know the mode yet, joinRoom handles it
               joinRoom(autoJoinCode);
           }
       }
@@ -120,6 +119,7 @@ const LobbyPage: React.FC = () => {
                  
                  // 4P Logic: Sync Lobby Players
                  if (val.mode === '4p') {
+                     // Safety check: ensure players object exists
                      setLobbyPlayers(val.players || {});
                      
                      // Auto-Start Logic for Host
@@ -131,25 +131,18 @@ const LobbyPage: React.FC = () => {
              } else {
                  // Room deleted (Match started or Host left)
                  if (hostTimerRef.current) clearTimeout(hostTimerRef.current);
-                 // If room is gone, verify if we were redirected to a match
-                 // Usually App.tsx handles the activeMatch redirect, but we can clear state here
+                 // Clear state
                  setHostedCode(null);
                  setLobbyPlayers({});
              }
          });
          
          // Clean up on disconnect 
-         // FIX: Only Host deletes room. Guests remove themselves.
-         // We can't strictly check isHost inside onDisconnect callback easily without keeping ref
-         // So we do a targeted remove based on assumed role in next effect or rely on backend rules
-         // For client side:
+         // Guest: remove self. Host: room removal handled in creation.
+         // We add a listener here just in case, but usually handled by create logic.
+         // Just to be safe for guests:
          const userInRoomRef = ref(db, `rooms/${hostedCode}/players/${user.uid}`);
-         onDisconnect(userInRoomRef).remove(); // Everyone removes themselves
-         
-         // Note: If host disconnects, ideally we want room to close.
-         // This requires checking if host. We'll do it roughly:
-         // If I created the room, I set an onDisconnect on the room itself.
-         // This is handled in create functions.
+         onDisconnect(userInRoomRef).remove(); 
 
          return () => {
              unsub();
@@ -274,9 +267,10 @@ const LobbyPage: React.FC = () => {
           }
       };
       
+      // Set room first
       await set(ref(db, `rooms/${code}`), roomData);
       
-      // Host Disconnect Logic: Destroy Room
+      // Host Disconnect Logic: Destroy Room (Attached to room root)
       onDisconnect(ref(db, `rooms/${code}`)).remove();
 
       setHostedCode(code);
@@ -286,9 +280,10 @@ const LobbyPage: React.FC = () => {
 
   const joinRoom = async (codeOverride?: string) => {
     let codeToJoin = codeOverride || roomCode;
-    codeToJoin = codeToJoin.trim(); // Sanitize input
+    if (!codeToJoin) return;
+    codeToJoin = codeToJoin.trim(); 
     
-    if (!user || !codeToJoin) return;
+    if (!user) return;
     if (!codeOverride) playSound('click');
     
     const roomRef = ref(db, `rooms/${codeToJoin}`);
@@ -299,13 +294,15 @@ const LobbyPage: React.FC = () => {
       
       // IF 4P MODE
       if (rData.mode === '4p') {
+          // Robust check for players object
           const players = rData.players || {};
-          if (Object.keys(players).length >= 4) {
+          
+          if (Object.keys(players).length >= 4 && !players[user.uid]) {
               showAlert("Full", "Room is full (4/4)", "error");
               return;
           }
           
-          // Already in?
+          // Already in? (Re-joining)
           if (players[user.uid]) {
               setHostedCode(codeToJoin);
               setViewMode('4p');
@@ -340,7 +337,7 @@ const LobbyPage: React.FC = () => {
       } catch(e) {}
 
       const updates: any = {};
-      updates[`rooms/${codeToJoin}`] = null;
+      updates[`rooms/${codeToJoin}`] = null; // Delete 1v1 room on join
       updates[`matches/${matchId}`] = {
         matchId, status: 'active', mode: 'custom', 
         questionLimit: rData.questionLimit || 10, 
@@ -389,7 +386,7 @@ const LobbyPage: React.FC = () => {
       } catch(e) {}
 
       const updates: any = {};
-      updates[`rooms/${roomData.code}`] = null;
+      updates[`rooms/${roomData.code}`] = null; // Delete room when starting
       updates[`matches/${matchId}`] = {
           matchId,
           status: 'active',
@@ -634,6 +631,7 @@ const LobbyPage: React.FC = () => {
       if(!user || !selectedChapter) return;
       const code = Math.floor(1000 + Math.random() * 9000).toString();
       setHostedCode(code);
+      // Explicitly set mode: '1v1'
       await set(ref(db, `rooms/${code}`), { host: user.uid, sid: selectedSubject, lid: selectedChapter, questionLimit: quizLimit, createdAt: Date.now(), mode: '1v1' });
       // Add disconnect logic for 1v1
       onDisconnect(ref(db, `rooms/${code}`)).remove();
