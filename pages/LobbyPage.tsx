@@ -417,6 +417,31 @@ const LobbyPage: React.FC = () => {
       }
   };
 
+  // 1v1 Create Room Helper
+  const createRoom = async () => {
+      if(!user || !selectedChapter) return;
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      
+      // Create room in DB first to avoid race condition with listener
+      await set(ref(db, `rooms/${code}`), { 
+          host: user.uid, 
+          sid: selectedSubject, 
+          lid: selectedChapter, 
+          questionLimit: quizLimit, 
+          createdAt: Date.now(), 
+          mode: '1v1' 
+      });
+      
+      // Add disconnect logic for 1v1
+      onDisconnect(ref(db, `rooms/${code}`)).remove();
+      
+      // Update state AFTER creation
+      setHostedCode(code);
+      
+      playSound('click');
+      showToast("Room Created!", "success");
+  };
+
   // UI HELPERS
   const showSelectors = (viewMode === 'auto' && !isSearching) || (viewMode === 'custom' && customSubMode === 'create' && !hostedCode) || (viewMode === '4p' && customSubMode === 'create' && !hostedCode);
   const pageTitle = viewMode === 'auto' ? 'Ranked Match' : viewMode === '4p' ? 'Squad Battle' : customSubMode === 'join' ? 'Join' : customSubMode === 'create' ? 'Create Room' : 'Private Mode';
@@ -607,7 +632,7 @@ const LobbyPage: React.FC = () => {
                         ) : viewMode === '4p' ? (
                             <Button fullWidth size="lg" onClick={create4PRoom} disabled={!selectedChapter} className="shadow-xl bg-purple-600 border-purple-800 hover:bg-purple-700">CREATE SQUAD ROOM</Button>
                         ) : (
-                            <Button fullWidth size="lg" onClick={() => {setHostedCode((Math.floor(1000 + Math.random() * 9000).toString())); createRoom();}} disabled={!selectedChapter} className="shadow-xl bg-indigo-600 border-indigo-800 hover:bg-indigo-700">CREATE DUEL ROOM</Button>
+                            <Button fullWidth size="lg" onClick={createRoom} disabled={!selectedChapter} className="shadow-xl bg-indigo-600 border-indigo-800 hover:bg-indigo-700">CREATE DUEL ROOM</Button>
                         )}
                     </div>
               )}
@@ -628,20 +653,6 @@ const LobbyPage: React.FC = () => {
       )}
     </div>
   );
-  
-  // Helper for 1v1 Create Room (restored from prev logic simplistically)
-  async function createRoom() {
-      if(!user || !selectedChapter) return;
-      const code = Math.floor(1000 + Math.random() * 9000).toString();
-      setHostedCode(code);
-      // Explicitly set mode: '1v1'
-      await set(ref(db, `rooms/${code}`), { host: user.uid, sid: selectedSubject, lid: selectedChapter, questionLimit: quizLimit, createdAt: Date.now(), mode: '1v1' });
-      // Add disconnect logic for 1v1
-      onDisconnect(ref(db, `rooms/${code}`)).remove();
-      
-      playSound('click');
-      showToast("Room Created!", "success");
-  }
 };
 
 export default LobbyPage;
