@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useContext, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ref, onValue, push, set, serverTimestamp, update, get, runTransaction, query, limitToLast, onChildAdded, off } from 'firebase/database';
+import { Howler } from 'howler';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { ChatMessage, UserProfile, Subject, Chapter } from '../types';
@@ -105,7 +106,8 @@ const ChatPage: React.FC = () => {
           const newMsg: ChatMessage = { id: snapshot.key!, ...data, chatId: derivedChatId };
 
           // Play Sound for New Incoming Messages
-          if (newMsg.sender !== user.uid && newMsg.timestamp > mountTimeRef.current) {
+          // Relaxed condition: Allow 2s clock skew to ensure we catch near-instant messages
+          if (newMsg.sender !== user.uid && newMsg.timestamp > (mountTimeRef.current - 2000)) {
               playSound('message');
               // Check for 2026 Animation trigger
               if (newMsg.text && (newMsg.text.includes('2025') || newMsg.text.includes('2026'))) {
@@ -272,6 +274,13 @@ const ChatPage: React.FC = () => {
   const sendMessage = async (e?: React.FormEvent, type: 'text' | 'invite' = 'text', inviteCode?: string, subjectName?: string) => {
       e?.preventDefault();
       if ((!inputText.trim() && type === 'text') || !user || !chatId) return;
+
+      // Unlock Audio Context explicitly on user action to ensure sounds play
+      try {
+          if (Howler && Howler.ctx && Howler.ctx.state === 'suspended') {
+              Howler.ctx.resume();
+          }
+      } catch (err) {}
 
       // Play SENT sound
       playSound('sent');
