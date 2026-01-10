@@ -6,12 +6,14 @@ import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { UserProfile } from '../types';
 import { Avatar } from '../components/UI';
+import { UserProfileModal } from '../components/UserProfileModal';
 
 const LeaderboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useContext(UserContext);
   const [players, setPlayers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
      // 1. Initial Load from Cache
@@ -32,10 +34,14 @@ const LeaderboardPage: React.FC = () => {
                  uid: key,
                  name: data[key].name || 'Unknown',
                  email: data[key].email || '',
+                 username: data[key].username || '',
                  points: typeof data[key].points === 'number' ? data[key].points : 0,
                  avatar: data[key].avatar || '',
                  isVerified: data[key].isVerified,
-                 isSupport: data[key].isSupport // Ensure isSupport is fetched
+                 isSupport: data[key].isSupport,
+                 banned: data[key].banned,
+                 activeMatch: data[key].activeMatch,
+                 isOnline: data[key].isOnline
              }));
              
              // Sort descending
@@ -102,7 +108,12 @@ const LeaderboardPage: React.FC = () => {
                 const level = Math.floor(p.points / 10) + 1;
                 
                 return (
-                    <div key={p.uid} className={`flex items-center p-3 md:p-4 rounded-2xl border shadow-sm ${getRankStyle(idx)} ${isMe ? 'ring-2 ring-game-primary ring-offset-2 dark:ring-offset-gray-900' : ''} animate__animated animate__fadeInUp transition-all hover:scale-[1.01]`} style={{animationDelay: `${idx * 0.05}s`}}>
+                    <div 
+                        key={p.uid} 
+                        onClick={() => setSelectedUser(p)}
+                        className={`flex items-center p-3 md:p-4 rounded-2xl border shadow-sm ${getRankStyle(idx)} ${isMe ? 'ring-2 ring-game-primary ring-offset-2 dark:ring-offset-gray-900' : ''} animate__animated animate__fadeInUp transition-all hover:scale-[1.01] cursor-pointer`} 
+                        style={{animationDelay: `${idx * 0.05}s`}}
+                    >
                         {/* Rank Icon */}
                         <div className="w-10 flex justify-center items-center mr-2 shrink-0">
                             {getIcon(idx)}
@@ -133,6 +144,10 @@ const LeaderboardPage: React.FC = () => {
                 );
             })}
         </div>
+      )}
+
+      {selectedUser && (
+          <UserProfileModal user={selectedUser} onClose={() => setSelectedUser(null)} />
       )}
     </div>
   );

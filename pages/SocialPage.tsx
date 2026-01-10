@@ -4,7 +4,8 @@ import { ref, onValue, off, update, remove } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { UserProfile } from '../types';
-import { Button, Input, Avatar, Modal } from '../components/UI';
+import { Button, Input, Avatar } from '../components/UI';
+import { UserProfileModal } from '../components/UserProfileModal';
 import { useNavigate } from 'react-router-dom';
 import { showToast } from '../services/alert';
 
@@ -408,52 +409,17 @@ const SocialPage: React.FC = () => {
             </div>
         </div>
 
-        {/* User Modal */}
+        {/* Use the new UserProfileModal */}
         {selectedUser && (
-            <Modal isOpen={true} onClose={() => setSelectedUser(null)} title={selectedUser.name}>
-                <div className="flex flex-col items-center mb-6">
-                    <Avatar src={selectedUser.avatar} seed={selectedUser.uid} size="xl" isVerified={selectedUser.isVerified} isSupport={selectedUser.isSupport} isOnline={selectedUser.isOnline} className="mb-4 shadow-xl border-4 border-white dark:border-slate-700" />
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white text-center flex items-center gap-2">
-                        {selectedUser.name}
-                        {selectedUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg"></i>}
-                        {selectedUser.isSupport && <i className="fas fa-check-circle text-game-primary text-lg"></i>}
-                    </h2>
-                    <p className="text-slate-400 font-bold font-mono text-sm">@{selectedUser.username}</p>
-                    
-                    {selectedUser.isOnline && (
-                        <div className="mt-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest animate-pulse">
-                            <i className="fas fa-circle text-[8px] mr-1"></i> Currently Online
-                        </div>
-                    )}
-
-                    {selectedUser.isSupport ? (
-                        <div className="mt-6">
-                            <span className="inline-flex items-center gap-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800 px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest">
-                                <i className="fas fa-shield-alt"></i> Official Account
-                            </span>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 gap-4 w-full mt-6">
-                            <div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center">
-                                <div className="text-xs text-slate-400 font-bold uppercase">Level</div>
-                                <div className="text-xl font-black text-slate-800 dark:text-white">{Math.floor((selectedUser.points || 0) / 10) + 1}</div>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-xl text-center">
-                                <div className="text-xs text-slate-400 font-bold uppercase">Points</div>
-                                <div className="text-xl font-black text-game-primary dark:text-blue-400">{selectedUser.points}</div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-                
-                <div className="flex gap-3">
-                    {friends.some(f => f.uid === selectedUser.uid) ? (
-                        <Button fullWidth onClick={() => { navigate(`/chat/${selectedUser.uid}`); setSelectedUser(null); }}>Message</Button>
-                    ) : (
-                        <Button fullWidth onClick={() => { sendRequest(selectedUser.uid); setSelectedUser(null); }}>Send Request</Button>
-                    )}
-                </div>
-            </Modal>
+            <UserProfileModal 
+                user={selectedUser} 
+                onClose={() => setSelectedUser(null)}
+                actionLabel={friends.some(f => f.uid === selectedUser.uid) ? "Message" : "Send Request"}
+                onAction={friends.some(f => f.uid === selectedUser.uid) 
+                    ? () => { navigate(`/chat/${selectedUser.uid}`); setSelectedUser(null); }
+                    : () => { sendRequest(selectedUser.uid); setSelectedUser(null); }
+                }
+            />
         )}
     </div>
   );

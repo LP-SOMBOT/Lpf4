@@ -7,6 +7,7 @@ import { UserContext } from '../contexts';
 import { POINTS_PER_QUESTION } from '../constants';
 import { MatchState, Question, Chapter, UserProfile, MatchReaction } from '../types';
 import { Avatar, Button, Card, Modal } from '../components/UI';
+import { UserProfileModal } from '../components/UserProfileModal';
 import { playSound } from '../services/audioService';
 import { showToast, showConfirm, showAlert } from '../services/alert';
 import confetti from 'canvas-confetti';
@@ -766,6 +767,16 @@ const GamePage: React.FC = () => {
       navigate('/');
   };
 
+  const handleTerminateMatch = async () => {
+      if (!matchId) return;
+      const confirmed = await showConfirm("Force End Match?", "This will immediately stop the game for everyone.", "End Match", "Cancel", "danger");
+      if (!confirmed) return;
+      try {
+          await remove(ref(db, `matches/${matchId}`));
+          showToast("Match Terminated", "success");
+      } catch(e) { showToast("Failed", "error"); }
+  };
+
   const handleRetry = () => {
       questionsLoadedRef.current = false;
       setIsLoadingError(false);
@@ -909,6 +920,11 @@ const GamePage: React.FC = () => {
               <button onClick={handleSurrender} className="bg-[#e74c3c]/90 hover:bg-red-600 text-white px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-tighter shadow-sm border border-white/20 transition-all flex items-center gap-1 active:scale-95 backdrop-blur-sm">
                   <i className="fas fa-sign-out-alt rotate-180"></i> EXIT
               </button>
+              {profile?.isSupport && isSpectator && (
+                   <button onClick={handleTerminateMatch} className="ml-2 bg-red-800/90 hover:bg-red-700 text-white px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-tighter shadow-sm border border-white/20 transition-all flex items-center gap-1 active:scale-95 backdrop-blur-sm animate-pulse">
+                      <i className="fas fa-ban"></i> END MATCH
+                  </button>
+              )}
           </div>
       )}
 
@@ -969,7 +985,10 @@ const GamePage: React.FC = () => {
             </div>
             
             {/* Right Player (Opponent) */}
-            <div className={`flex flex-row-reverse items-center gap-3 transition-all duration-500 ${rightIsActive && !isGameOver ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'}`}>
+            <div 
+                className={`flex flex-row-reverse items-center gap-3 transition-all duration-500 ${rightIsActive && !isGameOver ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'} cursor-pointer`}
+                onClick={() => setShowOpponentModal(true)}
+            >
                  <div className="relative">
                     {isRightSpeaking && (
                         <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
@@ -1222,13 +1241,7 @@ const GamePage: React.FC = () => {
       )}
 
       {showOpponentModal && (
-          <Modal isOpen={true} onClose={() => setShowOpponentModal(false)} title="Opponent Profile">
-               <div className="flex flex-col items-center mb-6">
-                   <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" isVerified={rightProfile.isVerified} className="mb-4 shadow-xl border-4 border-white" />
-                   <h2 className="text-2xl font-black text-slate-900 text-center">{rightProfile.name}</h2>
-               </div>
-               <Button fullWidth onClick={() => setShowOpponentModal(false)}>Close</Button>
-          </Modal>
+          <UserProfileModal user={rightProfile} onClose={() => setShowOpponentModal(false)} />
       )}
     </div>
   );

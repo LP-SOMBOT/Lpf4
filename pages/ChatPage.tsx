@@ -7,6 +7,7 @@ import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { ChatMessage, UserProfile, Subject, Chapter } from '../types';
 import { Avatar, Button, Modal, Card } from '../components/UI';
+import { UserProfileModal } from '../components/UserProfileModal';
 import { playSound } from '../services/audioService';
 import { showToast, showAlert } from '../services/alert';
 import { chatCache } from '../services/chatCache';
@@ -26,6 +27,7 @@ const ChatPage: React.FC = () => {
   // UX State
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [showProfile, setShowProfile] = useState(false);
   
   // 2026 Animation State
   const [showYearAnim, setShowYearAnim] = useState(false);
@@ -470,17 +472,17 @@ const ChatPage: React.FC = () => {
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 p-4 shadow-sm flex items-center justify-between relative z-20">
             <div className="flex items-center gap-3">
                 <button onClick={() => navigate(-1)} className="text-gray-500 dark:text-gray-300 w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"><i className="fas fa-arrow-left"></i></button>
-                <div className="relative">
+                <div className="relative cursor-pointer flex items-center gap-3" onClick={() => setShowProfile(true)}>
                     <Avatar src={targetUser.avatar} seed={targetUser.uid} size="sm" isVerified={targetUser.isVerified} isSupport={targetUser.isSupport} isOnline={targetUser.isOnline} />
-                </div>
-                <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1">
-                        {targetUser.name}
-                        {targetUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
-                        {targetUser.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                        {targetUser.isOnline ? <span className="text-green-500 font-black"><i className="fas fa-circle text-[6px] align-middle mr-1 animate-pulse"></i> Online</span> : `@${targetUser.username}`}
+                    <div>
+                        <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1">
+                            {targetUser.name}
+                            {targetUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                            {targetUser.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                            {targetUser.isOnline ? <span className="text-green-500 font-black"><i className="fas fa-circle text-[6px] align-middle mr-1 animate-pulse"></i> Online</span> : `@${targetUser.username}`}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -613,6 +615,10 @@ const ChatPage: React.FC = () => {
                 </div>
             </div>
         </Modal>
+
+        {showProfile && targetUser && (
+            <UserProfileModal user={targetUser} onClose={() => setShowProfile(false)} />
+        )}
 
         {/* 2026 Celebration Overlay */}
         {showYearAnim && (
