@@ -7,7 +7,7 @@ import { auth, db } from '../firebase';
 import { UserContext, ThemeContext } from '../contexts';
 import { Avatar, Button, Card, Input, Modal } from '../components/UI';
 import { playSound } from '../services/audioService';
-import { generateAvatarUrl } from '../constants';
+import { generateAvatarUrl, APP_LOGO_URL } from '../constants';
 import { showToast, showAlert } from '../services/alert';
 
 const ProfilePage: React.FC = () => {
@@ -66,6 +66,15 @@ const ProfilePage: React.FC = () => {
     if (!isEditing) {
         handleSaveAvatarOnly(url);
     }
+  };
+
+  const setAppLogoAvatar = () => {
+      setCurrentAvatarUrl(APP_LOGO_URL);
+      setShowAvatarSelector(false);
+      playSound('click');
+      if (!isEditing) {
+          handleSaveAvatarOnly(APP_LOGO_URL);
+      }
   };
 
   const handleSaveAvatarOnly = async (url: string) => {
@@ -232,6 +241,7 @@ const ProfilePage: React.FC = () => {
                 seed={user?.uid} 
                 size="xl" 
                 isVerified={profile.isVerified}
+                isSupport={profile.isSupport}
                 className="mb-4 border-4 border-white dark:border-gray-800 shadow-xl cursor-pointer hover:opacity-90 transition-opacity" 
                 onClick={() => setShowAvatarSelector(true)}
             />
@@ -284,6 +294,14 @@ const ProfilePage: React.FC = () => {
       {/* Avatar Selection Modal */}
       <Modal isOpen={showAvatarSelector} title="Choose Avatar" onClose={() => setShowAvatarSelector(false)}>
           <div className="text-center mb-4">
+              
+              {/* SUPPORT EXCLUSIVE: SET APP LOGO */}
+              {profile.isSupport && (
+                  <Button fullWidth onClick={setAppLogoAvatar} className="mb-4 shadow-lg bg-gradient-to-r from-orange-500 to-red-600 border-none text-white animate__animated animate__pulse">
+                      <i className="fas fa-graduation-cap mr-2"></i> Use App Logo
+                  </Button>
+              )}
+
               {profile.allowCustomAvatar && (
                   <div className="mb-6">
                       <input 
