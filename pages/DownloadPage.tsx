@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
@@ -24,7 +23,7 @@ const DownloadPage: React.FC = () => {
          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/')}>
             <div className="relative">
                 <div className="absolute inset-0 bg-game-primary blur-lg opacity-40 group-hover:opacity-70 transition-opacity"></div>
-                <img src="https://files.catbox.moe/qn40s6.png" className="w-10 h-10 relative z-10 drop-shadow-md" alt="Logo" />
+                <img src="/logo.png" className="w-10 h-10 relative z-10 drop-shadow-md" alt="Logo" />
             </div>
             <span className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter">LP-F4</span>
          </div>

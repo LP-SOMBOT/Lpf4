@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, set, get } from 'firebase/database';
@@ -246,7 +245,7 @@ const AuthPage: React.FC = () => {
              <div className="w-24 h-24 mx-auto mb-4 relative group">
                 <div className="absolute inset-0 bg-gradient-to-tr from-game-primary to-red-500 rounded-3xl rotate-6 blur-lg opacity-60 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="relative w-full h-full bg-white dark:bg-slate-800 rounded-3xl border border-white/50 dark:border-slate-600 flex items-center justify-center shadow-xl overflow-hidden">
-                    <img src="https://files.catbox.moe/qn40s6.png" className="w-20 h-20 object-contain" alt="Logo" />
+                    <img src="/logo.png" className="w-20 h-20 object-contain" alt="Logo" />
                 </div>
              </div>
              <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight relative inline-block">

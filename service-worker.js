@@ -1,11 +1,10 @@
-
 /* eslint-disable no-restricted-globals */
 
 const CACHE_NAME = 'lp-f4-cache-v3';
 const urlsToCache = [
   './',
   './index.html',
-  'https://files.catbox.moe/qn40s6.png',
+  '/logo.png',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css',

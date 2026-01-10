@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
@@ -249,17 +248,50 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-orange-50 dark:bg-slate-900 text-white transition-colors">
-        <div className="absolute inset-0 bg-white/5 backdrop-blur-xl z-0"></div>
-        <div className="relative z-10 w-24 h-24 mb-4">
-             <div className="absolute inset-0 bg-orange-500 opacity-20 rounded-full animate-ping"></div>
-             <div className="relative w-full h-full bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center shadow-xl z-10">
-                 <img src="https://files.catbox.moe/qn40s6.png" alt="Logo" className="w-12 h-12" />
-             </div>
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
+        {/* Ambient Background */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/20 rounded-full blur-[128px] animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[128px] animate-pulse delay-1000"></div>
+        
+        <div className="relative z-10 flex flex-col items-center">
+            {/* Logo Container */}
+            <div className="relative mb-8">
+                {/* Glow effect */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-orange-500 to-red-600 rounded-3xl blur-xl opacity-40 animate-pulse"></div>
+                
+                {/* Logo Box */}
+                <div className="relative w-32 h-32 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl flex items-center justify-center border border-white/50 dark:border-slate-800 ring-1 ring-orange-500/10 backdrop-blur-md">
+                     <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain drop-shadow-md animate-[float_4s_ease-in-out_infinite]" />
+                </div>
+                
+                {/* Orbiting particles (Pure CSS) */}
+                <div className="absolute -inset-4 border border-dashed border-orange-300 dark:border-slate-700 rounded-full animate-[spin_10s_linear_infinite] opacity-30 pointer-events-none"></div>
+            </div>
+
+            {/* Typography */}
+            <div className="text-center mb-8">
+                <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-1 flex items-center justify-center gap-1">
+                    LP<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">F4</span>
+                </h1>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.4em] animate-pulse">Battle Arena</p>
+            </div>
+            
+            {/* Loading Bar */}
+            <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 via-red-500 to-orange-500 animate-[loading_1.5s_ease-in-out_infinite] w-1/2"></div>
+            </div>
         </div>
-        <h1 className="relative z-10 text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600 mb-2 animate-pulse">
-            LP-F4
-        </h1>
+
+        <style>{`
+            @keyframes loading {
+                0% { transform: translateX(-150%); }
+                100% { transform: translateX(250%); }
+            }
+            @keyframes float {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-10px); }
+            }
+        `}</style>
       </div>
     );
   }
