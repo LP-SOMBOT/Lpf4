@@ -4,8 +4,6 @@ import { ref, onValue } from 'firebase/database';
 import { db } from '../firebase';
 import { playSound } from '../services/audioService';
 
-const ASSISTANT_API_KEY = "AIzaSyANNTSat_EsUKxz38GoyWWqUR5rEa5OHfY";
-
 interface Message {
   role: 'user' | 'model';
   text: string;
@@ -70,12 +68,14 @@ export const LPAssistant: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: ASSISTANT_API_KEY });
+      // Initialize with the environment variable as per guidelines
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const systemPrompt = `You are LP Assistant, a helpful AI guide for the LP-F4 Quiz Battle app (Somali Student Quiz Battle). 
       IMPORTANT INSTRUCTION: Your primary language is Somali (Af-Soomaali). You must answer all questions in Somali unless the user explicitly requests another language.`;
 
+      // Use Gemini 3 Flash Preview for better performance and reasoning
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: userMsg,
         config: { systemInstruction: systemPrompt }
       });
@@ -83,6 +83,7 @@ export const LPAssistant: React.FC = () => {
       const reply = response.text || "Waan ka xumahay, hadda ma fikiri karo.";
       setMessages([...newHistory, { role: 'model', text: reply }]);
     } catch (error) {
+      console.error("Assistant Error:", error);
       setMessages([...newHistory, { role: 'model', text: "Waan ka xumahay, kuma xirni karo maskaxdayda." }]);
     } finally {
       setIsTyping(false);
@@ -112,7 +113,7 @@ export const LPAssistant: React.FC = () => {
                        </div>
                        <div>
                           <span className="font-bold block leading-none">LP Assistant</span>
-                          <span className="text-[10px] opacity-80">Online</span>
+                          <span className="text-[10px] opacity-80">Online • Gemini 3</span>
                        </div>
                    </div>
                    <button onClick={() => setMessages([])} className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition-colors border border-white/20">Clear</button>
