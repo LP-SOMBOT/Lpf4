@@ -26,6 +26,11 @@ const SocialPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'explore'>('friends');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Swipe Logic
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 50;
+
   // --- DATA STATES ---
   const [friends, setFriends] = useState<UserProfile[]>([]);
   const [requests, setRequests] = useState<{uid: string, user: UserProfile}[]>([]);
@@ -143,6 +148,32 @@ const SocialPage: React.FC = () => {
       showToast("Request sent", "success");
   };
 
+  // --- SWIPE HANDLERS ---
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+        if (activeTab === 'friends') setActiveTab('requests');
+        else if (activeTab === 'requests') setActiveTab('explore');
+    }
+    if (isRightSwipe) {
+        if (activeTab === 'explore') setActiveTab('requests');
+        else if (activeTab === 'requests') setActiveTab('friends');
+    }
+  };
+
   // --- LIST PROCESSING ---
   const exploreList = useMemo(() => {
       return allUsers.filter(u => {
@@ -239,8 +270,13 @@ const SocialPage: React.FC = () => {
             </button>
         </div>
 
-        {/* 3. Content List */}
-        <div className="flex-1 space-y-3">
+        {/* 3. Content List - Swipeable Container */}
+        <div 
+            className="flex-1 space-y-3 min-h-[300px]"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+        >
             
             {/* --- FRIENDS TAB --- */}
             {activeTab === 'friends' && (
@@ -270,8 +306,10 @@ const SocialPage: React.FC = () => {
 
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
-                                        <div className="font-black text-slate-800 dark:text-white text-base truncate mb-0.5">
+                                        <div className="font-black text-slate-800 dark:text-white text-base truncate mb-0.5 flex items-center gap-1">
                                             {f.name}
+                                            {f.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                            {f.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                                         </div>
                                         <div className={`text-xs truncate font-bold ${meta.unreadCount > 0 ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>
                                             {isMe ? `You: ${lastMsg}` : lastMsg}
@@ -315,12 +353,13 @@ const SocialPage: React.FC = () => {
                                         <div className="font-black text-slate-800 dark:text-white text-sm truncate flex items-center gap-1">
                                             {u.name}
                                             {u.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                            {u.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                                         </div>
                                         <div className="text-xs text-slate-400 font-bold truncate">@{u.username || 'user'}</div>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 shrink-0">
+                                <div className="flex items-center gap-2 shrink-0">
                                     <div className="bg-[#fbbf24] text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm">
                                         Lv.{getLevel(u.points)}
                                     </div>
@@ -332,7 +371,7 @@ const SocialPage: React.FC = () => {
                                     ) : (
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); sendRequest(u.uid); }}
-                                            className="btn-3d bg-[#8b5cf6] text-white px-4 py-2 rounded-full text-xs font-black flex items-center gap-1 transition-all"
+                                            className="btn-3d bg-[#8b5cf6] text-white px-3 py-2 rounded-full text-xs font-black flex items-center gap-1 transition-all"
                                             style={{ boxShadow: '0px 3px 0px 0px #6d28d9' }}
                                         >
                                             <i className="fas fa-user-plus text-[10px]"></i> Add
@@ -357,18 +396,19 @@ const SocialPage: React.FC = () => {
                             <div key={r.uid} className="bg-white dark:bg-slate-800 p-4 rounded-[1.8rem] shadow-sm flex flex-col gap-4 animate__animated animate__fadeIn">
                                 <div className="flex items-center gap-4">
                                     <Avatar src={r.user.avatar} seed={r.user.uid} size="md" />
-                                    <div>
-                                        <div className="font-black text-slate-800 dark:text-white text-sm flex items-center gap-1">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-black text-slate-800 dark:text-white text-sm flex items-center gap-1 truncate">
                                             {r.user.name}
                                             {r.user.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                            {r.user.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                                         </div>
-                                        <div className="text-xs text-slate-400 font-bold">Wants to be friends</div>
+                                        <div className="text-xs text-slate-400 font-bold truncate">Wants to be friends</div>
                                     </div>
-                                    <div className="ml-auto bg-[#fbbf24] text-white text-[10px] font-black px-2.5 py-1 rounded-full">
+                                    <div className="ml-auto bg-[#fbbf24] text-white text-[10px] font-black px-2.5 py-1 rounded-full shrink-0">
                                         Lv.{getLevel(r.user.points)}
                                     </div>
                                 </div>
-                                <div className="flex gap-3">
+                                <div className="flex gap-3 flex-wrap">
                                     <button 
                                         onClick={async () => {
                                             await update(ref(db), { 
@@ -378,14 +418,14 @@ const SocialPage: React.FC = () => {
                                             });
                                             showToast("Friend Added!", "success");
                                         }} 
-                                        className="btn-3d flex-1 bg-game-primary text-white py-3 rounded-xl text-xs font-black uppercase"
+                                        className="btn-3d flex-1 min-w-[80px] bg-game-primary text-white py-3 rounded-xl text-xs font-black uppercase"
                                         style={{ boxShadow: '0px 4px 0px 0px #c2410c' }}
                                     >
                                         Accept
                                     </button>
                                     <button 
                                         onClick={() => remove(ref(db, `users/${user?.uid}/friendRequests/${r.uid}`))} 
-                                        className="btn-3d flex-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 py-3 rounded-xl text-xs font-black uppercase"
+                                        className="btn-3d flex-1 min-w-[80px] bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 py-3 rounded-xl text-xs font-black uppercase"
                                         style={{ boxShadow: '0px 4px 0px 0px rgba(0,0,0,0.2)' }}
                                     >
                                         Reject

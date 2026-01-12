@@ -194,8 +194,8 @@ const GamePage: React.FC = () => {
   const triggerReactionAnimation = (reaction: MatchReaction) => {
     const id = ++reactionCounter.current;
     setActiveReactions(prev => {
-        // Limit active reactions on screen to prevent crash
-        const filtered = prev.length > 5 ? prev.slice(1) : prev;
+        // Clear previous reaction from THIS sender immediately
+        const filtered = prev.filter(r => r.senderId !== reaction.senderId);
         return [...filtered, { id, senderId: reaction.senderId, value: reaction.value }];
     });
     playSound('reaction');
