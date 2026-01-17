@@ -287,11 +287,12 @@ const SocialPage: React.FC = () => {
                         </div>
                     ) : (
                         sortedFriends.map(f => {
-                            const meta = chatMetadata[f.uid] || { lastMessage: '', unreadCount: 0 };
-                            const lastMsg = meta.lastMessage 
+                            // FIX: Safely access metadata via optional chaining to resolve property access error on potential fallback
+                            const meta = chatMetadata[f.uid];
+                            const lastMsg = meta?.lastMessage 
                                 ? (meta.lastMessage === 'CHALLENGE_INVITE' ? '🎮 Game Invite' : meta.lastMessage) 
                                 : 'Start chatting';
-                            const isMe = meta.lastMessageSender === user?.uid;
+                            const isMe = meta?.lastMessageSender === user?.uid;
                             
                             return (
                                 <div 
@@ -311,14 +312,14 @@ const SocialPage: React.FC = () => {
                                             {f.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
                                             {f.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                                         </div>
-                                        <div className={`text-xs truncate font-bold ${meta.unreadCount > 0 ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>
+                                        <div className={`text-xs truncate font-bold ${meta && meta.unreadCount > 0 ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>
                                             {isMe ? `You: ${lastMsg}` : lastMsg}
                                         </div>
                                     </div>
 
                                     {/* Right Side: Level Badge (No Chat Icon) */}
                                     <div className="shrink-0 flex items-center gap-3">
-                                        {meta.unreadCount > 0 && (
+                                        {meta && meta.unreadCount > 0 && (
                                             <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[10px] text-white font-black animate-pulse">
                                                 {meta.unreadCount}
                                             </div>

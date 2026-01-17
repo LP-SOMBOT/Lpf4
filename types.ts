@@ -106,5 +106,6 @@ export interface ChatMessage {
   msgStatus?: 'sending' | 'sent' | 'delivered' | 'read'; // Added 'sending'
   inviteCode?: string; // Room code if type is invite
   subjectName?: string; // Subject name for the invite
-  status?: 'waiting' | 'played' | 'canceled';
+  // FIX: Added 'expired' to allow valid comparison in ChatPage.tsx
+  status?: 'waiting' | 'played' | 'canceled' | 'expired';
 }
