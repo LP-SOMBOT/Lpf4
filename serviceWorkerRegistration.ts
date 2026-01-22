@@ -1,4 +1,3 @@
-
 // This optional code is used to register a service worker.
 // register() is not called by default.
 
@@ -27,9 +26,8 @@ export function register(config?: Config) {
     }
 
     window.addEventListener('load', () => {
-      // Point to the service-worker.js file relative to the current page.
-      // This fixes issues where the app is served from a subdirectory or preview URL.
-      const swUrl = './service-worker.js';
+      // Use absolute path relative to current origin to prevent cross-origin errors in preview envs
+      const swUrl = `${window.location.origin}/service-worker.js`;
 
       if (isLocalhost) {
         // This is running on localhost. Let's check if a service worker still exists or not.
@@ -85,7 +83,7 @@ function registerValidSW(swUrl: string, config?: Config) {
       };
     })
     .catch((error) => {
-      console.error('Error during service worker registration:', error);
+      console.warn('Error during service worker registration:', error);
     });
 }
 

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp, push, onChildAdded, off, query, limitToLast } from 'firebase/database';
@@ -374,8 +373,8 @@ const GamePage: React.FC = () => {
           const candidate = remoteCandidatesQueue.current.shift();
           if (candidate) {
               try {
-                  await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-              } catch (e) { console.error("Error adding queued candidate", e); }
+                  await peerConnectionRef.current.addIceCandidate(candidate);
+              } catch (e) { console.warn("Error adding queued candidate", e); }
           }
       }
   };
@@ -479,13 +478,13 @@ const GamePage: React.FC = () => {
 
       // 3. Listen for ICE Candidates
       const candidatesRef = ref(db, `matches/${matchId}/webrtc/candidates/${rightProfile.uid}`);
-      const unsubCandidates = onChildAdded(candidatesRef, (snapshot) => {
+      const unsubCandidates = onChildAdded(candidatesRef, async (snapshot) => {
           if (snapshot.exists()) {
               const candidate = snapshot.val();
-              if (pc.remoteDescription) {
+              if (candidate && pc.remoteDescription && pc.signalingState !== 'closed') {
                   try {
-                      pc.addIceCandidate(new RTCIceCandidate(candidate));
-                  } catch (e) { console.error("Error adding candidate", e); }
+                      await pc.addIceCandidate(candidate);
+                  } catch (e) { console.warn("Error adding candidate", e); }
               } else {
                   // Queue candidate if remote description not yet set
                   remoteCandidatesQueue.current.push(candidate);
@@ -787,6 +786,44 @@ const GamePage: React.FC = () => {
   const isMyTurn = match?.turn === user?.uid;
   const isGameOver = match?.status === 'completed';
 
+  // Option Styling Helper
+  const getOptionStyles = (index: number) => {
+      const isSelected = selectedOption === index;
+      const isResult = showFeedback !== null;
+      // Is this specific option the correct answer?
+      const isCorrect = isResult && showFeedback.answer === index;
+      // Is this specific option the selected one and it turned out wrong?
+      const isWrong = isResult && !showFeedback.correct && isSelected;
+      
+      // Default / Unselected State
+      let containerClass = "border-slate-800 bg-slate-900/50 text-slate-300";
+      let letterBoxClass = "bg-slate-800 text-cyan-400 border border-slate-700";
+      let glowClass = "shadow-none";
+      let barClass = "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]"; // Default selection bar
+
+      if (isCorrect) {
+          // Correct Answer (Green) - Prioritize showing correct answer
+          containerClass = "border-green-500 bg-green-500/10 text-white";
+          letterBoxClass = "bg-green-500 text-white border-green-500";
+          glowClass = "shadow-[0_0_20px_rgba(34,197,94,0.3)]";
+          barClass = "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]";
+      } else if (isWrong) {
+          // Wrong Selection (Red)
+          containerClass = "border-red-500 bg-red-500/10 text-white";
+          letterBoxClass = "bg-red-500 text-white border-red-500";
+          glowClass = "shadow-[0_0_20px_rgba(239,68,68,0.3)]";
+          barClass = "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]";
+      } else if (isSelected) {
+          // Just Selected (Processing/Pending) - Orange
+          containerClass = "border-orange-500 bg-slate-900 text-white";
+          letterBoxClass = "bg-orange-500 text-white border-orange-500";
+          glowClass = "shadow-[0_0_20px_rgba(249,115,22,0.3)]";
+          barClass = "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]";
+      }
+
+      return { containerClass, letterBoxClass, glowClass, barClass };
+  };
+
   if (!match || !leftProfile || !rightProfile || isLoadingError || (!currentQuestion && !isGameOver && !showIntro && !showCountdown && !isSpectator)) {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center">
@@ -804,9 +841,9 @@ const GamePage: React.FC = () => {
                   ) : (
                       <>
                         <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                           <i className="fas fa-gamepad text-game-accent"></i>
+                           <i className="fas fa-gamepad text-cyan-400"></i>
                         </div>
-                        <h2 className="font-bold text-xl">{isSpectator ? 'Loading Match...' : 'Waiting for opponent...'}</h2>
+                        <h2 className="font-bold text-xl text-cyan-400">{isSpectator ? 'Loading Match...' : 'Waiting for opponent...'}</h2>
                       </>
                   )}
              </div>
@@ -816,433 +853,323 @@ const GamePage: React.FC = () => {
 
   const leftLevel = Math.floor((leftProfile.points || 0) / 10) + 1;
   const rightLevel = Math.floor((rightProfile.points || 0) / 10) + 1;
-  const leftIsActive = match.turn === leftProfile.uid;
-  const rightIsActive = match.turn === rightProfile.uid;
   const safeScores = match.scores || {};
   const winnerUid = match.winner;
   
   const isLeftSpeaking = match.players?.[leftProfile.uid]?.isSpeaking || false;
   const isRightSpeaking = match.players?.[rightProfile.uid]?.isSpeaking || false;
 
-  const showGameControls = !isGameOver && !isSpectator && !showIntro && !showCountdown;
-
   return (
-    <div className="min-h-screen relative flex flex-col font-sans overflow-y-auto transition-colors pt-24">
-       
-      <style>{`
-        @keyframes turnAlert {
-            0% { transform: translateY(-200%); opacity: 0; }
-            15% { transform: translateY(0); opacity: 1; }
-            85% { transform: translateY(0); opacity: 1; }
-            100% { transform: translateY(-200%); opacity: 0; }
-        }
-        .animate-turn-alert {
-            animation: turnAlert 2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        @keyframes ripple {
-            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-        }
-        .speaking-ripple {
-            animation: ripple 1.5s infinite;
-        }
-      `}</style>
-      
-      {/* Hidden Audio Element for Remote Stream with explicit autoplay */}
-      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
-       
-      {/* IMPROVED VS Screen Animation */}
-      {showIntro && !isSpectator && (
-          <div className="fixed inset-0 z-[60] flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
-              <div className="absolute inset-0 z-0">
-                  <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-orange-600/20 to-transparent"></div>
-                  <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-blue-600/20 to-transparent"></div>
-              </div>
+    <div className="min-h-screen bg-[#050b14] font-sans overflow-hidden relative flex flex-col items-center select-none">
+        
+        {/* Hidden Audio Element for Remote Stream with explicit autoplay */}
+        <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
 
-              <div className="w-full md:w-1/2 h-1/2 md:h-full bg-orange-500 relative flex items-center justify-center animate__animated animate__slideInLeft shadow-[10px_0_50px_rgba(0,0,0,0.5)] z-10">
-                  <div className="text-center z-20 transform scale-110">
-                      <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="xl" className="border-[6px] border-white shadow-2xl mb-6 mx-auto" isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
-                      <h2 className="text-4xl font-black text-white uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 tracking-tighter">
-                          {leftProfile.name}
-                      </h2>
-                      <div className="inline-block bg-black/40 px-4 py-1.5 rounded-full text-white font-black mt-2 text-sm backdrop-blur-sm border border-white/20 shadow-lg">LVL {leftLevel}</div>
-                  </div>
-                  <i className="fas fa-bolt text-9xl absolute -left-10 bottom-0 text-white/10 rotate-12"></i>
-              </div>
-              
-              <div className="absolute z-30 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate__animated animate__zoomIn animate__delay-1s">
-                  <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-8 border-slate-900 shadow-[0_0_50px_rgba(255,255,255,0.5)]">
-                      <span className="font-black text-5xl italic text-slate-900 transform -skew-x-12">VS</span>
-                  </div>
-              </div>
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-[#050b14] to-[#050b14] pointer-events-none"></div>
+        
+        {/* Grid Floor Effect */}
+        <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-[linear-gradient(to_bottom,transparent_0%,#0f172a_100%),linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:40px_40px] [transform:perspective(500px)_rotateX(60deg)_translateY(100px)] opacity-30 pointer-events-none origin-bottom"></div>
 
-              <div className="w-full md:w-1/2 h-1/2 md:h-full bg-blue-600 relative flex items-center justify-center animate__animated animate__slideInRight shadow-[-10px_0_50px_rgba(0,0,0,0.5)] z-10">
-                  <div className="text-center z-20 transform scale-110">
-                      <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" className="border-[6px] border-white shadow-2xl mb-6 mx-auto" isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
-                      <h2 className="text-4xl font-black text-white uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 tracking-tighter">
-                          {rightProfile.name}
-                      </h2>
-                      <div className="inline-block bg-black/40 px-4 py-1.5 rounded-full text-white font-black mt-2 text-sm backdrop-blur-sm border border-white/20 shadow-lg">LVL {rightLevel}</div>
-                  </div>
-                  <i className="fas fa-gamepad text-9xl absolute -right-10 top-0 text-white/10 -rotate-12"></i>
-              </div>
-          </div>
-      )}
+        {/* --- OVERLAYS: Intro, Countdown, Result --- */}
+        {/* IMPROVED VS Screen Animation */}
+        {showIntro && !isSpectator && (
+            <div className="fixed inset-0 z-[60] flex flex-col md:flex-row items-center justify-center bg-slate-900 overflow-hidden">
+                <div className="absolute inset-0 z-0">
+                    <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-cyan-600/20 to-transparent"></div>
+                    <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-orange-600/20 to-transparent"></div>
+                </div>
 
-      {/* COUNTDOWN OVERLAY */}
-      {showCountdown && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm animate__animated animate__fadeIn">
-              <div className="text-center">
-                  <div className="text-[150px] md:text-[200px] font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)] animate__animated animate__zoomIn animate__faster key={countdownValue}">
-                      {countdownValue === 0 ? 'GO!' : countdownValue}
-                  </div>
-                  {countdownValue > 0 && (
-                      <div className="text-2xl font-bold text-white/80 uppercase tracking-[0.5em] animate-pulse">Get Ready</div>
-                  )}
-              </div>
-          </div>
-      )}
+                <div className="w-full md:w-1/2 h-1/2 md:h-full bg-cyan-500 relative flex items-center justify-center animate__animated animate__slideInLeft shadow-[10px_0_50px_rgba(0,0,0,0.5)] z-10">
+                    <div className="text-center z-20 transform scale-110">
+                        <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="xl" className="border-[6px] border-white shadow-2xl mb-6 mx-auto" isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
+                        <h2 className="text-4xl font-black text-white uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 tracking-tighter">
+                            {leftProfile.name}
+                        </h2>
+                        <div className="inline-block bg-black/40 px-4 py-1.5 rounded-full text-white font-black mt-2 text-sm backdrop-blur-sm border border-white/20 shadow-lg">LVL {leftLevel}</div>
+                    </div>
+                    <i className="fas fa-bolt text-9xl absolute -left-10 bottom-0 text-white/10 rotate-12"></i>
+                </div>
+                
+                <div className="absolute z-30 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate__animated animate__zoomIn animate__delay-1s">
+                    <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-8 border-slate-900 shadow-[0_0_50px_rgba(255,255,255,0.5)]">
+                        <span className="font-black text-5xl italic text-slate-900 transform -skew-x-12">VS</span>
+                    </div>
+                </div>
 
-      {/* Turn Alert */}
-      {showTurnAlert && (
-        <div className="fixed top-24 left-0 right-0 z-[70] flex justify-center pointer-events-none">
-            <div className="animate-turn-alert bg-gradient-to-r from-orange-500 to-red-600 text-white px-8 py-3 rounded-full shadow-[0_10px_30px_rgba(249,115,22,0.5)] border-4 border-white dark:border-slate-800 flex items-center gap-3 transform">
-                <i className="fas fa-bolt text-yellow-300 animate-pulse text-xl"></i>
-                <span className="font-black text-xl uppercase tracking-widest italic drop-shadow-md">Your Turn!</span>
+                <div className="w-full md:w-1/2 h-1/2 md:h-full bg-orange-600 relative flex items-center justify-center animate__animated animate__slideInRight shadow-[-10px_0_50px_rgba(0,0,0,0.5)] z-10">
+                    <div className="text-center z-20 transform scale-110">
+                        <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="xl" className="border-[6px] border-white shadow-2xl mb-6 mx-auto" isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
+                        <h2 className="text-4xl font-black text-white uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 tracking-tighter">
+                            {rightProfile.name}
+                        </h2>
+                        <div className="inline-block bg-black/40 px-4 py-1.5 rounded-full text-white font-black mt-2 text-sm backdrop-blur-sm border border-white/20 shadow-lg">LVL {rightLevel}</div>
+                    </div>
+                    <i className="fas fa-gamepad text-9xl absolute -right-10 top-0 text-white/10 -rotate-12"></i>
+                </div>
             </div>
-        </div>
-      )}
+        )}
 
-      {/* Exit Button Pill */}
-      {!isGameOver && (
-          <div className="fixed top-28 left-1/2 -translate-x-1/2 z-[40]">
-              <button onClick={handleSurrender} className="bg-[#e74c3c]/90 hover:bg-red-600 text-white px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-tighter shadow-sm border border-white/20 transition-all flex items-center gap-1 active:scale-95 backdrop-blur-sm">
-                  <i className="fas fa-sign-out-alt rotate-180"></i> EXIT
-              </button>
-              {profile?.isSupport && isSpectator && (
-                   <button onClick={handleTerminateMatch} className="ml-2 bg-red-800/90 hover:bg-red-700 text-white px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-tighter shadow-sm border border-white/20 transition-all flex items-center gap-1 active:scale-95 backdrop-blur-sm animate-pulse">
-                      <i className="fas fa-ban"></i> END MATCH
-                  </button>
-              )}
-          </div>
-      )}
+        {/* COUNTDOWN OVERLAY */}
+        {showCountdown && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm animate__animated animate__fadeIn">
+                <div className="text-center">
+                    <div className="text-[150px] md:text-[200px] font-black text-cyan-400 drop-shadow-[0_0_30px_rgba(34,211,238,0.8)] animate__animated animate__zoomIn animate__faster key={countdownValue}">
+                        {countdownValue === 0 ? 'GO!' : countdownValue}
+                    </div>
+                </div>
+            </div>
+        )}
 
-      {/* REDESIGNED HEADER SCOREBOARD */}
-      <div className="fixed top-0 left-0 right-0 z-50 p-3 pointer-events-none">
-         <div className="max-w-4xl mx-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl border border-white/40 dark:border-slate-700/50 p-2 md:p-3 flex items-center justify-between pointer-events-auto transition-all duration-300 relative overflow-visible">
-            
-            {/* Left Player (Me) */}
-            <div className={`flex items-center gap-3 transition-all duration-500 ${leftIsActive && !isGameOver ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'}`}>
-                 <div className="relative">
-                     {isLeftSpeaking && (
-                        <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
-                     )}
-                     
-                     <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${leftIsActive ? 'bg-gradient-to-r from-orange-500 to-yellow-500 shadow-[0_0_20px_rgba(249,115,22,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isLeftSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : ''}`}>
-                        <Avatar src={leftProfile.avatar} seed={leftProfile.uid} size="md" className="border-2 border-white dark:border-slate-800" />
-                     </div>
+        {/* RESULT / GAME OVER */}
+        {isGameOver && (
+           <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-6">
+              <div className="w-full max-w-lg animate__animated animate__zoomIn">
+                  <Card className="!p-0 overflow-hidden border-none shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-slate-800 rounded-[2.5rem]">
+                      <div className={`py-10 px-6 relative text-center overflow-hidden ${winnerUid === user?.uid ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600' : winnerUid === 'draw' ? 'bg-slate-700' : 'bg-gradient-to-br from-slate-700 to-slate-900'}`}>
+                          <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                          <div className="relative z-10">
+                              <h1 className="text-5xl md:text-6xl font-black text-white uppercase italic tracking-tighter drop-shadow-lg leading-none">
+                                  {winnerUid === user?.uid ? 'VICTORY' : winnerUid === 'draw' ? 'DRAW' : 'DEFEAT'}
+                              </h1>
+                              <p className="text-white/80 font-bold mt-2 text-sm uppercase tracking-widest">{subjectName}</p>
+                          </div>
+                      </div>
+                      <div className="p-8">
+                          <div className="flex justify-between items-center mb-10 gap-4">
+                              <div className="flex-1 flex flex-col items-center">
+                                  <Avatar src={leftProfile.avatar} size="lg" className={`border-4 ${winnerUid === leftProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-700'}`} />
+                                  <div className="text-center mt-2">
+                                      <div className="font-black text-white uppercase text-xs">You</div>
+                                      <div className="text-3xl font-black text-cyan-400">{safeScores[leftProfile.uid] ?? 0}</div>
+                                  </div>
+                              </div>
+                              <div className="text-slate-600 font-black text-2xl italic px-4">VS</div>
+                              <div className="flex-1 flex flex-col items-center">
+                                  <Avatar src={rightProfile.avatar} size="lg" className={`border-4 ${winnerUid === rightProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-700'}`} />
+                                  <div className="text-center mt-2">
+                                      <div className="font-black text-white uppercase text-xs">{rightProfile.name.split(' ')[0]}</div>
+                                      <div className="text-3xl font-black text-orange-500">{safeScores[rightProfile.uid] ?? 0}</div>
+                                  </div>
+                              </div>
+                          </div>
+                          <Button onClick={handleLeave} size="lg" fullWidth className="py-5 shadow-xl !rounded-2xl text-lg shadow-orange-500/20">
+                              CONTINUE <i className="fas fa-arrow-right ml-2"></i>
+                          </Button>
+                      </div>
+                  </Card>
+              </div>
+           </div>
+        )}
 
-                     {isLeftSpeaking && (
-                         <div className="absolute -top-1 -right-1 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
-                             <i className="fas fa-microphone text-xs"></i>
-                         </div>
-                     )}
+        {/* Turn Alert */}
+        {showTurnAlert && !isGameOver && (
+            <div className="absolute top-28 left-0 right-0 z-[45] flex justify-center pointer-events-none">
+                <div className="animate-turn-alert bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-8 py-3 rounded-full shadow-[0_0_30px_rgba(6,182,212,0.5)] border-2 border-white flex items-center gap-3 transform">
+                    <i className="fas fa-bolt text-yellow-300 animate-pulse text-xl"></i>
+                    <span className="font-black text-xl uppercase tracking-widest italic drop-shadow-md">Your Turn!</span>
+                </div>
+            </div>
+        )}
 
-                     <div className="absolute -bottom-1 -right-1 bg-slate-800 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white dark:border-slate-800 z-20 shadow-sm">
+        {/* HEADER AREA */}
+        <div className="w-full max-w-lg px-4 pt-8 pb-2 z-10 flex justify-between items-start relative">
+            {/* Player 1 (Blue) */}
+            <div className="flex flex-col items-center w-24">
+                <div className="relative">
+                    {/* Glow Ring */}
+                    <div className="absolute inset-0 rounded-3xl bg-cyan-500 blur-md opacity-40"></div>
+                    <div className={`w-20 h-20 rounded-3xl bg-slate-900 border-2 border-cyan-400 relative overflow-hidden z-10 ${isLeftSpeaking ? 'ring-4 ring-green-500' : ''}`}>
+                        <img src={leftProfile.avatar} className="w-full h-full object-cover" />
+                    </div>
+                    {/* Level Badge */}
+                    <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-slate-900 border border-cyan-500 text-cyan-400 text-[9px] font-black px-2 py-0.5 rounded-full z-20 shadow-lg whitespace-nowrap">
                         LVL {leftLevel}
-                     </div>
-                     
-                     {/* REACTIONS FOR LEFT */}
-                     {activeReactions.filter(r => r.senderId === leftProfile.uid).map(r => (
-                         <div key={r.id} className="absolute top-[78px] left-0 z-[100] animate__animated animate__bounceIn">
-                             <div className="relative bg-white px-3 py-1.5 rounded-full border-2 border-orange-500 shadow-[0_4px_15px_rgba(249,115,22,0.3)] min-w-[50px] text-center whitespace-nowrap flex items-center justify-center">
-                                <div className="absolute -top-2 left-8 -translate-x-1/2 w-3 h-3 bg-white border-t-2 border-l-2 border-orange-500 transform rotate-45"></div>
-                                <span className={`text-orange-600 font-black uppercase tracking-wider ${r.value.length > 2 ? 'text-[10px] md:text-xs' : 'text-2xl md:text-3xl leading-none'}`}>{r.value}</span>
+                    </div>
+                    {/* Floating Reaction - Moved BELOW Avatar */}
+                    {activeReactions.filter(r => r.senderId === leftProfile.uid).map(r => (
+                         <div key={r.id} className="absolute top-16 left-1/2 -translate-x-1/2 z-50 animate__animated animate__zoomIn animate__faster">
+                             <div className="bg-white text-black px-3 py-1.5 rounded-2xl font-black shadow-[0_0_15px_rgba(34,211,238,0.5)] border-2 border-cyan-500 whitespace-nowrap text-xs md:text-sm">
+                                {r.value}
                              </div>
                          </div>
-                     ))}
-                 </div>
-                 
-                 <div className="flex flex-col">
-                     <div className="text-base font-black text-slate-900 dark:text-white leading-tight truncate max-w-[100px] flex items-center gap-1">
-                        You
-                        {leftProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
-                     </div>
-                     <div className="flex items-center gap-1 mt-0.5">
-                        <i className="fas fa-bolt text-orange-500 text-xs"></i>
-                        <span className="text-lg font-black text-slate-700 dark:text-slate-300 leading-none">{safeScores[leftProfile.uid] ?? 0}</span>
-                     </div>
-                 </div>
-            </div>
-            
-            {/* Center Status */}
-            <div className="flex flex-col items-center justify-center shrink-0 mx-1">
-                 <div className="text-xl font-black text-slate-300 dark:text-slate-700 italic tracking-tighter leading-none mb-1">VS</div>
-                 <div className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-inner whitespace-nowrap">
-                     {match.currentQ + 1}/{questions.length}
-                 </div>
-            </div>
-            
-            {/* Right Player (Opponent) */}
-            <div 
-                className={`flex flex-row-reverse items-center gap-3 transition-all duration-500 ${rightIsActive && !isGameOver ? 'scale-100 opacity-100' : 'scale-95 opacity-80 grayscale-[0.3]'} cursor-pointer`}
-                onClick={() => setShowOpponentModal(true)}
-            >
-                 <div className="relative">
-                    {isRightSpeaking && (
-                        <div className="absolute -inset-3 rounded-full border-4 border-green-500/50 animate-ping opacity-75"></div>
-                    )}
-
-                    <div className={`p-[3px] rounded-full transition-all duration-300 relative z-10 ${rightIsActive ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'bg-slate-200 dark:bg-slate-700'} ${isRightSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]' : ''}`}>
-                        <Avatar src={rightProfile.avatar} seed={rightProfile.uid} size="md" className="border-2 border-white dark:border-slate-800" />
+                    ))}
+                </div>
+                <div className="mt-4 text-center">
+                    <div className="text-white font-black text-sm flex items-center justify-center gap-1">
+                        You {leftProfile.isVerified && <i className="fas fa-check-circle text-cyan-400 text-xs"></i>}
                     </div>
+                    <div className="text-cyan-400 font-bold text-xs flex items-center justify-center gap-1 mt-0.5">
+                        <i className="fas fa-bolt text-[10px]"></i> {safeScores[leftProfile.uid] ?? 0}
+                    </div>
+                </div>
+            </div>
 
-                    {isRightSpeaking && (
-                         <div className="absolute -top-1 -left-1 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 z-30 shadow-sm animate-bounce">
-                             <i className="fas fa-microphone text-xs"></i>
-                         </div>
-                     )}
+            {/* VS Center */}
+            <div className="flex flex-col items-center mt-2">
+                <div className="relative">
+                    <i className="fas fa-bolt text-5xl text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-orange-500 drop-shadow-[0_0_15px_rgba(234,179,8,0.6)] transform -skew-x-12 animate-pulse"></i>
+                    <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl font-black text-white italic tracking-tighter drop-shadow-md">VS</span>
+                </div>
+                <div className="mt-3 bg-slate-800/80 border border-orange-500/30 text-orange-400 px-4 py-1 rounded-full text-xs font-black shadow-[0_0_15px_rgba(249,115,22,0.2)]">
+                    {match.currentQ + 1}/{questions.length}
+                </div>
+            </div>
 
-                    <div className="absolute -bottom-1 -left-1 bg-slate-800 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white dark:border-slate-800 z-20 shadow-sm">
+            {/* Player 2 (Orange) */}
+            <div className="flex flex-col items-center w-24">
+                <div className="relative cursor-pointer" onClick={() => setShowOpponentModal(true)}>
+                    <div className="absolute inset-0 rounded-3xl bg-orange-500 blur-md opacity-40"></div>
+                    <div className={`w-20 h-20 rounded-3xl bg-slate-900 border-2 border-orange-500 relative overflow-hidden z-10 ${isRightSpeaking ? 'ring-4 ring-green-500' : ''}`}>
+                        <img src={rightProfile.avatar} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-slate-900 border border-orange-500 text-orange-500 text-[9px] font-black px-2 py-0.5 rounded-full z-20 shadow-lg whitespace-nowrap">
                         LVL {rightLevel}
                     </div>
-
-                    {/* REACTIONS FOR RIGHT */}
+                    {/* Floating Reaction - Moved BELOW Avatar */}
                     {activeReactions.filter(r => r.senderId === rightProfile.uid).map(r => (
-                         <div key={r.id} className="absolute top-[78px] right-0 z-[100] animate__animated animate__bounceIn">
-                             <div className="relative bg-white px-3 py-1.5 rounded-full border-2 border-blue-500 shadow-[0_4px_15px_rgba(59,130,246,0.3)] min-w-[50px] text-center whitespace-nowrap flex items-center justify-center">
-                                <div className="absolute -top-2 right-8 translate-x-1/2 w-3 h-3 bg-white border-t-2 border-l-2 border-blue-500 transform rotate-45"></div>
-                                <span className={`text-blue-600 font-black uppercase tracking-wider ${r.value.length > 2 ? 'text-[10px] md:text-xs' : 'text-2xl md:text-3xl leading-none'}`}>{r.value}</span>
+                         <div key={r.id} className="absolute top-16 left-1/2 -translate-x-1/2 z-50 animate__animated animate__zoomIn animate__faster">
+                             <div className="bg-white text-black px-3 py-1.5 rounded-2xl font-black shadow-[0_0_15px_rgba(249,115,22,0.5)] border-2 border-orange-500 whitespace-nowrap text-xs md:text-sm">
+                                {r.value}
                              </div>
                          </div>
-                     ))}
-                 </div>
-                 
-                 <div className="flex flex-col items-end">
-                     <div className="text-base font-black text-slate-900 dark:text-white leading-tight truncate max-w-[100px] flex items-center gap-1 justify-end">
-                        {rightProfile.isOnline && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>}
+                    ))}
+                </div>
+                <div className="mt-4 text-center">
+                    <div className="text-white font-black text-sm truncate max-w-[80px] mx-auto flex items-center justify-center gap-1">
                         {rightProfile.name}
-                        {rightProfile.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
-                     </div>
-                     <div className="flex items-center gap-1 mt-0.5 justify-end">
-                        <span className="text-lg font-black text-slate-700 dark:text-slate-300 leading-none">{safeScores[rightProfile.uid] ?? 0}</span>
-                        <i className="fas fa-bolt text-blue-500 text-xs"></i>
-                     </div>
-                 </div>
+                        {rightProfile.isVerified && <i className="fas fa-check-circle text-orange-500 text-xs"></i>}
+                    </div>
+                    <div className="text-orange-500 font-bold text-xs flex items-center justify-center gap-1 mt-0.5">
+                        {safeScores[rightProfile.uid] ?? 0} <i className="fas fa-bolt text-[10px]"></i> 
+                    </div>
+                </div>
             </div>
-         </div>
-      </div>
+        </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 pb-32 w-full max-w-3xl mx-auto z-10">
-        {isGameOver ? (
-           /* REDESIGNED RESULT UI */
-           <div className="w-full max-w-lg animate__animated animate__zoomIn">
-              <Card className="!p-0 overflow-hidden border-none shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-white dark:bg-slate-800 rounded-[2.5rem]">
-                  {/* Header Banner */}
-                  <div className={`py-10 px-6 relative text-center overflow-hidden ${winnerUid === user?.uid ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600' : winnerUid === 'draw' ? 'bg-slate-700' : 'bg-gradient-to-br from-slate-700 to-slate-900'}`}>
-                      {/* Decorative elements */}
-                      <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                      <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"></div>
-                      <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-black/20 rounded-full blur-3xl"></div>
-                      
-                      <div className="relative z-10">
-                          <div className="inline-block px-4 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black text-white uppercase tracking-[0.2em] mb-3">Match Summary</div>
-                          <h1 className="text-5xl md:text-6xl font-black text-white uppercase italic tracking-tighter drop-shadow-lg leading-none">
-                              {winnerUid === user?.uid ? 'VICTORY' : winnerUid === 'draw' ? 'DRAW' : 'DEFEAT'}
-                          </h1>
-                          <p className="text-white/80 font-bold mt-2 text-sm uppercase tracking-widest">{subjectName}</p>
-                      </div>
-                  </div>
+        {/* QUESTION CARD (Resized & Positioned) */}
+        <div className="w-full max-w-lg px-4 z-10 flex-1 flex flex-col justify-start pt-4 min-h-0 pb-24 overflow-y-auto custom-scrollbar">
+            <div className="relative bg-slate-900/40 backdrop-blur-xl border border-cyan-500/30 rounded-[2rem] p-6 shadow-[0_0_40px_rgba(6,182,212,0.1)]">
+                {/* Glossy Reflection */}
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent rounded-t-[2rem] pointer-events-none"></div>
+                
+                {/* Category Tag */}
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <div className="bg-slate-900 border border-cyan-500 text-cyan-400 px-4 py-1 text-[9px] rounded-full font-black uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(6,182,212,0.4)] flex items-center gap-2">
+                        <i className="fas fa-layer-group"></i> {subjectName}
+                    </div>
+                </div>
 
-                  {/* Summary Content */}
-                  <div className="p-8">
-                      {/* Comparison Bar */}
-                      <div className="flex justify-between items-center mb-10 gap-4">
-                          {/* Me */}
-                          <div className="flex-1 flex flex-col items-center">
-                              <div className="relative mb-3">
-                                  <Avatar src={leftProfile.avatar} size="lg" className={`border-4 ${winnerUid === leftProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-100 dark:border-slate-700'}`} isVerified={leftProfile.isVerified} isSupport={leftProfile.isSupport} />
-                                  {winnerUid === leftProfile.uid && <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl animate-bounce">👑</div>}
-                              </div>
-                              <div className="text-center">
-                                  <div className="font-black text-slate-800 dark:text-white uppercase text-xs truncate max-w-[80px]">You</div>
-                                  <div className="text-3xl font-black text-game-primary">{safeScores[leftProfile.uid] ?? 0}</div>
-                              </div>
-                          </div>
+                {/* Report Icon */}
+                <button onClick={handleReport} className="absolute top-4 right-5 text-slate-600 hover:text-red-500 transition-colors">
+                    <i className="fas fa-flag"></i>
+                </button>
 
-                          <div className="text-slate-200 dark:text-slate-600 font-black text-2xl italic px-4">VS</div>
+                {/* Question Text (Resized) */}
+                <div className="mt-3 flex items-center justify-center min-h-[50px]">
+                    <h2 className="text-lg md:text-xl font-bold text-center text-white leading-snug drop-shadow-md">
+                        {currentQuestion?.question}
+                    </h2>
+                </div>
+            </div>
 
-                          {/* Opponent */}
-                          <div className="flex-1 flex flex-col items-center">
-                              <div className="relative mb-3">
-                                  <Avatar src={rightProfile.avatar} size="lg" className={`border-4 ${winnerUid === rightProfile.uid ? 'border-yellow-400 ring-4 ring-yellow-400/20' : 'border-slate-100 dark:border-slate-700'}`} isVerified={rightProfile.isVerified} isSupport={rightProfile.isSupport} />
-                                  {winnerUid === rightProfile.uid && <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl animate-bounce">👑</div>}
-                              </div>
-                              <div className="text-center">
-                                  <div className="font-black text-slate-800 dark:text-white uppercase text-xs truncate max-w-[80px]">{rightProfile.name.split(' ')[0]}</div>
-                                  <div className="text-3xl font-black text-slate-400">{safeScores[rightProfile.uid] ?? 0}</div>
-                              </div>
-                          </div>
-                      </div>
-
-                      {/* Stats Grid */}
-                      <div className="grid grid-cols-2 gap-4 mb-10">
-                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex flex-col items-center">
-                              <span className="text-[10px] font-black text-slate-400 uppercase mb-1">XP Gained</span>
-                              <div className="flex items-center gap-2">
-                                  <i className="fas fa-bolt text-game-primary"></i>
-                                  <span className="text-2xl font-black text-slate-800 dark:text-white">+{safeScores[user?.uid || ''] ?? 0}</span>
-                              </div>
-                          </div>
-                          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex flex-col items-center">
-                              <span className="text-[10px] font-black text-slate-400 uppercase mb-1">New Level</span>
-                              <div className="flex items-center gap-2">
-                                  <i className="fas fa-star text-amber-500"></i>
-                                  <span className="text-2xl font-black text-slate-800 dark:text-white">{leftLevel}</span>
-                              </div>
-                          </div>
-                      </div>
-
-                      <Button onClick={handleLeave} size="lg" fullWidth className="py-5 shadow-xl !rounded-2xl text-lg shadow-orange-500/20">
-                          CONTINUE <i className="fas fa-arrow-right ml-2"></i>
-                      </Button>
-                  </div>
-              </Card>
-           </div>
-        ) : (
-            <>
-                 {/* Question Card */}
-                 <div className={`relative w-full bg-slate-100 dark:bg-slate-800 rounded-[1.5rem] p-6 shadow-xl mb-6 min-h-[180px] flex flex-col items-center justify-center text-center border-t-4 transition-colors duration-300 ${isMyTurn ? 'border-orange-500 shadow-orange-500/10' : 'border-slate-300 dark:border-slate-600'}`}>
-                     <button onClick={handleReport} className="absolute top-4 right-6 text-slate-300 hover:text-red-500 transition-colors z-30" title="Report Question">
-                         <i className="fas fa-flag text-lg opacity-50 hover:opacity-100"></i>
-                     </button>
-
-                     <div className="mb-4">
-                         <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-200 dark:bg-slate-700 text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">
-                             <i className="fas fa-layer-group text-game-primary"></i> {subjectName}
-                         </span>
-                     </div>
-                     <h2 className="relative z-10 text-xl md:text-2xl font-black text-[#2c3e50] dark:text-white leading-snug drop-shadow-sm">
-                        {currentQuestion && currentQuestion.question}
-                     </h2>
-                 </div>
-
-                 {/* Options Grid */}
-                 <div className="relative w-full grid grid-cols-1 gap-3">
-                     {!isMyTurn && !isSpectator && (
-                         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                             <div className="backdrop-blur-xl bg-white/30 dark:bg-slate-900/40 border border-white/50 px-10 py-6 rounded-[2rem] shadow-[0_15px_50px_rgba(0,0,0,0.15)] flex flex-col items-center gap-3 animate__animated animate__fadeIn transform scale-110">
-                                 <div className="w-12 h-12 rounded-full bg-[#f1f1ff] dark:bg-indigo-900/30 flex items-center justify-center">
-                                     <i className="fas fa-hourglass-half text-[#6366f1] animate-bounce"></i>
-                                 </div>
-                                 <div className="text-center">
-                                     <div className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest mb-1">Waiting for</div>
-                                     <div className="text-lg font-black text-[#2c3e50] dark:text-white tracking-tight">{rightProfile.name}</div>
-                                 </div>
-                             </div>
+            {/* OPTIONS LIST (Resized) */}
+            <div className="mt-3 space-y-2">
+                {/* Wait Overlay */}
+                {!isMyTurn && !isSpectator && !isGameOver && (
+                     <div className="absolute inset-x-0 bottom-24 z-30 flex items-center justify-center pointer-events-none animate__animated animate__fadeIn">
+                         <div className="bg-slate-900/80 backdrop-blur-md border border-white/20 px-6 py-2 rounded-full shadow-2xl flex items-center gap-3">
+                             <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                             <span className="text-xs font-bold text-white uppercase tracking-widest">Opponent's Turn</span>
                          </div>
-                     )}
+                     </div>
+                )}
 
-                     {currentQuestion && currentQuestion.options.map((opt, idx) => {
-                        let bgClass = "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200";
-                        let animateClass = "";
-                        
-                        // Default blocked style for opponent's turn
-                        if (!isMyTurn && !isSpectator) {
-                            bgClass = "bg-slate-50 dark:bg-slate-800/50 border-transparent text-slate-400 blur-[2px] opacity-60 grayscale pointer-events-none";
-                        }
-
-                        if (showFeedback) {
-                            if (idx === showFeedback.answer) {
-                                bgClass = "bg-green-500 text-white border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.6)] z-10 scale-[1.02]";
-                                animateClass = "animate__animated animate__shakeY animate__faster";
-                            }
-                            else if (selectedOption === idx) {
-                                bgClass = "bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] z-10 scale-[1.02]";
-                                animateClass = "animate__animated animate__shakeX animate__faster";
-                            }
-                            else {
-                                bgClass = "opacity-50 grayscale blur-[1px] scale-95";
-                            }
-                        }
-
-                        return (
-                            <button 
-                                key={idx} 
-                                disabled={!isMyTurn || selectedOption !== null} 
-                                onClick={() => handleOptionClick(idx)} 
-                                className={`w-full p-4 rounded-2xl text-left transition-all duration-200 flex items-center gap-4 border-2 shadow-sm ${bgClass} ${animateClass}`}
-                            >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 bg-slate-50 dark:bg-slate-700 text-slate-400 ${showFeedback ? 'bg-white/20 text-white' : ''}`}>
-                                    {String.fromCharCode(65 + idx)}
+                {currentQuestion?.options.map((opt, idx) => {
+                    const style = getOptionStyles(idx);
+                    const showBar = selectedOption === idx || (showFeedback && showFeedback.answer === idx);
+                    
+                    return (
+                        <button
+                            key={idx}
+                            disabled={!isMyTurn || selectedOption !== null}
+                            onClick={() => handleOptionClick(idx)}
+                            className={`w-full relative group transition-all duration-200 transform active:scale-[0.98] ${!isMyTurn && !isSpectator ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                        >
+                            <div className={`relative p-1 rounded-2xl border-2 transition-all duration-300 ${style.containerClass} ${style.glowClass}`}>
+                                <div className="flex items-center gap-3 bg-transparent p-2 rounded-xl">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm transition-colors ${style.letterBoxClass}`}>
+                                        {String.fromCharCode(65 + idx)}
+                                    </div>
+                                    <span className={`font-bold text-left text-sm leading-tight ${selectedOption === idx || (showFeedback && showFeedback.answer === idx) ? 'text-white' : 'text-slate-300'}`}>
+                                        {opt}
+                                    </span>
                                 </div>
-                                <span className="font-bold text-base leading-tight flex-1">{opt}</span>
-                            </button>
-                        );
-                    })}
-                 </div>
-            </>
+                                {/* Neon Bar on Right for selection or correct result */}
+                                {showBar && (
+                                    <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-l-full ${style.barClass}`}></div>
+                                )}
+                            </div>
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
+
+        {/* BOTTOM CONTROLS - FIXED FLOATING */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-6 pointer-events-none bg-gradient-to-t from-[#050b14] via-[#050b14]/80 to-transparent pt-10">
+            <div className="w-full max-w-lg px-8 flex justify-between items-end pointer-events-auto relative">
+                {/* Reaction Button (Left) */}
+                <div className="relative">
+                    <button 
+                        onClick={() => setShowReactionMenu(!showReactionMenu)}
+                        className="w-14 h-14 rounded-full bg-slate-900 border-2 border-orange-500 text-orange-500 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(249,115,22,0.2)] hover:bg-orange-500 hover:text-white transition-all active:scale-90"
+                    >
+                        <i className={`fas ${showReactionMenu ? 'fa-times' : 'fa-smile'}`}></i>
+                    </button>
+                    {/* Reaction Menu Overlay (Faster Animation) */}
+                    {showReactionMenu && (
+                        <div className="absolute bottom-16 left-0 bg-slate-800/95 backdrop-blur-xl border border-orange-500/30 p-4 rounded-[2rem] w-64 shadow-2xl animate__animated animate__zoomIn animate__faster origin-bottom-left z-30 mb-2">
+                            <div className="grid grid-cols-4 gap-2 mb-3">
+                                {reactionEmojis.map(emoji => (
+                                    <button key={emoji} onClick={() => sendReaction(emoji)} className="text-3xl hover:scale-125 transition-transform p-2">{emoji}</button>
+                                ))}
+                            </div>
+                            <div className="space-y-2 pt-2 border-t border-white/10">
+                                {reactionMessages.map(msg => (
+                                    <button key={msg} onClick={() => sendReaction(msg)} className="w-full text-left px-3 py-1.5 rounded-lg bg-slate-700/50 text-[10px] font-bold text-slate-300 uppercase hover:bg-orange-500 hover:text-white transition-colors">{msg}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* PTT Button (Center - Large) */}
+                <button
+                    onMouseDown={handlePTTStart}
+                    onMouseUp={stopTalking}
+                    onMouseLeave={stopTalking}
+                    onTouchStart={handlePTTStart}
+                    onTouchEnd={stopTalking}
+                    className={`w-20 h-20 rounded-full bg-slate-900 border-[3px] flex items-center justify-center text-3xl shadow-[0_0_30px_rgba(6,182,212,0.3)] transition-all active:scale-95 -mb-2 ${isTalking ? 'border-green-500 text-green-500 shadow-[0_0_40px_rgba(34,197,94,0.6)] scale-110' : 'border-cyan-500 text-cyan-400 hover:scale-105'}`}
+                >
+                    <i className={`fas ${isTalking ? 'fa-microphone-lines' : 'fa-microphone'}`}></i>
+                </button>
+
+                {/* Exit Button (Right) */}
+                <button 
+                    onClick={handleSurrender}
+                    className="w-14 h-14 rounded-full bg-slate-900 border-2 border-red-500/80 text-red-500 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(239,68,68,0.2)] hover:bg-red-500 hover:text-white transition-all active:scale-90"
+                >
+                    <i className="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        {showOpponentModal && (
+            <UserProfileModal user={rightProfile} onClose={() => setShowOpponentModal(false)} />
         )}
-      </div>
-
-      {/* Push-to-Talk Button */}
-      {showGameControls && (
-          <div className="fixed bottom-8 right-4 z-[60]">
-              <button
-                  onMouseDown={handlePTTStart}
-                  onMouseUp={stopTalking}
-                  onMouseLeave={stopTalking}
-                  onTouchStart={handlePTTStart}
-                  onTouchEnd={stopTalking}
-                  className={`w-16 h-16 rounded-full shadow-2xl border-4 transition-all duration-200 flex items-center justify-center transform active:scale-95 ${
-                      isTalking 
-                      ? 'bg-green-500 border-green-400 scale-110 shadow-[0_0_30px_rgba(34,197,94,0.6)]' 
-                      : hasMicPermission 
-                        ? 'bg-white border-game-accent hover:bg-slate-50'
-                        : 'bg-slate-100 border-slate-300 opacity-80'
-                  }`}
-              >
-                  <i className={`fas ${hasMicPermission ? 'fa-microphone' : 'fa-microphone-slash'} text-2xl ${isTalking ? 'text-white animate-pulse' : 'text-slate-400'}`}></i>
-                  {isTalking && (
-                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-sm whitespace-nowrap">
-                          Speaking
-                      </span>
-                  )}
-              </button>
-          </div>
-      )}
-
-      {/* Reaction Toggle Button */}
-      {showGameControls && (
-          <div className="fixed bottom-8 left-4 z-[60]">
-               <button 
-                onClick={() => setShowReactionMenu(!showReactionMenu)}
-                className="w-16 h-16 rounded-full bg-white shadow-2xl border-4 border-[#f97316] text-3xl flex items-center justify-center transition-all active:scale-95 hover:bg-orange-50"
-               >
-                   <i className={`fas ${showReactionMenu ? 'fa-times text-red-500' : 'fa-smile text-[#f97316]'}`}></i>
-               </button>
-               
-               {showReactionMenu && (
-                   <div className="absolute bottom-20 left-0 w-64 p-4 bg-white/95 rounded-3xl shadow-2xl border-2 border-slate-100 animate__animated animate__bounceIn">
-                       <div className="grid grid-cols-4 gap-3 mb-4">
-                           {reactionEmojis.map(emoji => (
-                               <button key={emoji} onClick={() => sendReaction(emoji)} className="text-3xl hover:scale-125 transition-transform p-1">{emoji}</button>
-                           ))}
-                       </div>
-                       <div className="space-y-2 border-t border-slate-100 pt-3">
-                           {reactionMessages.map(msg => (
-                               <button key={msg} onClick={() => sendReaction(msg)} className="w-full text-left px-4 py-2 rounded-xl bg-slate-50 text-[11px] font-black text-slate-600 uppercase tracking-wide hover:bg-game-primary hover:text-white transition-colors">{msg}</button>
-                           ))}
-                       </div>
-                   </div>
-               )}
-          </div>
-      )}
-
-      {showOpponentModal && (
-          <UserProfileModal user={rightProfile} onClose={() => setShowOpponentModal(false)} />
-      )}
     </div>
   );
 };
