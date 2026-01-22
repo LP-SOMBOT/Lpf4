@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#050b14" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>LP-F4 | Battle Arena</title>
     
@@ -33,7 +33,7 @@
                 surface: '#ffffff',
                 surfaceDark: '#1e293b', // Slate 800
                 bg: '#fff7ed', // Orange 50
-                bgDark: '#0f172a', // Slate 900
+                bgDark: '#050b14', // Slate 900
               }
             },
             fontFamily: {
@@ -66,17 +66,15 @@
 
     <style>
       :root {
-        color-scheme: light dark;
+        color-scheme: dark;
       }
       body {
         font-family: 'Poppins', sans-serif;
         margin: 0;
         padding: 0;
         overscroll-behavior-y: none;
-        background-color: #f8fafc; 
-      }
-      .dark body {
-        background-color: #0f172a;
+        background-color: #050b14; 
+        color: white;
       }
       
       /* Disable scrollbar for immersive feel */
@@ -87,14 +85,10 @@
       
       /* Game UI Utilities */
       .game-panel {
-        background: rgba(255, 255, 255, 0.9);
-        border: 2px solid #fdba74; /* Orange 200 */
+        background: rgba(30, 41, 59, 0.9);
+        border: 2px solid #334155;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         border-radius: 1.5rem;
-      }
-      .dark .game-panel {
-        background: rgba(30, 41, 59, 0.9);
-        border-color: #334155;
       }
 
       /* 3D Button Utility */
@@ -118,29 +112,29 @@
         z-index: 9999 !important;
       }
       
-      /* COMPACT POPUP STYLE */
+      /* COMPACT POPUP STYLE - Dark Mode Forced */
       .glass-swal-popup {
-        background: rgba(255, 255, 255, 0.95) !important;
+        background: rgba(15, 23, 42, 0.95) !important; /* Slate 900 */
         backdrop-filter: blur(10px) !important;
         -webkit-backdrop-filter: blur(10px) !important;
-        border: 1px solid rgba(0,0,0,0.05) !important;
-        box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.15) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.5) !important;
         border-radius: 1.5rem !important;
-        padding: 1rem 1rem 1.25rem 1rem !important; /* Compact Padding */
+        padding: 1rem 1rem 1.25rem 1rem !important;
         font-family: 'Poppins', sans-serif !important;
-        color: #1e293b !important;
-        width: 20em !important; /* REDUCED WIDTH */
+        color: #ffffff !important;
+        width: 20em !important;
         max-width: 85vw !important;
         position: relative !important;
       }
       
       .glass-swal-toast {
-        background: #ffffff !important;
-        border: 1px solid rgba(0,0,0,0.05) !important;
-        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.1) !important;
+        background: #1e293b !important; /* Slate 800 */
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.3) !important;
         border-radius: 1rem !important;
         padding: 0.75rem !important;
-        color: #1e293b !important;
+        color: #ffffff !important;
       }
 
       /* CUSTOM X BUTTON */
@@ -150,9 +144,9 @@
         right: 0.5rem !important;
         width: 2rem !important;
         height: 2rem !important;
-        background: #f1f5f9 !important; /* Slate 100 */
+        background: #334155 !important;
         border-radius: 50% !important;
-        color: #64748b !important;
+        color: #94a3b8 !important;
         font-size: 1.25rem !important;
         display: flex !important;
         align-items: center !important;
@@ -162,47 +156,25 @@
         transition: all 0.2s !important;
       }
       .swal2-close:hover {
+        background: #475569 !important;
         color: #ef4444 !important;
-        background: #fee2e2 !important; /* Red 100 */
-        transform: rotate(90deg) !important;
       }
       
       /* Compact Text */
       .glass-swal-title, .glass-swal-toast-title, .swal2-title {
-        color: #1e293b !important;
+        color: #ffffff !important;
         font-weight: 800 !important;
-        font-size: 1.1rem !important; /* Smaller Title */
+        font-size: 1.1rem !important;
         margin-bottom: 0.25rem !important;
         padding: 0 !important;
       }
       
       .glass-swal-content, .swal2-html-container {
-        color: #475569 !important;
+        color: #cbd5e1 !important;
         font-weight: 500 !important;
-        font-size: 0.85rem !important; /* Smaller Text */
+        font-size: 0.85rem !important;
         margin: 0.5rem 0 1rem 0 !important;
         line-height: 1.4 !important;
-      }
-
-      /* Dark Mode Override */
-      .dark .glass-swal-popup, .dark .glass-swal-toast {
-        background: rgba(30, 41, 59, 0.95) !important;
-        border-color: rgba(255,255,255,0.05) !important;
-        color: #ffffff !important; 
-      }
-      .dark .swal2-close {
-        background: #334155 !important;
-        color: #94a3b8 !important;
-      }
-      .dark .swal2-close:hover {
-        background: #475569 !important;
-        color: #ef4444 !important;
-      }
-      .dark .glass-swal-title, .dark .glass-swal-toast-title, .dark .swal2-title {
-        color: #ffffff !important;
-      }
-      .dark .glass-swal-content, .dark .swal2-html-container {
-        color: #cbd5e1 !important;
       }
 
       /* Compact Buttons */
@@ -217,25 +189,21 @@
         margin: 0 5px !important;
       }
       .glass-swal-btn-cancel {
-        background-color: #f1f5f9 !important;
-        color: #64748b !important;
+        background-color: #334155 !important;
+        color: #cbd5e1 !important;
         border-radius: 0.75rem !important;
         padding: 0.6rem 1.5rem !important;
         font-weight: 700 !important;
         font-size: 0.8rem !important;
         margin: 0 5px !important;
       }
-      .dark .glass-swal-btn-cancel {
-        background-color: #334155 !important;
-        color: #cbd5e1 !important;
-      }
 
       /* Input Fields in Alerts */
       .glass-swal-input, .swal2-input {
-        background-color: #f8fafc !important;
-        border: 2px solid #e2e8f0 !important;
+        background-color: #1e293b !important;
+        border: 2px solid #334155 !important;
         border-radius: 0.75rem !important;
-        color: #1e293b !important;
+        color: #ffffff !important;
         font-weight: 600 !important;
         padding: 0.6rem !important;
         text-align: center !important;
@@ -243,11 +211,6 @@
         margin: 0.5rem auto 1rem auto !important;
         width: 80% !important;
         box-shadow: none !important;
-      }
-      .dark .glass-swal-input, .dark .swal2-input {
-        background-color: #1e293b !important;
-        border-color: #334155 !important;
-        color: #ffffff !important;
       }
     </style>
   <script type="importmap">

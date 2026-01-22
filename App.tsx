@@ -57,27 +57,12 @@ const AppContent: React.FC = () => {
   // Verification Modal State
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   
-  // Theme Logic - Defaults to Light
-  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'light' || saved === 'dark') return saved;
-    return 'light'; // Default to Light
-  });
-
-  const setTheme = (newTheme: 'light' | 'dark') => {
-    setThemeState(newTheme);
-    localStorage.setItem('theme', newTheme);
-  };
-
-  // Apply Theme Class
+  // Enforce Dark Theme
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [theme]);
+    document.documentElement.classList.add('dark');
+    // Ensure body background is set
+    document.body.style.backgroundColor = '#050b14';
+  }, []);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -248,39 +233,36 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#050b14] overflow-hidden">
         {/* Ambient Background */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/20 rounded-full blur-[128px] animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[128px] animate-pulse delay-1000"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-[128px] animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px] animate-pulse delay-1000"></div>
         
         <div className="relative z-10 flex flex-col items-center">
             {/* Logo Container */}
             <div className="relative mb-8">
                 {/* Glow effect */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-orange-500 to-red-600 rounded-3xl blur-xl opacity-40 animate-pulse"></div>
+                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-full blur-2xl opacity-40 animate-pulse"></div>
                 
                 {/* Logo Box */}
-                <div className="relative w-32 h-32 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl flex items-center justify-center border border-white/50 dark:border-slate-800 ring-1 ring-orange-500/10 backdrop-blur-md overflow-hidden">
-                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-game-primary to-red-600">
-                         <i className="fas fa-graduation-cap text-5xl text-white drop-shadow-md animate-pulse"></i>
+                <div className="relative w-32 h-32 bg-[#0f172a] rounded-full shadow-2xl flex items-center justify-center border border-cyan-500/30 ring-4 ring-black/50 backdrop-blur-md overflow-hidden">
+                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b]">
+                         <i className="fas fa-graduation-cap text-5xl text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)] animate-bounce"></i>
                      </div>
                 </div>
-                
-                {/* Orbiting particles (Pure CSS) */}
-                <div className="absolute -inset-4 border border-dashed border-orange-300 dark:border-slate-700 rounded-full animate-[spin_10s_linear_infinite] opacity-30 pointer-events-none"></div>
             </div>
 
             {/* Typography */}
             <div className="text-center mb-8">
-                <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-1 flex items-center justify-center gap-1">
-                    LP<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">F4</span>
+                <h1 className="text-5xl font-black text-white tracking-tighter mb-1 flex items-center justify-center gap-1">
+                    LP<span className="text-cyan-400">F4</span>
                 </h1>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.4em] animate-pulse">Battle Arena</p>
+                <p className="text-[10px] font-bold text-cyan-500/70 uppercase tracking-[0.5em] animate-pulse">Battle Arena</p>
             </div>
             
             {/* Loading Bar */}
-            <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-500 via-red-500 to-orange-500 animate-[loading_1.5s_ease-in-out_infinite] w-1/2"></div>
+            <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-500 animate-[loading_1s_ease-in-out_infinite] w-1/2"></div>
             </div>
         </div>
 
@@ -288,10 +270,6 @@ const AppContent: React.FC = () => {
             @keyframes loading {
                 0% { transform: translateX(-150%); }
                 100% { transform: translateX(250%); }
-            }
-            @keyframes float {
-                0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-10px); }
             }
         `}</style>
       </div>
@@ -303,23 +281,20 @@ const AppContent: React.FC = () => {
 
   return (
     <UserContext.Provider value={{ user, profile, loading }}>
-      <ThemeContext.Provider value={{ theme, setTheme }}>
+      <ThemeContext.Provider value={{ theme: 'dark', setTheme: () => {} }}>
         {/* GLOBAL GAMING BACKGROUND */}
-        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none bg-[#050b14]">
             {/* Base Layer */}
-            <div className="absolute inset-0 bg-slate-50 dark:bg-slate-900 transition-colors duration-500" />
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
             
-            {/* Primary Gradient Mesh (Orange) - Top Left */}
-            <div className="absolute top-0 left-0 w-[120vw] h-[120vw] sm:w-[80vw] sm:h-[80vw] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-200/50 via-transparent to-transparent dark:from-orange-900/30 dark:via-transparent dark:to-transparent blur-3xl transform -translate-x-1/3 -translate-y-1/3" />
+            {/* Primary Gradient Mesh (Cyan/Blue) - Top Left */}
+            <div className="absolute top-0 left-0 w-[120vw] h-[120vw] sm:w-[80vw] sm:h-[80vw] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-900/20 via-transparent to-transparent blur-3xl transform -translate-x-1/3 -translate-y-1/3" />
             
-            {/* Accent Gradient Mesh (Indigo) - Bottom Right */}
-            <div className="absolute bottom-0 right-0 w-[120vw] h-[120vw] sm:w-[80vw] sm:h-[80vw] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-200/50 via-transparent to-transparent dark:from-indigo-900/30 dark:via-transparent dark:to-transparent blur-3xl transform translate-x-1/3 translate-y-1/3" />
-            
-            {/* Subtle Texture Pattern for 'Game' Feel */}
-            <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
+            {/* Accent Gradient Mesh (Orange) - Bottom Right */}
+            <div className="absolute bottom-0 right-0 w-[120vw] h-[120vw] sm:w-[80vw] sm:h-[80vw] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-900/20 via-transparent to-transparent blur-3xl transform translate-x-1/3 translate-y-1/3" />
         </div>
 
-        <div className="w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden relative z-10 text-slate-900 dark:text-white transition-colors duration-300">
+        <div className="w-full h-[100dvh] font-sans flex flex-col md:flex-row overflow-hidden relative z-10 text-white">
             {/* Desktop Navigation */}
             {user && showNavbar && (
                 <div className="hidden md:block w-24 lg:w-72 shrink-0 z-20 h-full p-4">
@@ -360,11 +335,11 @@ const AppContent: React.FC = () => {
                 {/* Verification Success Modal */}
                 <Modal isOpen={showVerificationModal} onClose={handleDismissVerification}>
                     <div className="flex flex-col items-center text-center p-4">
-                        <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4 animate__animated animate__bounceIn">
+                        <div className="w-20 h-20 bg-blue-900/30 rounded-full flex items-center justify-center mb-4 animate__animated animate__bounceIn">
                             <i className="fas fa-check-circle text-5xl text-blue-500 drop-shadow-lg"></i>
                         </div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 uppercase italic tracking-tight">Congratulations!</h2>
-                        <p className="text-slate-600 dark:text-slate-300 font-bold mb-6">
+                        <h2 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">Congratulations!</h2>
+                        <p className="text-slate-300 font-bold mb-6">
                             You have been officially verified! The blue badge is now visible on your profile.
                         </p>
                         <Button fullWidth onClick={handleDismissVerification} className="shadow-xl bg-blue-500 border-blue-700 hover:bg-blue-600">
