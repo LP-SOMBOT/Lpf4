@@ -1,8 +1,7 @@
 
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'lp-f4-cache-v4';
-// IMPORTANT: All URLs here must be valid and accessible (200 OK) or the Service Worker will fail to install.
+const CACHE_NAME = 'lp-f4-cache-v5';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -15,12 +14,10 @@ const urlsToCache = [
 
 // Install a service worker
 self.addEventListener('install', (event) => {
-  // Perform install steps
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Opened cache');
-        // cache.addAll is atomic, if any request fails, the whole install fails.
         return cache.addAll(urlsToCache);
       })
       .catch((err) => {
@@ -32,32 +29,50 @@ self.addEventListener('install', (event) => {
 
 // Cache and return requests
 self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  
+  // Handle Navigation Requests (SPA Support)
+  // If the user navigates to /lobby or /profile, serve index.html from cache
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .catch(() => {
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  // Standard Cache Strategy for Assets
   event.respondWith(
-    caches.match(event.request)
+    caches.match(request)
       .then((response) => {
-        // Cache hit - return response
         if (response) {
           return response;
         }
-        return fetch(event.request).then(
+        
+        // Filter out unwanted schemes
+        if (request.url.startsWith('chrome-extension')) {
+            return fetch(request);
+        }
+
+        return fetch(request).then(
           (response) => {
-            // Check if we received a valid response
+            // Check for valid response
             if(!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
-            // Don't cache API calls to Firebase/Google or data URLs
-            const url = event.request.url;
-            if (url.includes('firebase') || url.includes('googleapis') || url.startsWith('data:')) {
+            // Don't cache API calls to Firebase/Google
+            if (request.url.includes('firebase') || request.url.includes('googleapis') || request.url.includes('firestore')) {
                 return response;
             }
 
-            // Clone the response
+            // Clone and cache
             const responseToCache = response.clone();
-
             caches.open(CACHE_NAME)
               .then((cache) => {
-                cache.put(event.request, responseToCache);
+                cache.put(request, responseToCache);
               });
 
             return response;
