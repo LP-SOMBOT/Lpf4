@@ -100,24 +100,19 @@ export const Input: React.FC<InputProps> = ({ label, icon, rightElement, classNa
 // --- Verification Badge ---
 export const VerificationBadge: React.FC<{ className?: string, size?: 'xs'|'sm'|'md'|'lg'|'xl' }> = ({ className = '', size = 'md' }) => {
   const sizeClasses = {
-    xs: "w-3 h-3",
-    sm: "w-4 h-4",
-    md: "w-5 h-5",
-    lg: "w-6 h-6",
-    xl: "w-8 h-8"
+    xs: "w-4 h-4",
+    sm: "w-5 h-5",
+    md: "w-6 h-6",
+    lg: "w-8 h-8",
+    xl: "w-10 h-10"
   };
   
   return (
     <div className={`inline-block select-none ${sizeClasses[size]} ${className}`} title="Verified">
         <img 
-            src="/verify.png" 
+            src="https://cdn-icons-png.flaticon.com/512/12559/12559876.png" 
             alt="Verified" 
             className="w-full h-full object-contain"
-            onError={(e) => {
-                // Fallback if image fails to load
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.parentElement?.classList.add('bg-blue-500', 'rounded-full');
-            }} 
         />
     </div>
   );
