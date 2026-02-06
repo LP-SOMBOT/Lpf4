@@ -109,3 +109,12 @@ export interface ChatMessage {
   // FIX: Added 'expired' to allow valid comparison in ChatPage.tsx
   status?: 'waiting' | 'played' | 'canceled' | 'expired';
 }
+
+export interface StudyMaterial {
+  id: string;
+  fileName: string; // Display name
+  subjectName: string; // Links to Subject ID or Name
+  fileURL: string;
+  fileSize: string; // e.g. "2.4 MB"
+  uploadDate: number;
+}

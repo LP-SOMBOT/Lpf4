@@ -2,7 +2,7 @@
 import React, { useContext } from 'react';
 import { UserContext } from '../contexts';
 import { UserProfile } from '../types';
-import { Modal, Avatar, Button } from './UI';
+import { Modal, Avatar, Button, VerificationBadge } from './UI';
 import { SupportActionPanel } from './SupportActionPanel';
 
 interface Props {
@@ -21,7 +21,7 @@ export const UserProfileModal: React.FC<Props> = ({ user, onClose, actionLabel, 
                 <Avatar src={user.avatar} seed={user.uid} size="xl" isVerified={user.isVerified} isSupport={user.isSupport} isOnline={user.isOnline} className="mb-4 shadow-xl border-4 border-white dark:border-slate-700" />
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white text-center flex items-center gap-2">
                     {user.name}
-                    {user.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg"></i>}
+                    {user.isVerified && <VerificationBadge size="lg" className="text-blue-500" />}
                     {user.isSupport && <i className="fas fa-check-circle text-game-primary text-lg"></i>}
                 </h2>
                 {user.banned && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold mt-1">Banned User</span>}

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
@@ -27,6 +28,7 @@ import AboutPage from './pages/AboutPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import SocialPage from './pages/SocialPage';
 import ChatPage from './pages/ChatPage';
+import LibraryPage from './pages/LibraryPage';
 import { SupportDashboard } from './pages/SupportDashboard';
 
 // Protected Route Component
@@ -276,7 +278,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  const showNavbar = ['/', '/lobby', '/leaderboard', '/profile', '/about', '/social'].includes(location.pathname);
+  const showNavbar = ['/', '/lobby', '/leaderboard', '/profile', '/about', '/social', '/library'].includes(location.pathname);
   const showAssistant = user && !location.pathname.includes('/game') && !location.pathname.includes('/chat') && !location.pathname.includes('/support');
 
   return (
@@ -310,6 +312,7 @@ const AppContent: React.FC = () => {
                       <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
                       <Route path="/lobby" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
                       <Route path="/social" element={<ProtectedRoute><SocialPage /></ProtectedRoute>} />
+                      <Route path="/library" element={<ProtectedRoute><LibraryPage /></ProtectedRoute>} />
                       <Route path="/chat/:uid" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
                       <Route path="/game/:matchId" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
                       <Route path="/solo" element={<ProtectedRoute><SoloPage /></ProtectedRoute>} />

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 
 // --- Base Styles ---
 const CARD_BASE = "bg-white dark:bg-slate-800 rounded-3xl border-2 border-slate-200 dark:border-slate-700 shadow-xl transition-all";
@@ -57,27 +57,62 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   rightElement?: React.ReactNode;
 }
 
-export const Input: React.FC<InputProps> = ({ label, icon, rightElement, className = '', ...props }) => (
-  <div className="mb-4">
-    {label && <label className="block text-slate-600 dark:text-slate-300 text-xs font-black uppercase tracking-widest mb-2 ml-1">{label}</label>}
-    <div className="relative group">
-      {icon && (
-        <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-game-primary transition-colors z-10">
-          <i className={`fas ${icon} text-lg`}></i>
-        </span>
-      )}
-      <input 
-        className={`w-full ${INPUT_BASE} py-4 ${icon ? 'pl-12' : 'pl-4'} ${rightElement ? 'pr-12' : 'pr-4'} text-slate-900 dark:text-white placeholder-slate-400 outline-none ${className}`}
-        {...props}
-      />
-      {rightElement && (
-        <div className="absolute inset-y-0 right-0 flex items-center pr-3 z-10">
-          {rightElement}
-        </div>
-      )}
+export const Input: React.FC<InputProps> = ({ label, icon, rightElement, className = '', type, ...props }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === 'password';
+  const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type;
+
+  return (
+    <div className="mb-4">
+      {label && <label className="block text-slate-600 dark:text-slate-300 text-xs font-black uppercase tracking-widest mb-2 ml-1">{label}</label>}
+      <div className="relative group">
+        {icon && (
+          <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-game-primary transition-colors z-10">
+            <i className={`fas ${icon} text-lg`}></i>
+          </span>
+        )}
+        <input 
+          className={`w-full ${INPUT_BASE} py-4 ${icon ? 'pl-12' : 'pl-4'} ${rightElement || isPassword ? 'pr-12' : 'pr-4'} text-slate-900 dark:text-white placeholder-slate-400 outline-none ${className}`}
+          type={effectiveType}
+          {...props}
+        />
+        {isPassword ? (
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 hover:text-game-primary transition-colors z-10 focus:outline-none"
+              tabIndex={-1}
+            >
+              <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-lg`}></i>
+            </button>
+        ) : (
+            rightElement && (
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 z-10">
+                {rightElement}
+                </div>
+            )
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+// --- Verification Badge ---
+export const VerificationBadge: React.FC<{ className?: string, size?: 'xs'|'sm'|'md'|'lg'|'xl' }> = ({ className = '', size = 'md' }) => {
+  const sizeClasses = {
+    xs: "w-3 h-3",
+    sm: "w-4 h-4",
+    md: "w-5 h-5",
+    lg: "w-6 h-6",
+    xl: "w-8 h-8"
+  };
+  
+  return (
+    <div className={`inline-flex items-center justify-center ${sizeClasses[size]} ${className}`} title="Verified">
+        <img src="/verify.png" alt="Verified" className="w-full h-full object-contain" />
+    </div>
+  );
+};
 
 // --- Card ---
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
@@ -118,7 +153,7 @@ export const Avatar: React.FC<{
           <img src={imageUrl} alt="Avatar" className="w-full h-full object-cover" />
         </div>
         
-        {/* Online Status Overlay with Pulse Effect */}
+        {/* Online Status Overlay */}
         {isOnline && (
              <span className="absolute bottom-0.5 right-0.5 block h-3.5 w-3.5 rounded-full ring-2 ring-white dark:ring-slate-800 bg-green-500 z-10">
                  <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75"></span>

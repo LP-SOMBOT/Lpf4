@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp, push, onChildAdded, off, query, limitToLast } from 'firebase/database';
@@ -5,7 +6,7 @@ import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { POINTS_PER_QUESTION } from '../constants';
 import { MatchState, Question, Chapter, UserProfile, MatchReaction } from '../types';
-import { Avatar, Button, Card, Modal } from '../components/UI';
+import { Avatar, Button, Card, Modal, VerificationBadge } from '../components/UI';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { playSound } from '../services/audioService';
 import { showToast, showConfirm, showAlert } from '../services/alert';
@@ -998,7 +999,7 @@ const GamePage: React.FC = () => {
                 </div>
                 <div className="mt-4 text-center">
                     <div className="text-white font-black text-sm flex items-center justify-center gap-1">
-                        You {leftProfile.isVerified && <i className="fas fa-check-circle text-cyan-400 text-xs"></i>}
+                        You {leftProfile.isVerified && <VerificationBadge size="xs" className="text-cyan-400" />}
                     </div>
                     <div className="text-cyan-400 font-bold text-xs flex items-center justify-center gap-1 mt-0.5">
                         <i className="fas fa-bolt text-[10px]"></i> {safeScores[leftProfile.uid] ?? 0}
@@ -1039,7 +1040,7 @@ const GamePage: React.FC = () => {
                 <div className="mt-4 text-center">
                     <div className="text-white font-black text-sm truncate max-w-[80px] mx-auto flex items-center justify-center gap-1">
                         {rightProfile.name}
-                        {rightProfile.isVerified && <i className="fas fa-check-circle text-orange-500 text-xs"></i>}
+                        {rightProfile.isVerified && <VerificationBadge size="xs" className="text-orange-500" />}
                     </div>
                     <div className="text-orange-500 font-bold text-xs flex items-center justify-center gap-1 mt-0.5">
                         {safeScores[rightProfile.uid] ?? 0} <i className="fas fa-bolt text-[10px]"></i> 

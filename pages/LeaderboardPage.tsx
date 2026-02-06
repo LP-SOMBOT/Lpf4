@@ -5,7 +5,7 @@ import { ref, onValue, off } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { UserProfile } from '../types';
-import { Avatar } from '../components/UI';
+import { Avatar, VerificationBadge } from '../components/UI';
 import { UserProfileModal } from '../components/UserProfileModal';
 
 const LeaderboardPage: React.FC = () => {
@@ -126,7 +126,7 @@ const LeaderboardPage: React.FC = () => {
                         <div className="flex-1 min-w-0 pr-2">
                             <div className="font-bold text-sm md:text-base text-slate-900 dark:text-white truncate flex items-center gap-2">
                                 {p.name}
-                                {p.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                {p.isVerified && <VerificationBadge size="xs" className="text-blue-500" />}
                                 {p.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
                                 {isMe && <span className="bg-game-primary text-white text-[9px] px-1.5 py-0.5 rounded-md font-black tracking-wide">You</span>}
                             </div>

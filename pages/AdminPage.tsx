@@ -1,15 +1,20 @@
+
 import React, { useState, useEffect } from 'react';
 import { ref, push, set, get, remove, onValue, off, update } from 'firebase/database';
-import { db } from '../firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '../firebase';
 import { Button, Input, Card, Modal } from '../components/UI';
-import { Question, Subject, Chapter } from '../types';
+import { Question, Subject, Chapter, StudyMaterial } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { read, utils, writeFile } from 'xlsx';
-import { showAlert, showConfirm } from '../services/alert';
+import { showAlert, showConfirm, showToast } from '../services/alert';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
   
+  // View State
+  const [activeTab, setActiveTab] = useState<'quizzes' | 'pdfs'>('quizzes');
+
   // Selection State
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedChapter, setSelectedChapter] = useState<string>('');
@@ -18,12 +23,19 @@ export const AdminPage: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>([]);
   
-  // Form State
+  // Quiz Form State
   const [inputMode, setInputMode] = useState<'manual' | 'bulk' | 'parser'>('manual');
   const [questionText, setQuestionText] = useState('');
   const [options, setOptions] = useState<string[]>(['', '', '', '']); 
   const [correctAnswer, setCorrectAnswer] = useState(0);
+  
+  // PDF Upload Form State
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfTitle, setPdfTitle] = useState('');
+  const [pdfSubject, setPdfSubject] = useState('');
+  
   const [loading, setLoading] = useState(false);
 
   // Text Parser State
@@ -82,6 +94,20 @@ export const AdminPage: React.FC = () => {
   useEffect(() => {
       fetchQuestions();
   }, [selectedChapter]);
+
+  // 4. Fetch Study Materials
+  useEffect(() => {
+      const matRef = ref(db, 'studyMaterials');
+      const unsub = onValue(matRef, (snapshot) => {
+          if (snapshot.exists()) {
+              const data = snapshot.val();
+              setStudyMaterials(Object.values(data));
+          } else {
+              setStudyMaterials([]);
+          }
+      });
+      return () => off(matRef);
+  }, []);
 
   const fetchQuestions = async () => {
     if (!selectedChapter) {
@@ -410,6 +436,72 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  // PDF HANDLING
+  const handlePdfUpload = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!pdfFile || !pdfTitle || !pdfSubject) {
+          showAlert("Missing Info", "Please provide a file, title, and subject.", "warning");
+          return;
+      }
+      
+      if (pdfFile.size > 20 * 1024 * 1024) { // 20MB
+          showAlert("Too Large", "File size must be under 20MB.", "error");
+          return;
+      }
+
+      setLoading(true);
+      try {
+          // 1. Upload to Firebase Storage
+          const storageReference = storageRef(storage, `pdfs/${Date.now()}_${pdfFile.name}`);
+          const snapshot = await uploadBytes(storageReference, pdfFile);
+          const downloadURL = await getDownloadURL(snapshot.ref);
+          
+          // 2. Save Metadata to Realtime DB
+          const newRef = push(ref(db, 'studyMaterials'));
+          await set(newRef, {
+              id: newRef.key,
+              fileName: pdfTitle,
+              subjectName: pdfSubject, // Store ID
+              fileURL: downloadURL,
+              fileSize: (pdfFile.size / (1024 * 1024)).toFixed(2) + ' MB',
+              uploadDate: Date.now()
+          });
+
+          setPdfFile(null);
+          setPdfTitle('');
+          setPdfSubject('');
+          showAlert("Success", "PDF Uploaded successfully!", "success");
+      } catch(e) {
+          console.error(e);
+          showAlert("Error", "Failed to upload PDF.", "error");
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  const handleDeletePdf = async (item: StudyMaterial) => {
+      const confirm = await showConfirm("Delete PDF?", "This file will be permanently removed.");
+      if (!confirm) return;
+
+      try {
+          // Attempt to delete from DB first (safest)
+          await remove(ref(db, `studyMaterials/${item.id}`));
+          
+          // Try to delete from storage (if we can parse the ref)
+          try {
+              // Basic extraction from URL or just rely on orphaned file cleanup policy if simple
+              const fileRef = storageRef(storage, item.fileURL);
+              await deleteObject(fileRef);
+          } catch(err) {
+              console.warn("Could not delete from storage bucket directly", err);
+          }
+          
+          showToast("PDF Deleted", "success");
+      } catch(e) {
+          showAlert("Error", "Failed to delete PDF.", "error");
+      }
+  };
+
   return (
     <div className="min-h-screen p-4 pb-20 pt-20 transition-colors max-w-4xl mx-auto w-full">
       {/* Header */}
@@ -422,8 +514,25 @@ export const AdminPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 animate__animated animate__fadeIn">
-        <Card className="border-l-8 border-game-primary">
+      <div className="flex gap-4 mb-6">
+          <button 
+            onClick={() => setActiveTab('quizzes')} 
+            className={`flex-1 py-3 rounded-2xl font-black uppercase text-xs tracking-wider transition-all ${activeTab === 'quizzes' ? 'bg-game-primary text-white shadow-lg' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}
+          >
+            <i className="fas fa-list-ul mr-2"></i> Quiz Manager
+          </button>
+          <button 
+            onClick={() => setActiveTab('pdfs')} 
+            className={`flex-1 py-3 rounded-2xl font-black uppercase text-xs tracking-wider transition-all ${activeTab === 'pdfs' ? 'bg-game-primary text-white shadow-lg' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}
+          >
+            <i className="fas fa-file-pdf mr-2"></i> PDF Uploads
+          </button>
+      </div>
+
+      {activeTab === 'quizzes' ? (
+        <div className="grid gap-6 animate__animated animate__fadeIn">
+            {/* ... Existing Quiz Manager UI ... */}
+            <Card className="border-l-8 border-game-primary">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <div className="flex justify-between items-center mb-2">
@@ -625,8 +734,121 @@ export const AdminPage: React.FC = () => {
             )}
           </div>
         </Card>
+        </div>
+      ) : (
+        <div className="grid gap-6 animate__animated animate__fadeIn">
+            {/* PDF UPLOAD CARD */}
+            <Card>
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
+                        <i className="fas fa-cloud-upload-alt text-game-primary"></i> Upload Material
+                    </h2>
+                </div>
+                <form onSubmit={handlePdfUpload} className="space-y-4">
+                    <Input 
+                        label="Display Title" 
+                        value={pdfTitle} 
+                        onChange={(e) => setPdfTitle(e.target.value)} 
+                        placeholder="e.g. Chapter 1 Notes" 
+                    />
+                    
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 ml-1">Subject</label>
+                        <div className="relative">
+                            <select 
+                                value={pdfSubject} 
+                                onChange={(e) => setPdfSubject(e.target.value)}
+                                className="w-full p-3 bg-slate-100 text-gray-900 dark:bg-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 rounded-xl appearance-none font-bold focus:ring-4 focus:ring-game-primary/20 focus:border-game-primary transition-all cursor-pointer"
+                            >
+                                <option value="">Select Subject</option>
+                                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            <i className="fas fa-chevron-down absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"></i>
+                        </div>
+                    </div>
 
-        <Modal isOpen={!!modalType} title={`Create ${modalType === 'subject' ? 'Subject' : 'Chapter'}`}>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 ml-1">PDF File (Max 20MB)</label>
+                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative cursor-pointer">
+                            <input 
+                                type="file" 
+                                accept="application/pdf" 
+                                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                            <div className="pointer-events-none">
+                                {pdfFile ? (
+                                    <div className="flex items-center justify-center gap-2 text-green-500">
+                                        <i className="fas fa-check-circle text-xl"></i>
+                                        <span className="font-bold">{pdfFile.name} ({(pdfFile.size/1024/1024).toFixed(1)}MB)</span>
+                                    </div>
+                                ) : (
+                                    <div className="text-gray-400">
+                                        <i className="fas fa-file-pdf text-3xl mb-2"></i>
+                                        <p className="text-sm font-bold">Click to Select PDF</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <Button type="submit" fullWidth isLoading={loading} disabled={!pdfFile || !pdfTitle || !pdfSubject}>
+                        <i className="fas fa-upload mr-2"></i> Upload PDF
+                    </Button>
+                </form>
+            </Card>
+
+            {/* PDF MANAGEMENT LIST */}
+            <Card>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold dark:text-white">Uploaded Files</h2>
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs font-bold border border-slate-200 dark:border-slate-700">{studyMaterials.length} Files</span>
+                </div>
+                
+                <div className="space-y-3">
+                    {studyMaterials.length === 0 ? (
+                        <div className="text-center py-10 opacity-50">
+                            <p>No study materials uploaded yet.</p>
+                        </div>
+                    ) : (
+                        studyMaterials.map(item => {
+                            const subName = subjects.find(s => s.id === item.subjectName)?.name || 'Unknown Subject';
+                            return (
+                                <div key={item.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center justify-between group shadow-sm hover:shadow-md transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 text-red-500 flex items-center justify-center text-xl">
+                                            <i className="fas fa-file-pdf"></i>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-800 dark:text-white text-sm">{item.fileName}</h4>
+                                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                                <span className="font-semibold text-game-primary">{subName}</span>
+                                                <span>•</span>
+                                                <span>{item.fileSize}</span>
+                                                <span>•</span>
+                                                <span>{new Date(item.uploadDate).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <a href={item.fileURL} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 text-blue-500 flex items-center justify-center hover:bg-blue-500 hover:text-white transition-all">
+                                            <i className="fas fa-eye"></i>
+                                        </a>
+                                        <button onClick={() => handleDeletePdf(item)} className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all">
+                                            <i className="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </Card>
+        </div>
+      )}
+
+      {/* Reused Create Subject/Chapter Modal */}
+      <Modal isOpen={!!modalType} title={`Create ${modalType === 'subject' ? 'Subject' : 'Chapter'}`}>
           <div className="space-y-4 pt-2">
               <Input label="Name" value={newItemName} onChange={(e) => { setNewItemName(e.target.value); if (!newItemId) setNewItemId(e.target.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')); }} autoFocus placeholder="e.g. Mathematics" />
               <Input label="ID (Auto-generated)" value={newItemId} onChange={(e) => setNewItemId(e.target.value)} placeholder="e.g. mathematics" className="font-mono text-sm" />
@@ -636,7 +858,6 @@ export const AdminPage: React.FC = () => {
               </div>
           </div>
       </Modal>
-      </div>
     </div>
   );
 };

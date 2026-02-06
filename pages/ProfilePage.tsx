@@ -1,10 +1,11 @@
+
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut, updateProfile } from 'firebase/auth';
 import { ref, update, get } from 'firebase/database';
 import { auth, db } from '../firebase';
 import { UserContext } from '../contexts';
-import { Avatar, Button, Card, Input, Modal } from '../components/UI';
+import { Avatar, Button, Card, Input, Modal, VerificationBadge } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { generateAvatarUrl } from '../constants';
 import { showToast, showAlert } from '../services/alert';
@@ -262,7 +263,7 @@ const ProfilePage: React.FC = () => {
                     title="Click to edit name"
                 >
                     {profile.name}
-                    {profile.isVerified && <i className="fas fa-check-circle text-blue-500 text-lg" title="Verified"></i>}
+                    {profile.isVerified && <VerificationBadge size="lg" className="text-blue-500" />}
                     {profile.isSupport && <i className="fas fa-check-circle text-game-primary text-lg" title="Support Team"></i>}
                     <i className="fas fa-pencil-alt text-xs opacity-0 group-hover:opacity-100 transition-opacity text-game-primary"></i>
                 </h2>

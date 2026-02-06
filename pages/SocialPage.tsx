@@ -4,7 +4,7 @@ import { ref, onValue, off, update, remove } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { UserProfile } from '../types';
-import { Avatar } from '../components/UI';
+import { Avatar, VerificationBadge } from '../components/UI';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { useNavigate } from 'react-router-dom';
 import { showToast } from '../services/alert';
@@ -309,7 +309,7 @@ const SocialPage: React.FC = () => {
                                     <div className="flex-1 min-w-0">
                                         <div className="font-black text-slate-800 dark:text-white text-base truncate mb-0.5 flex items-center gap-1">
                                             {f.name}
-                                            {f.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                            {f.isVerified && <VerificationBadge size="xs" className="text-blue-500" />}
                                             {f.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                                         </div>
                                         <div className={`text-xs truncate font-bold ${meta && meta.unreadCount > 0 ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>
@@ -353,7 +353,7 @@ const SocialPage: React.FC = () => {
                                     <div className="min-w-0">
                                         <div className="font-black text-slate-800 dark:text-white text-sm truncate flex items-center gap-1">
                                             {u.name}
-                                            {u.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                            {u.isVerified && <VerificationBadge size="xs" className="text-blue-500" />}
                                             {u.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                                         </div>
                                         <div className="text-xs text-slate-400 font-bold truncate">@{u.username || 'user'}</div>
@@ -400,7 +400,7 @@ const SocialPage: React.FC = () => {
                                     <div className="min-w-0 flex-1">
                                         <div className="font-black text-slate-800 dark:text-white text-sm flex items-center gap-1 truncate">
                                             {r.user.name}
-                                            {r.user.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                                            {r.user.isVerified && <VerificationBadge size="xs" className="text-blue-500" />}
                                             {r.user.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                                         </div>
                                         <div className="text-xs text-slate-400 font-bold truncate">Wants to be friends</div>

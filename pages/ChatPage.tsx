@@ -6,7 +6,7 @@ import { Howler } from 'howler';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { ChatMessage, UserProfile, Subject, Chapter } from '../types';
-import { Avatar, Button, Modal, Card } from '../components/UI';
+import { Avatar, Button, Modal, Card, VerificationBadge } from '../components/UI';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { playSound } from '../services/audioService';
 import { showToast, showAlert } from '../services/alert';
@@ -477,7 +477,7 @@ const ChatPage: React.FC = () => {
                     <div>
                         <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1">
                             {targetUser.name}
-                            {targetUser.isVerified && <i className="fas fa-check-circle text-blue-500 text-xs"></i>}
+                            {targetUser.isVerified && <VerificationBadge size="xs" className="text-blue-500" />}
                             {targetUser.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                         </div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">

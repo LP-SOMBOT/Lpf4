@@ -1,9 +1,10 @@
+
 import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ref, update } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
-import { Avatar, Card, Modal, Button } from '../components/UI';
+import { Avatar, Card, Modal, Button, VerificationBadge } from '../components/UI';
 import { playSound } from '../services/audioService';
 import { generateAvatarUrl } from '../constants';
 import { showToast } from '../services/alert';
@@ -124,7 +125,7 @@ const HomePage: React.FC = () => {
                 <div>
                     <h1 className="text-white font-black text-xl leading-tight flex items-center gap-1">
                         Hi, {profile?.name}
-                        {profile?.isVerified && <i className="fas fa-check-circle text-cyan-400 text-xs"></i>}
+                        {profile?.isVerified && <VerificationBadge size="sm" className="text-cyan-400" />}
                     </h1>
                     {/* XP Bar */}
                     <div className="w-32 h-2.5 bg-slate-800 rounded-full mt-1.5 overflow-hidden relative border border-slate-700 shadow-inner">

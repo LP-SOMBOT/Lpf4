@@ -1,3 +1,4 @@
+
 import React, { useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserContext } from '../contexts';
@@ -15,6 +16,7 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
     { path: '/', icon: 'fa-home', label: 'Home' },
     { path: '/lobby', icon: 'fa-gamepad', label: 'Battle' },
     { path: '/social', icon: 'fa-user-friends', label: 'Social', isNew: true },
+    { path: '/library', icon: 'fa-book-open', label: 'Library' },
     { path: '/leaderboard', icon: 'fa-trophy', label: 'Rank' },
     { path: '/profile', icon: 'fa-user', label: 'Me' },
   ];
@@ -72,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
   // Mobile Horizontal - Neon Glass Island
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 p-4 pointer-events-none flex justify-center pb-6">
-        <div className="pointer-events-auto bg-[#0f172a]/90 backdrop-blur-2xl border border-cyan-500/20 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] rounded-3xl px-2 py-2 flex items-center justify-between gap-1 w-full max-w-sm ring-1 ring-white/5">
+        <div className="pointer-events-auto bg-[#0f172a]/90 backdrop-blur-2xl border border-cyan-500/20 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] rounded-3xl px-2 py-2 flex items-center justify-between gap-1 w-full max-w-md ring-1 ring-white/5">
             {navItems.slice(0, 5).map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
