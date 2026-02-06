@@ -82,10 +82,9 @@ const LibraryPage: React.FC = () => {
               </button>
               
               <div className="text-right">
-                  <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 uppercase tracking-tighter leading-none mb-1">
-                      Digital<br/><span className="text-cyan-400">Archive</span>
+                  <h1 className="text-4xl font-black text-white uppercase tracking-tighter leading-none mb-1">
+                      Library
                   </h1>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">Knowledge Base V2.0</p>
               </div>
           </div>
 

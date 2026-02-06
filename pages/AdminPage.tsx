@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ref, push, set, get, remove, onValue, off, update } from 'firebase/database';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
 import { Button, Input, Card, Modal } from '../components/UI';
 import { Question, Subject, Chapter, StudyMaterial } from '../types';
 import { useNavigate } from 'react-router-dom';
@@ -436,7 +435,7 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  // PDF HANDLING
+  // PDF HANDLING - DIRECT TO REALTIME DB (Base64)
   const handlePdfUpload = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!pdfFile || !pdfTitle || !pdfSubject) {
@@ -444,37 +443,47 @@ export const AdminPage: React.FC = () => {
           return;
       }
       
-      if (pdfFile.size > 20 * 1024 * 1024) { // 20MB
-          showAlert("Too Large", "File size must be under 20MB.", "error");
+      // Limit to 5MB for Realtime DB stability (default is often 10MB per write, 5MB is safer)
+      if (pdfFile.size > 5 * 1024 * 1024) { 
+          showAlert("Too Large", "For Database Storage, files must be under 5MB.", "error");
           return;
       }
 
       setLoading(true);
       try {
-          // 1. Upload to Firebase Storage
-          const storageReference = storageRef(storage, `pdfs/${Date.now()}_${pdfFile.name}`);
-          const snapshot = await uploadBytes(storageReference, pdfFile);
-          const downloadURL = await getDownloadURL(snapshot.ref);
+          const reader = new FileReader();
           
-          // 2. Save Metadata to Realtime DB
-          const newRef = push(ref(db, 'studyMaterials'));
-          await set(newRef, {
-              id: newRef.key,
-              fileName: pdfTitle,
-              subjectName: pdfSubject, // Store ID
-              fileURL: downloadURL,
-              fileSize: (pdfFile.size / (1024 * 1024)).toFixed(2) + ' MB',
-              uploadDate: Date.now()
-          });
+          reader.onload = async () => {
+              const base64Data = reader.result as string;
+              
+              const newRef = push(ref(db, 'studyMaterials'));
+              await set(newRef, {
+                  id: newRef.key,
+                  fileName: pdfTitle,
+                  subjectName: pdfSubject, // Store ID
+                  fileURL: base64Data, // Store Base64 directly
+                  fileSize: (pdfFile.size / (1024 * 1024)).toFixed(2) + ' MB',
+                  uploadDate: Date.now()
+              });
 
-          setPdfFile(null);
-          setPdfTitle('');
-          setPdfSubject('');
-          showAlert("Success", "PDF Uploaded successfully!", "success");
+              setPdfFile(null);
+              setPdfTitle('');
+              setPdfSubject('');
+              showAlert("Success", "PDF Saved to Database!", "success");
+              setLoading(false);
+          };
+
+          reader.onerror = (error) => {
+              console.error(error);
+              showAlert("Error", "Failed to read file.", "error");
+              setLoading(false);
+          };
+
+          reader.readAsDataURL(pdfFile);
+
       } catch(e) {
           console.error(e);
           showAlert("Error", "Failed to upload PDF.", "error");
-      } finally {
           setLoading(false);
       }
   };
@@ -484,18 +493,8 @@ export const AdminPage: React.FC = () => {
       if (!confirm) return;
 
       try {
-          // Attempt to delete from DB first (safest)
+          // Just delete from DB
           await remove(ref(db, `studyMaterials/${item.id}`));
-          
-          // Try to delete from storage (if we can parse the ref)
-          try {
-              // Basic extraction from URL or just rely on orphaned file cleanup policy if simple
-              const fileRef = storageRef(storage, item.fileURL);
-              await deleteObject(fileRef);
-          } catch(err) {
-              console.warn("Could not delete from storage bucket directly", err);
-          }
-          
           showToast("PDF Deleted", "success");
       } catch(e) {
           showAlert("Error", "Failed to delete PDF.", "error");
@@ -768,7 +767,7 @@ export const AdminPage: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 ml-1">PDF File (Max 20MB)</label>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 ml-1">PDF File (Max 5MB)</label>
                         <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative cursor-pointer">
                             <input 
                                 type="file" 
@@ -793,7 +792,7 @@ export const AdminPage: React.FC = () => {
                     </div>
 
                     <Button type="submit" fullWidth isLoading={loading} disabled={!pdfFile || !pdfTitle || !pdfSubject}>
-                        <i className="fas fa-upload mr-2"></i> Upload PDF
+                        <i className="fas fa-upload mr-2"></i> Save to Database
                     </Button>
                 </form>
             </Card>

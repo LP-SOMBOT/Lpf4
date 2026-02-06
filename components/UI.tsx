@@ -108,8 +108,17 @@ export const VerificationBadge: React.FC<{ className?: string, size?: 'xs'|'sm'|
   };
   
   return (
-    <div className={`inline-flex items-center justify-center ${sizeClasses[size]} ${className}`} title="Verified">
-        <img src="/verify.png" alt="Verified" className="w-full h-full object-contain" />
+    <div className={`inline-block select-none ${sizeClasses[size]} ${className}`} title="Verified">
+        <img 
+            src="/verify.png" 
+            alt="Verified" 
+            className="w-full h-full object-contain"
+            onError={(e) => {
+                // Fallback if image fails to load
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement?.classList.add('bg-blue-500', 'rounded-full');
+            }} 
+        />
     </div>
   );
 };
