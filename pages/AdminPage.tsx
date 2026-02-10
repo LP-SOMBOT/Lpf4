@@ -28,14 +28,13 @@ export const AdminPage: React.FC = () => {
   // Library Meta State
   const [libCategories, setLibCategories] = useState<string[]>([]);
   const [libSubjects, setLibSubjects] = useState<string[]>([]);
+  const [isLibraryEnabled, setIsLibraryEnabled] = useState<boolean>(true);
   
   // Quiz Form State
   const [inputMode, setInputMode] = useState<'manual' | 'bulk' | 'parser'>('manual');
   const [questionText, setQuestionText] = useState('');
   const [options, setOptions] = useState<string[]>(['', '', '', '']); 
   const [correctAnswer, setCorrectAnswer] = useState(0);
-  
-  // FIX: Added missing editingQuestion state to manage quiz editing modal
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   
   // PDF Upload Form State
@@ -123,10 +122,11 @@ export const AdminPage: React.FC = () => {
               const data = snap.val();
               setLibCategories(Object.values(data.categories || {}));
               setLibSubjects(Object.values(data.subjects || {}));
+              setIsLibraryEnabled(data.enabled !== false);
           } else {
-              // Defaults if nothing exists
               setLibCategories(['General', 'National Exams', 'Past Papers']);
               setLibSubjects(['Mathematics', 'Physics', 'Biology', 'Chemistry', 'English', 'Somali']);
+              setIsLibraryEnabled(true);
           }
       });
 
@@ -388,7 +388,6 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  // FIX: Added missing handleUpdateQuestion function to persist quiz changes
   const handleUpdateQuestion = async () => {
     if (!editingQuestion || !selectedChapter) return;
     setLoading(true);
@@ -408,6 +407,16 @@ export const AdminPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleToggleLibrary = async () => {
+      const newValue = !isLibraryEnabled;
+      try {
+          await update(ref(db, 'settings/library'), { enabled: newValue });
+          showToast(`Library ${newValue ? 'Enabled' : 'Disabled'}`, 'success');
+      } catch (e) {
+          showAlert("Error", "Failed to toggle library", "error");
+      }
   };
 
   const handleCreateItem = async () => {
@@ -765,7 +774,6 @@ export const AdminPage: React.FC = () => {
                     ) : (
                         questions.map((q, qidx) => (
                         <div key={q.id} className="bg-slate-900/60 p-6 rounded-[2rem] border border-slate-800 relative group hover:border-slate-600 transition-all shadow-xl">
-                            {/* FIX: Added missing Edit button to trigger the editing modal */}
                             <div className="absolute top-4 right-4 flex gap-2">
                                 <button onClick={() => setEditingQuestion(q)} className="w-10 h-10 rounded-xl bg-game-primary/10 text-game-primary hover:bg-game-primary hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg">
                                     <i className="fas fa-edit"></i>
@@ -794,6 +802,27 @@ export const AdminPage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6 animate__animated animate__fadeIn">
+                {/* Master Toggle Bar */}
+                <div className="bg-[#1e293b]/80 backdrop-blur-xl border-2 border-slate-800 rounded-3xl p-5 flex items-center justify-between shadow-2xl">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all shadow-lg ${isLibraryEnabled ? 'bg-game-success/10 text-game-success border border-game-success/20' : 'bg-game-danger/10 text-game-danger border border-game-danger/20'}`}>
+                           <i className={`fas ${isLibraryEnabled ? 'fa-unlock' : 'fa-lock'}`}></i>
+                        </div>
+                        <div>
+                           <h3 className="font-black text-sm uppercase tracking-tight">Archive Master Switch</h3>
+                           <p className={`text-[10px] font-bold uppercase tracking-widest ${isLibraryEnabled ? 'text-game-success' : 'text-game-danger'}`}>
+                               {isLibraryEnabled ? 'Public Access Enabled' : 'Restricted (Coming Soon Mode)'}
+                           </p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={handleToggleLibrary}
+                        className={`w-16 h-8 rounded-full relative transition-all duration-500 shadow-inner border-2 ${isLibraryEnabled ? 'bg-game-success border-white/20' : 'bg-slate-700 border-slate-600'}`}
+                    >
+                        <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 transform ${isLibraryEnabled ? 'translate-x-8' : 'translate-x-0.5'}`}></div>
+                    </button>
+                </div>
+
                 {/* Lib Sub-tabs */}
                 <div className="flex gap-2 mb-4 bg-slate-800/40 p-1 rounded-xl">
                     <button onClick={() => setLibSubTab('files')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${libSubTab === 'files' ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Manage Files</button>
@@ -949,7 +978,6 @@ export const AdminPage: React.FC = () => {
           </div>
       </Modal>
 
-      {/* FIX: editingQuestion modal is now correctly linked to component state */}
       {editingQuestion && (
         <Modal isOpen={true} title="Secure Editor" onClose={() => setEditingQuestion(null)}>
             <div className="space-y-6 pt-2 pb-2">

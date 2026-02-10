@@ -31,6 +31,7 @@ const LibraryPage: React.FC = () => {
   // Meta options from DB
   const [libCategories, setLibCategories] = useState<string[]>([]);
   const [libSubjects, setLibSubjects] = useState<string[]>([]);
+  const [isLibraryEnabled, setIsLibraryEnabled] = useState<boolean>(true);
   
   const [selectedPdf, setSelectedPdf] = useState<StudyMaterial | null>(null);
   const [loading, setLoading] = useState(!localStorage.getItem('library_cache'));
@@ -61,6 +62,7 @@ const LibraryPage: React.FC = () => {
             const data = snap.val();
             setLibCategories(Object.values(data.categories || {}));
             setLibSubjects(Object.values(data.subjects || {}));
+            setIsLibraryEnabled(data.enabled !== false);
         }
     });
 
@@ -116,6 +118,40 @@ const LibraryPage: React.FC = () => {
       setIframeLoading(true);
       setReaderKey(prev => prev + 1);
   };
+
+  if (!isLibraryEnabled) {
+      return (
+          <div className="min-h-screen bg-[#050b14] font-sans flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none"></div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] bg-cyan-900/10 rounded-full blur-[128px] animate-pulse"></div>
+              
+              <div className="relative z-10 animate__animated animate__zoomIn">
+                  <div className="w-32 h-32 bg-slate-900/50 rounded-[3rem] border-4 border-slate-800 flex items-center justify-center mx-auto mb-10 shadow-2xl relative group">
+                      <div className="absolute inset-0 bg-cyan-500/10 rounded-[3rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <i className="fas fa-lock text-5xl text-slate-700 animate-pulse"></i>
+                      <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-game-primary rounded-2xl flex items-center justify-center text-slate-950 shadow-lg rotate-12">
+                          <i className="fas fa-tools text-xl"></i>
+                      </div>
+                  </div>
+                  
+                  <h1 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-4 drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">Archive Restricted</h1>
+                  <p className="text-slate-500 font-bold text-sm max-w-xs mx-auto leading-relaxed mb-10">
+                      The Knowledge Bank is currently being recalibrated by the administrators. Full access will be restored shortly.
+                  </p>
+                  
+                  <div className="flex flex-col gap-4 max-w-xs mx-auto w-full">
+                      <div className="bg-[#1e293b]/50 border border-white/5 py-4 px-6 rounded-2xl flex items-center gap-4">
+                          <div className="w-1.5 h-1.5 rounded-full bg-game-primary animate-ping"></div>
+                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Deployment in progress...</span>
+                      </div>
+                      <Button fullWidth onClick={() => navigate('/')} className="shadow-2xl !py-5">
+                          Return to Base
+                      </Button>
+                  </div>
+              </div>
+          </div>
+      );
+  }
 
   if (selectedPdf) {
       const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(selectedPdf.fileURL)}&embedded=true`;
