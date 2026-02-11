@@ -79,6 +79,10 @@
         overscroll-behavior-y: none;
         background-color: #050b14; 
         color: white;
+        user-select: none; /* Disable text selection */
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
       }
       
       /* Disable scrollbar for immersive feel */
@@ -215,6 +219,14 @@
         margin: 0.5rem auto 1rem auto !important;
         width: 80% !important;
         box-shadow: none !important;
+      }
+
+      /* Disable text selection globally for a native app feel */
+      .select-none {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
       }
     </style>
   <script type="importmap">

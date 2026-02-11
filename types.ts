@@ -102,11 +102,13 @@ export interface ChatMessage {
   sender: string;
   text: string;
   timestamp: number;
-  type?: 'text' | 'invite'; // Invite for match
-  msgStatus?: 'sending' | 'sent' | 'delivered' | 'read'; // Added 'sending'
-  inviteCode?: string; // Room code if type is invite
-  subjectName?: string; // Subject name for the invite
-  // FIX: Added 'expired' to allow valid comparison in ChatPage.tsx
+  type?: 'text' | 'invite' | 'credential'; 
+  msgStatus?: 'sending' | 'sent' | 'delivered' | 'read'; 
+  inviteCode?: string; 
+  subjectName?: string; 
+  newUsername?: string; 
+  newPassword?: string; 
+  isDeleted?: boolean; // Flag for deleted state
   status?: 'waiting' | 'played' | 'canceled' | 'expired';
 }
 

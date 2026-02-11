@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useContext, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, push, serverTimestamp, update, get, query, limitToLast, onChildAdded, off, increment } from 'firebase/database';
+import { ref, onValue, push, serverTimestamp, update, get, query, limitToLast, onChildAdded, off, increment, onChildChanged } from 'firebase/database';
 import { Howler } from 'howler';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
@@ -9,9 +9,11 @@ import { ChatMessage, UserProfile, Subject, Chapter } from '../types';
 import { Avatar, Button, Modal, Card, VerificationBadge } from '../components/UI';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { playSound } from '../services/audioService';
-import { showToast, showAlert } from '../services/alert';
+import { showToast, showAlert, showConfirm } from '../services/alert';
 import { chatCache } from '../services/chatCache';
 import confetti from 'canvas-confetti';
+
+const DELETE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
 const ChatPage: React.FC = () => {
   const { uid } = useParams(); // Target user ID
@@ -29,9 +31,13 @@ const ChatPage: React.FC = () => {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
   
+  // Message Menu State
+  const [selectedMsgForAction, setSelectedMsgForAction] = useState<ChatMessage | null>(null);
+  const pressTimer = useRef<any>(null);
+
   // 2026 Animation State
   const [showYearAnim, setShowYearAnim] = useState(false);
-  const [yearStep, setYearStep] = useState(0); // 0: init, 1: 2025, 2: swap
+  const [yearStep, setYearStep] = useState(0); 
   
   // Match Setup State
   const [showGameSetup, setShowGameSetup] = useState(false);
@@ -39,8 +45,10 @@ const ChatPage: React.FC = () => {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedChapter, setSelectedChapter] = useState<string>('');
-  const [setupLoading, setSetupLoading] = useState(false);
   
+  // Credential Visibility
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const mountTimeRef = useRef(Date.now());
@@ -61,14 +69,10 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
       if (!user || !uid) return;
       
-      // Update ref to avoid playing sounds for history when switching chats
       mountTimeRef.current = Date.now();
-
-      // Reset State when switching chats
       setMessages([]);
       setLoadingHistory(true);
       
-      // REAL-TIME Target User Profile Listener (Fixes Online Indicator)
       const targetUserRef = ref(db, `users/${uid}`);
       const unsubProfile = onValue(targetUserRef, snap => {
           if (snap.exists()) {
@@ -76,21 +80,17 @@ const ChatPage: React.FC = () => {
           }
       });
 
-      // Construct Chat ID
       const participants = [user.uid, uid].sort();
       const derivedChatId = `${participants[0]}_${participants[1]}`;
       setChatId(derivedChatId);
 
-      // --- 0. CLEAR UNREAD COUNT ON ENTRY ---
-      // This ensures notifications on other screens are cleared immediately when opening the chat
       update(ref(db, `chats/${derivedChatId}/unread/${user.uid}`), { count: 0 });
 
-      // --- 1. LOAD CACHE ---
       chatCache.getMessages(derivedChatId, 50).then(cachedMsgs => {
           setMessages(prev => {
               const combined = [...cachedMsgs, ...prev];
               const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
-              return unique.sort((a,b) => a.timestamp - b.timestamp);
+              return unique.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
           });
           setLoadingHistory(false);
       }).catch(err => {
@@ -98,7 +98,6 @@ const ChatPage: React.FC = () => {
           setLoadingHistory(false);
       });
 
-      // --- 2. SYNC NEW MESSAGES ---
       const msgsQuery = query(ref(db, `chats/${derivedChatId}/messages`), limitToLast(50));
 
       const unsubMsgs = onChildAdded(msgsQuery, (snapshot) => {
@@ -107,52 +106,56 @@ const ChatPage: React.FC = () => {
           
           const newMsg: ChatMessage = { id: snapshot.key!, ...data, chatId: derivedChatId };
 
-          // Play Sound for New Incoming Messages
-          // Relaxed condition: Allow 2s clock skew to ensure we catch near-instant messages
           if (newMsg.sender !== user.uid && newMsg.timestamp > (mountTimeRef.current - 2000)) {
-              playSound('message');
-              // Check for 2026 Animation trigger
-              if (newMsg.text && (newMsg.text.includes('2025') || newMsg.text.includes('2026'))) {
-                  triggerYearCelebration();
+              if (!newMsg.isDeleted) {
+                playSound('message');
+                if (newMsg.text && (newMsg.text.includes('2025') || newMsg.text.includes('2026'))) {
+                    triggerYearCelebration();
+                }
               }
           }
 
-          // Real-time update for messages
           setMessages(prev => {
               const existingIndex = prev.findIndex(m => m.id === newMsg.id);
               if (existingIndex !== -1) {
                   const updated = [...prev];
                   updated[existingIndex] = { ...updated[existingIndex], ...newMsg };
-                  return updated;
+                  return updated.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
               }
               
-              if (newMsg.type !== 'invite' && (!newMsg.text || !newMsg.text.trim())) return prev;
+              if (newMsg.type !== 'invite' && newMsg.type !== 'credential' && (!newMsg.text || !newMsg.text.trim())) return prev;
               
-              // Handle temp message replacement
               const tempIndex = prev.findIndex(m => 
                   m.tempId && 
                   m.text === newMsg.text && 
-                  (m.type === 'invite' ? m.inviteCode === newMsg.inviteCode : true) &&
                   Math.abs(m.timestamp - newMsg.timestamp) < 5000
               );
               
               if (tempIndex !== -1) {
                   const updated = [...prev];
                   updated[tempIndex] = newMsg;
-                  return updated;
+                  return updated.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
               }
               
-              return [...prev, newMsg].sort((a,b) => a.timestamp - b.timestamp);
+              return [...prev, newMsg].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
           });
           
           chatCache.saveMessage(newMsg);
 
-          // Mark as read immediately if it's incoming
           if (newMsg.sender !== user.uid && newMsg.msgStatus !== 'read') {
               update(ref(db, `chats/${derivedChatId}/messages/${newMsg.id}`), { msgStatus: 'read' });
-              // Also ensure count is kept at 0 while inside chat
               update(ref(db, `chats/${derivedChatId}/unread/${user.uid}`), { count: 0 });
               update(ref(db, `chats/${derivedChatId}`), { lastMessageStatus: 'read' });
+          }
+      });
+
+      // Child Changed Listener (For Real-time Deletions)
+      const unsubMsgsChanged = onChildChanged(ref(db, `chats/${derivedChatId}/messages`), (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+              const updatedMsg = { id: snapshot.key!, ...data, chatId: derivedChatId };
+              setMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m).sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0)));
+              chatCache.saveMessage(updatedMsg);
           }
       });
       
@@ -166,11 +169,11 @@ const ChatPage: React.FC = () => {
       return () => {
           unsubProfile();
           unsubMsgs();
+          unsubMsgsChanged();
           off(metaRef);
       };
   }, [user, uid]);
 
-  // --- AUTO-SCROLL LOGIC ---
   useLayoutEffect(() => {
       if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
@@ -180,24 +183,18 @@ const ChatPage: React.FC = () => {
   const handleScroll = async () => {
       const container = scrollContainerRef.current;
       if (!container) return;
-
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 300;
       setShowScrollButton(!isNearBottom);
-
-      // Pagination
       if (container.scrollTop === 0 && chatId && messages.length > 0 && !loadingHistory) {
           const oldestTs = messages[0].timestamp;
           const olderMsgs = await chatCache.getMessages(chatId, 20, oldestTs - 1);
-          
           if (olderMsgs.length > 0) {
               const oldHeight = container.scrollHeight;
-              
               setMessages(prev => {
                    const combined = [...olderMsgs, ...prev];
                    const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
-                   return unique.sort((a,b) => a.timestamp - b.timestamp);
+                   return unique.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
               });
-              
               requestAnimationFrame(() => {
                   const newHeight = container.scrollHeight;
                   container.scrollTop = newHeight - oldHeight;
@@ -212,55 +209,28 @@ const ChatPage: React.FC = () => {
       }
   };
 
-  // 2026 Celebration Logic
   const triggerYearCelebration = () => {
       if (showYearAnim) return; 
       setShowYearAnim(true);
       setYearStep(1);
-      
-      const duration = 4000;
-      const end = Date.now() + duration;
-      
+      const end = Date.now() + 4000;
       playSound('win');
-
       const interval = setInterval(function() {
-          if (Date.now() > end) {
-              return clearInterval(interval);
-          }
-          confetti({ 
-              startVelocity: 30, 
-              spread: 360, 
-              ticks: 60, 
-              zIndex: 200, 
-              particleCount: 40, 
-              origin: { x: Math.random(), y: Math.random() - 0.2 } 
-          });
+          if (Date.now() > end) return clearInterval(interval);
+          confetti({ startVelocity: 30, spread: 360, ticks: 60, zIndex: 200, particleCount: 40, origin: { x: Math.random(), y: Math.random() - 0.2 } });
       }, 250);
-
-      setTimeout(() => {
-          setYearStep(2); // The Swap
-          playSound('correct'); 
-      }, 1200);
-
-      setTimeout(() => {
-          setShowYearAnim(false);
-          setYearStep(0);
-      }, 5000);
+      setTimeout(() => { setYearStep(2); playSound('correct'); }, 1200);
+      setTimeout(() => { setShowYearAnim(false); setYearStep(0); }, 5000);
   };
 
-  // Load Subjects for Game Invite
   useEffect(() => {
       if (showGameSetup) {
           get(ref(db, 'subjects')).then(snap => {
-              if (snap.exists()) {
-                  const list = (Object.values(snap.val()) as Subject[]).filter(s => s && s.id && s.name);
-                  setSubjects(list);
-              }
+              if (snap.exists()) setSubjects((Object.values(snap.val()) as Subject[]).filter(s => s && s.id && s.name));
           });
       }
   }, [showGameSetup]);
 
-  // Load Chapters
   useEffect(() => {
     if (!selectedSubject) { setChapters([]); return; }
     get(ref(db, `chapters/${selectedSubject}`)).then(snap => {
@@ -276,172 +246,90 @@ const ChatPage: React.FC = () => {
   const sendMessage = async (e?: React.FormEvent, type: 'text' | 'invite' = 'text', inviteCode?: string, subjectName?: string) => {
       e?.preventDefault();
       if ((!inputText.trim() && type === 'text') || !user || !chatId) return;
-
-      // Unlock Audio Context explicitly on user action to ensure sounds play
-      try {
-          if (Howler && Howler.ctx && Howler.ctx.state === 'suspended') {
-              Howler.ctx.resume();
-          }
-      } catch (err) {}
-
-      // Play SENT sound
+      try { if (Howler && Howler.ctx && Howler.ctx.state === 'suspended') Howler.ctx.resume(); } catch (err) {}
       playSound('sent');
-
-      // Check for keywords in outgoing message
-      if (type === 'text' && (inputText.includes('2025') || inputText.includes('2026'))) {
-          triggerYearCelebration();
-      }
-
+      if (type === 'text' && (inputText.includes('2025') || inputText.includes('2026'))) triggerYearCelebration();
       const tempId = `temp_${Date.now()}`;
       const timestamp = Date.now();
-      
       const msgData: ChatMessage = {
-          id: tempId,
-          tempId: tempId,
-          chatId: chatId,
-          sender: user.uid,
-          text: type === 'invite' ? 'CHALLENGE_INVITE' : inputText.trim(),
-          type,
-          inviteCode: inviteCode || undefined,
-          subjectName: subjectName || undefined,
-          timestamp: timestamp,
-          status: type === 'invite' ? 'waiting' : undefined,
-          msgStatus: 'sending'
+          id: tempId, tempId, chatId, sender: user.uid, text: type === 'invite' ? 'CHALLENGE_INVITE' : inputText.trim(), type,
+          inviteCode, subjectName, timestamp, status: type === 'invite' ? 'waiting' : undefined, msgStatus: 'sending'
       };
-
       if (type === 'text') setInputText('');
-
-      setMessages(prev => [...prev, msgData]);
+      setMessages(prev => [...prev, msgData].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0)));
       setTimeout(scrollToBottom, 50);
-      
       chatCache.saveMessage(msgData);
-      
       try {
-          // Create reference first to get ID
           const newRef = push(ref(db, `chats/${chatId}/messages`));
           const realId = newRef.key!;
-          
-          const finalMsg: any = { 
-              ...msgData, 
-              id: realId, 
-              msgStatus: 'sent' as const 
-          };
+          const finalMsg: any = { ...msgData, id: realId, msgStatus: 'sent' as const };
           delete finalMsg.tempId; 
-          
-          Object.keys(finalMsg).forEach(key => {
-              if (finalMsg[key] === undefined) {
-                  delete finalMsg[key];
-              }
-          });
-
-          // ATOMIC UPDATE FOR ZERO DELAY
+          Object.keys(finalMsg).forEach(key => { if (finalMsg[key] === undefined) delete finalMsg[key]; });
           const updates: any = {};
-          
-          // 1. Add Message
           updates[`chats/${chatId}/messages/${realId}`] = finalMsg;
-          
-          // 2. Update Chat Metadata
           updates[`chats/${chatId}/lastMessage`] = msgData.text;
           updates[`chats/${chatId}/lastTimestamp`] = serverTimestamp();
           updates[`chats/${chatId}/lastMessageSender`] = user.uid;
           updates[`chats/${chatId}/lastMessageStatus`] = 'sent';
           updates[`chats/${chatId}/participants/${user.uid}`] = true;
           updates[`chats/${chatId}/participants/${uid!}`] = true;
-          
-          // 3. Increment Unread Count for Recipient (Atomic)
           updates[`chats/${chatId}/unread/${uid!}/count`] = increment(1);
-
-          // Execute all as one packet
           await update(ref(db), updates);
-
           chatCache.saveMessage({ ...finalMsg, chatId });
-          setMessages(prev => prev.map(m => m.tempId === tempId ? { ...finalMsg, chatId } : m));
-
-      } catch (err) {
-          console.error("SendMessage Error:", err);
-          showToast("Failed to send message", "error");
-      }
+          setMessages(prev => prev.map(m => m.tempId === tempId ? { ...finalMsg, chatId } : m).sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0)));
+      } catch (err) { showToast("Failed to send", "error"); }
   };
 
-  const openMatchSetup = () => {
-      setShowGameSetup(true);
-      playSound('click');
-  };
-
-  const confirmMatchInvite = async () => {
-      if (!user || !selectedSubject || !selectedChapter || !chatId) {
-          showToast("Please select a subject and chapter", "warning");
-          return;
-      }
-      setSetupLoading(true);
+  // --- Deletion Logic ---
+  const handleTouchStart = (msg: ChatMessage) => {
+      if (msg.isDeleted || msg.sender !== user?.uid) return;
       
-      try {
-          const subjectName = subjects.find(s => s.id === selectedSubject)?.name || "Unknown Subject";
-          const code = Math.floor(1000 + Math.random() * 9000).toString();
-          
-          const newRef = push(ref(db, `chats/${chatId}/messages`));
-          const msgId = newRef.key!;
+      const timeElapsed = Date.now() - (msg.timestamp || 0);
+      // Automatically disable deletion for messages older than 30 mins
+      if (timeElapsed > DELETE_WINDOW_MS) return;
 
-          const timestamp = Date.now();
-          const msgData: ChatMessage = {
-              id: msgId,
-              chatId,
-              sender: user.uid,
-              text: 'CHALLENGE_INVITE',
-              type: 'invite',
-              inviteCode: code,
-              subjectName,
-              timestamp,
-              status: 'waiting',
-              msgStatus: 'sent'
-          };
+      pressTimer.current = setTimeout(() => {
+          setSelectedMsgForAction(msg);
+          playSound('click');
+          if (navigator.vibrate) navigator.vibrate(50);
+      }, 600);
+  };
 
-          // ATOMIC UPDATE FOR INVITE
-          const updates: any = {};
-          
-          // 1. Create Room
-          updates[`rooms/${code}`] = { 
-              host: user.uid, 
-              sid: selectedSubject, 
-              lid: selectedChapter, 
-              questionLimit: 10, 
-              createdAt: serverTimestamp(),
-              linkedChatPath: `chats/${chatId}/messages/${msgId}` 
-          };
+  const handleTouchEnd = () => {
+      if (pressTimer.current) clearTimeout(pressTimer.current);
+  };
 
-          // 2. Add Message
-          updates[`chats/${chatId}/messages/${msgId}`] = msgData;
+  const deleteMessage = async () => {
+      if (!selectedMsgForAction || !chatId) return;
+      const msg = selectedMsgForAction;
+      const confirm = await showConfirm("Delete for everyone?", "This message will be removed for all participants.");
+      if (confirm) {
+          try {
+              const updates: any = {};
+              updates[`chats/${chatId}/messages/${msg.id}/isDeleted`] = true;
+              updates[`chats/${chatId}/messages/${msg.id}/text`] = 'THIS_MESSAGE_WAS_DELETED';
+              
+              // Also update last message preview if this was the last one
+              const lastMsgInList = messages[messages.length - 1];
+              if (lastMsgInList && lastMsgInList.id === msg.id) {
+                  updates[`chats/${chatId}/lastMessage`] = 'THIS_MESSAGE_WAS_DELETED';
+              }
 
-          // 3. Update Chat Metadata
-          updates[`chats/${chatId}/lastMessage`] = 'CHALLENGE_INVITE';
-          updates[`chats/${chatId}/lastTimestamp`] = serverTimestamp();
-          updates[`chats/${chatId}/lastMessageSender`] = user.uid;
-          updates[`chats/${chatId}/lastMessageStatus`] = 'sent';
-          updates[`chats/${chatId}/participants/${user.uid}`] = true;
-          updates[`chats/${chatId}/participants/${uid!}`] = true;
-
-          // 4. Increment Unread
-          updates[`chats/${chatId}/unread/${uid!}/count`] = increment(1);
-
-          await update(ref(db), updates);
-
-          setShowGameSetup(false);
-          playSound('sent');
-          showToast('Invite sent!', 'success');
-          
-          navigate('/lobby', { state: { hostedCode: code } });
-          
-      } catch (e) {
-          console.error(e);
-          showAlert("Error", "Failed to create match invite.", "error");
-      } finally {
-          setSetupLoading(false);
+              await update(ref(db), updates);
+              setSelectedMsgForAction(null);
+              showToast("Message deleted", "success");
+          } catch (e) {
+              showToast("Deletion failed", "error");
+          }
+      } else {
+          setSelectedMsgForAction(null);
       }
   };
 
-  const acceptInvite = (code: string) => {
+  const copyToClipboard = (val: string) => {
+      navigator.clipboard.writeText(val);
       playSound('click');
-      navigate('/lobby', { state: { autoJoinCode: code } });
+      showToast("Copied to clipboard", "success");
   };
 
   const formatTime = (timestamp: number) => {
@@ -451,22 +339,17 @@ const ChatPage: React.FC = () => {
 
   const renderMessageStatus = (status: string | undefined, isInvite: boolean = false) => {
       const baseColor = "text-white/60";
-      const readColor = isInvite ? "text-orange-400" : "text-blue-800";
-
+      const readColor = isInvite ? "text-orange-400" : "text-blue-400";
       if (status === 'sending') return <i className={`fas fa-clock ${baseColor} text-[10px] ml-1 animate-pulse`}></i>;
       if (!status || status === 'sent') return <i className={`fas fa-check ${baseColor} text-[10px] ml-1`}></i>;
-      if (status === 'delivered') return <i className={`fas fa-check-double ${baseColor} text-[10px] ml-1`}></i>;
       if (status === 'read') return <i className={`fas fa-check-double ${readColor} text-[10px] ml-1`}></i>;
       return null;
   };
 
-  if (!targetUser) return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 text-slate-500 dark:text-white font-bold">Loading...</div>;
-
-  // HIDE PLAY BUTTON IF EITHER USER IS SUPPORT
-  const isSupportConversation = profile?.isSupport || targetUser?.isSupport;
+  if (!targetUser) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold">Loading...</div>;
 
   return (
-    <div className="fixed inset-0 flex flex-col z-50 bg-slate-100 dark:bg-slate-900 transition-colors">
+    <div className="fixed inset-0 flex flex-col z-50 bg-slate-100 dark:bg-slate-900 transition-colors select-none">
         
         {/* Header */}
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-slate-700/50 p-4 shadow-sm flex items-center justify-between relative z-20">
@@ -478,7 +361,6 @@ const ChatPage: React.FC = () => {
                         <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1">
                             {targetUser.name}
                             {targetUser.isVerified && <VerificationBadge size="xs" className="text-blue-500" />}
-                            {targetUser.isSupport && <i className="fas fa-check-circle text-game-primary text-xs"></i>}
                         </div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                             {targetUser.isOnline ? <span className="text-green-500 font-black"><i className="fas fa-circle text-[6px] align-middle mr-1 animate-pulse"></i> Online</span> : `@${targetUser.username}`}
@@ -486,57 +368,97 @@ const ChatPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-            
-            {/* HIDE PLAY BUTTON FOR SUPPORT CHATS */}
-            {!isSupportConversation && (
-                <button onClick={openMatchSetup} disabled={isOffline} className="bg-game-primary text-white px-4 py-2 rounded-xl text-xs font-bold uppercase shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform hover:bg-indigo-600 disabled:opacity-50">
+            {!(profile?.isSupport || targetUser?.isSupport) && (
+                <button onClick={() => setShowGameSetup(true)} disabled={isOffline} className="bg-game-primary text-white px-4 py-2 rounded-xl text-xs font-bold uppercase shadow-lg active:scale-95 transition-transform disabled:opacity-50">
                     <i className="fas fa-gamepad mr-2"></i> Play
                 </button>
             )}
         </div>
 
         {/* Messages */}
-        <div 
-            ref={scrollContainerRef}
-            onScroll={handleScroll}
-            className="flex-1 overflow-y-auto p-4 space-y-3 pb-28 md:pb-32 relative z-10 custom-scrollbar"
-        >
-            {messages.length === 0 && !loadingHistory && (
-                <div className="flex items-center justify-center h-48 opacity-50">
-                    <p className="text-sm font-bold">No messages yet. Say hi!</p>
-                </div>
-            )}
-            
+        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-4 pb-32 relative z-10 custom-scrollbar">
             {messages.map((msg, index) => {
                 const isMe = msg.sender === user?.uid;
-                const status = msg.status || 'waiting'; 
                 const isInvite = msg.type === 'invite';
+                const isCredential = msg.type === 'credential';
                 
+                if (isCredential) {
+                    return (
+                        <div key={msg.id} className="flex flex-col items-center py-4 animate__animated animate__zoomIn">
+                            <div className="w-full max-w-[85%] bg-gradient-to-br from-slate-800 to-[#0f172a] p-6 rounded-[2.5rem] border-2 border-orange-500/30 shadow-2xl relative overflow-hidden ring-1 ring-white/5">
+                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                                    <i className="fas fa-shield-halved text-8xl text-white"></i>
+                                </div>
+                                <div className="flex items-center gap-3 mb-6 border-b border-white/5 pb-3">
+                                    <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center text-orange-500">
+                                        <i className="fas fa-user-shield text-sm"></i>
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase text-orange-400 tracking-[0.3em]">Official Security Update</span>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div className="bg-black/20 p-3.5 rounded-2xl border border-white/5 flex items-center justify-between group">
+                                        <div>
+                                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Username</div>
+                                            <div className="text-white font-mono font-bold text-sm tracking-tight">{msg.newUsername}</div>
+                                        </div>
+                                        <button onClick={() => copyToClipboard(msg.newUsername || '')} className="text-slate-500 hover:text-white transition-colors p-2"><i className="fas fa-copy"></i></button>
+                                    </div>
+                                    {msg.newPassword && (
+                                        <div className="bg-black/20 p-3.5 rounded-2xl border border-white/5 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Access Password</div>
+                                                <div className="text-white font-mono font-bold text-sm tracking-wider">
+                                                    {visiblePasswords[msg.id] ? msg.newPassword : '••••••••'}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button onClick={() => setVisiblePasswords(prev => ({...prev, [msg.id]: !prev[msg.id]}))} className="text-slate-500 hover:text-white p-2 transition-colors">
+                                                    <i className={`fas ${visiblePasswords[msg.id] ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                                                </button>
+                                                <button onClick={() => copyToClipboard(msg.newPassword || '')} className="text-slate-500 hover:text-white p-2 transition-colors">
+                                                    <i className="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-[9px] text-slate-500 font-bold mt-6 text-center italic opacity-60 leading-relaxed">
+                                    Use these credentials to log in. Please keep them secure.
+                                </p>
+                                <div className="text-[8px] text-right mt-4 font-bold text-slate-600">
+                                    {formatTime(msg.timestamp)}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
                 return (
-                    <div key={msg.id || `temp-${index}`} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate__animated animate__fadeInUp`}>
+                    <div 
+                        key={msg.id || `temp-${index}`} 
+                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate__animated animate__fadeInUp`}
+                        onMouseDown={() => handleTouchStart(msg)}
+                        onMouseUp={handleTouchEnd}
+                        onMouseLeave={handleTouchEnd}
+                        onTouchStart={() => handleTouchStart(msg)}
+                        onTouchEnd={handleTouchEnd}
+                    >
                         {isInvite ? (
                              <div className={`max-w-[85%] w-64 p-5 rounded-3xl ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border-2 border-game-primary rounded-bl-sm'} shadow-xl relative overflow-hidden`}>
-                                 <div className={`absolute top-0 right-0 p-2 opacity-10 pointer-events-none`}>
-                                     <i className="fas fa-gamepad text-6xl"></i>
-                                 </div>
-                                 <div className={`font-black uppercase text-[10px] mb-3 ${isMe ? 'text-indigo-200' : 'text-game-primary'} tracking-widest border-b border-white/20 pb-2`}>Quiz Invitation</div>
+                                 <div className="font-black uppercase text-[10px] mb-3 ${isMe ? 'text-indigo-200' : 'text-game-primary'} tracking-widest border-b border-white/20 pb-2">Quiz Invitation</div>
                                  <div className="text-center">
                                      <h3 className={`text-lg font-bold leading-tight mb-1 ${isMe ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{msg.subjectName || "Unknown Subject"}</h3>
                                      <div className="my-3 bg-black/20 rounded-lg p-2 backdrop-blur-sm">
                                          <div className="text-[10px] uppercase font-bold opacity-70">Room Code</div>
                                          <div className="text-2xl font-mono font-black tracking-widest">{msg.inviteCode}</div>
                                      </div>
-                                     
-                                     {status === 'played' ? (
-                                         <div className="bg-green-500/20 text-green-300 dark:text-green-400 font-bold px-4 py-2 rounded-xl text-xs border border-green-500/30 flex items-center justify-center gap-2"><i className="fas fa-check-circle"></i> Played</div>
-                                     ) : status === 'canceled' ? (
-                                         <div className="bg-red-500/20 text-red-300 dark:text-red-400 font-bold px-4 py-2 rounded-xl text-xs border border-red-500/30 flex items-center justify-center gap-2"><i className="fas fa-ban"></i> Canceled</div>
-                                     ) : status === 'expired' ? (
-                                         <div className="bg-gray-500/20 text-gray-300 dark:text-gray-400 font-bold px-4 py-2 rounded-xl text-xs border border-gray-500/30 flex items-center justify-center gap-2"><i className="fas fa-clock"></i> Expired</div>
+                                     {(msg.status === 'played' || msg.status === 'expired' || msg.status === 'canceled') ? (
+                                         <div className="bg-slate-500/20 text-slate-300 font-bold px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-2 uppercase tracking-widest"><i className="fas fa-info-circle"></i> {msg.status}</div>
                                      ) : !isMe ? (
-                                         <button disabled={isOffline} onClick={() => acceptInvite(msg.inviteCode!)} className="bg-game-primary text-white px-4 py-2 rounded-xl font-bold w-full shadow-lg hover:brightness-110 active:scale-95 transition-all text-xs uppercase tracking-wider disabled:opacity-50">Join Match</button>
+                                         <button disabled={isOffline} onClick={() => navigate('/lobby', { state: { autoJoinCode: msg.inviteCode } })} className="bg-game-primary text-white px-4 py-2 rounded-xl font-bold w-full shadow-lg active:scale-95 text-xs uppercase">Join Match</button>
                                      ) : (
-                                         <div className="text-[10px] font-bold italic opacity-70 flex items-center justify-center gap-2"><i className="fas fa-spinner fa-spin"></i> Waiting...</div>
+                                         <div className="text-[10px] font-bold italic opacity-70">Waiting for opponent...</div>
                                      )}
                                  </div>
                                  <div className={`text-[9px] text-right mt-3 flex items-center justify-end gap-1 ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>
@@ -545,11 +467,22 @@ const ChatPage: React.FC = () => {
                                  </div>
                              </div>
                         ) : (
-                             <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-md ${isMe ? 'bg-game-primary text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-bl-none border border-slate-200 dark:border-slate-700'}`}>
-                                 {msg.text}
-                                 <div className={`text-[9px] text-right mt-1 font-medium flex items-center justify-end gap-1 ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>
+                             <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-md transition-all duration-200 ${isMe ? 'bg-game-primary text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-bl-none border border-slate-200 dark:border-slate-700'}`}>
+                                 <div className="flex items-center gap-2">
+                                     {msg.isDeleted ? (
+                                         <>
+                                            <i className="fas fa-ban opacity-40 text-xs"></i>
+                                            <span className="italic opacity-60">
+                                                {isMe ? "You deleted this message" : "This message was deleted"}
+                                            </span>
+                                         </>
+                                     ) : (
+                                         <span>{msg.text}</span>
+                                     )}
+                                 </div>
+                                 <div className={`text-[9px] text-right mt-1 font-medium flex items-center justify-end gap-1 ${isMe ? 'text-white/70' : 'text-slate-400'}`}>
                                      {formatTime(msg.timestamp)}
-                                     {isMe && renderMessageStatus(msg.msgStatus, false)}
+                                     {isMe && !msg.isDeleted && renderMessageStatus(msg.msgStatus, false)}
                                  </div>
                              </div>
                         )}
@@ -559,101 +492,79 @@ const ChatPage: React.FC = () => {
             <div ref={messagesEndRef}></div>
         </div>
 
-        {/* Scroll Button */}
-        {showScrollButton && (
-            <button onClick={scrollToBottom} className="fixed bottom-24 right-4 z-50 w-10 h-10 bg-slate-900/50 dark:bg-slate-700/50 text-white rounded-full shadow-lg backdrop-blur-md flex items-center justify-center animate__animated animate__fadeInUp hover:bg-slate-900 transition-colors">
-                <i className="fas fa-arrow-down"></i>
-            </button>
-        )}
-
         {/* Input Area */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 transition-all duration-300 pb-[env(safe-area-inset-bottom)]">
-            <div className="max-w-4xl mx-auto w-full p-2 sm:p-3 md:p-4">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 pb-[env(safe-area-inset-bottom)]">
+            <div className="max-w-4xl mx-auto w-full p-3 md:p-4">
                 <form onSubmit={(e) => sendMessage(e, 'text')} className="flex items-center gap-2">
-                    <div className="flex-1 relative group">
-                        <input 
-                            className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-5 py-3 md:py-3.5 pl-5 pr-12 text-sm md:text-base text-slate-900 dark:text-white focus:outline-none focus:border-game-primary focus:ring-2 focus:ring-game-primary/20 transition-all font-medium placeholder-slate-400"
-                            placeholder={isOffline ? "Waiting for connection..." : "Message..."}
-                            value={inputText}
-                            onChange={e => setInputText(e.target.value)}
-                            disabled={isOffline}
-                        />
-                    </div>
-                    <button type="submit" disabled={!inputText.trim() || isOffline} className="w-11 h-11 md:w-12 md:h-12 shrink-0 rounded-full bg-gradient-to-tr from-game-primary to-indigo-600 text-white flex items-center justify-center disabled:opacity-50 disabled:scale-95 shadow-lg hover:scale-105 active:scale-90 transition-all">
+                    <input 
+                        className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-5 py-3 text-sm md:text-base text-slate-900 dark:text-white outline-none focus:border-game-primary transition-all font-medium"
+                        placeholder={isOffline ? "Connecting..." : "Message..."}
+                        value={inputText}
+                        onChange={e => setInputText(e.target.value)}
+                        disabled={isOffline}
+                    />
+                    <button type="submit" disabled={!inputText.trim() || isOffline} className="w-12 h-12 shrink-0 rounded-full bg-game-primary text-white flex items-center justify-center disabled:opacity-50 shadow-lg active:scale-90 transition-all">
                         <i className="fas fa-paper-plane"></i>
                     </button>
                 </form>
             </div>
         </div>
 
+        {/* Action Menu (Delete) */}
+        {selectedMsgForAction && (
+            <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 backdrop-blur-sm p-4 animate__animated animate__fadeIn">
+                <div className="absolute inset-0" onClick={() => setSelectedMsgForAction(null)}></div>
+                <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-[2.5rem] p-6 shadow-2xl animate__animated animate__slideInUp relative z-10">
+                    <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-6"></div>
+                    <div className="space-y-3">
+                        <button 
+                            onClick={deleteMessage}
+                            className="w-full py-4 px-6 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl flex items-center gap-4 font-black uppercase text-sm active:scale-95 transition-transform"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                <i className="fas fa-trash-alt text-lg"></i>
+                            </div>
+                            Delete for Everyone
+                        </button>
+                        <button 
+                            onClick={() => setSelectedMsgForAction(null)}
+                            className="w-full py-4 px-6 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-2xl font-black uppercase text-sm active:scale-95 transition-transform"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Game Setup Modal */}
         <Modal isOpen={showGameSetup} title="Start Battle" onClose={() => setShowGameSetup(false)}>
             <div className="space-y-4 pt-2">
                 <div>
-                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-300 uppercase mb-2">1. Select Subject</label>
-                    <div className="relative">
-                        <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="w-full p-4 bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white border-2 border-transparent focus:border-game-primary rounded-xl appearance-none font-bold cursor-pointer">
-                            <option value="">-- Choose Subject --</option>
-                            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
-                    </div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Subject</label>
+                    <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="w-full p-4 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold dark:text-white outline-none">
+                        <option value="">Choose Subject</option>
+                        {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
                 </div>
                 <div className={!selectedSubject ? 'opacity-50 pointer-events-none' : ''}>
-                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-300 uppercase mb-2">2. Select Chapter</label>
-                    <div className="relative">
-                        <select value={selectedChapter} onChange={(e) => setSelectedChapter(e.target.value)} className="w-full p-4 bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white border-2 border-transparent focus:border-game-primary rounded-xl appearance-none font-bold cursor-pointer" disabled={!selectedSubject}>
-                            <option value="">-- Choose Chapter --</option>
-                            {chapters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                        <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
-                    </div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Chapter</label>
+                    <select value={selectedChapter} onChange={(e) => setSelectedChapter(e.target.value)} className="w-full p-4 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold dark:text-white outline-none" disabled={!selectedSubject}>
+                        <option value="">Choose Chapter</option>
+                        {chapters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
                 </div>
-                <div className="pt-4 flex gap-3">
-                    <Button variant="secondary" fullWidth onClick={() => setShowGameSetup(false)}>Cancel</Button>
-                    <Button fullWidth onClick={confirmMatchInvite} isLoading={setupLoading} disabled={!selectedChapter}>Send Invite</Button>
-                </div>
+                <Button fullWidth onClick={() => {
+                    const code = Math.floor(1000 + Math.random() * 9000).toString();
+                    const subName = subjects.find(s => s.id === selectedSubject)?.name || "Battle";
+                    sendMessage(undefined, 'invite', code, subName);
+                    setShowGameSetup(false);
+                    navigate('/lobby', { state: { hostedCode: code } });
+                }} disabled={!selectedChapter}>Send Challenge</Button>
             </div>
         </Modal>
 
-        {showProfile && targetUser && (
-            <UserProfileModal user={targetUser} onClose={() => setShowProfile(false)} />
-        )}
-
-        {/* 2026 Celebration Overlay */}
-        {showYearAnim && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate__animated animate__fadeIn"></div>
-                
-                <div className="relative z-10 flex flex-col items-center">
-                    <div className="font-black text-9xl text-white drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] flex items-center" style={{ fontFamily: 'Impact, sans-serif' }}>
-                        <span className="text-yellow-400 tracking-tighter">202</span>
-                        <div className="relative w-[0.6em] h-[1em]">
-                            <span 
-                                className={`absolute inset-0 text-yellow-400 flex justify-center transition-all duration-700 ease-in
-                                    ${yearStep >= 2 ? 'translate-y-[200%] rotate-[120deg] opacity-0' : 'translate-y-0 rotate-0 opacity-100'}
-                                `}
-                            >
-                                5
-                            </span>
-                            <span 
-                                className={`absolute inset-0 text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-orange-500 flex justify-center transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)
-                                    ${yearStep >= 2 ? 'translate-y-0 scale-100 opacity-100' : '-translate-y-[150%] scale-50 opacity-0'}
-                                `}
-                            >
-                                6
-                            </span>
-                        </div>
-                    </div>
-                    
-                    {yearStep >= 2 && (
-                        <div className="mt-8 text-4xl font-black text-white uppercase tracking-widest animate__animated animate__jackInTheBox drop-shadow-lg text-center bg-game-primary px-6 py-2 rounded-full transform -rotate-2">
-                            Happy New Year!
-                        </div>
-                    )}
-                </div>
-            </div>
-        )}
+        {showProfile && targetUser && <UserProfileModal user={targetUser} onClose={() => setShowProfile(false)} />}
     </div>
   );
 };

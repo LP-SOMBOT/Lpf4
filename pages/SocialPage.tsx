@@ -299,9 +299,14 @@ const SocialPage: React.FC = () => {
                     ) : (
                         sortedFriends.map(f => {
                             const meta = chatMetadata[f.uid];
-                            const lastMsg = meta?.lastMessage 
-                                ? (meta.lastMessage === 'CHALLENGE_INVITE' ? '🎮 Game Invite' : meta.lastMessage) 
-                                : 'Start chatting';
+                            let lastMsgText = meta?.lastMessage || 'Start chatting';
+                            
+                            if (lastMsgText === 'THIS_MESSAGE_WAS_DELETED') {
+                                lastMsgText = '🚫 This message was deleted';
+                            } else if (lastMsgText === 'CHALLENGE_INVITE') {
+                                lastMsgText = '🎮 Game Invite';
+                            }
+
                             const isMe = meta?.lastMessageSender === user?.uid;
                             const unreadCount = meta?.unreadCount || 0;
                             
@@ -332,7 +337,7 @@ const SocialPage: React.FC = () => {
                                         <div className="flex justify-between items-center">
                                             <div className={`text-sm truncate flex items-center gap-1 ${unreadCount > 0 ? 'font-black text-slate-900 dark:text-slate-100' : 'font-medium text-slate-500 dark:text-slate-400'}`}>
                                                 {isMe && <i className={`fas fa-check-double text-[10px] mr-0.5 ${meta?.lastMessageStatus === 'read' ? 'text-blue-500' : 'text-slate-400'}`}></i>}
-                                                <span className="truncate">{lastMsg}</span>
+                                                <span className={`truncate ${meta?.lastMessage === 'THIS_MESSAGE_WAS_DELETED' ? 'italic opacity-60' : ''}`}>{lastMsgText}</span>
                                             </div>
                                             
                                             {unreadCount > 0 && (
