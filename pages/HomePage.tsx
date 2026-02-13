@@ -149,8 +149,9 @@ const HomePage: React.FC = () => {
                                 e.stopPropagation(); 
                                 window.open('https://pl28709979.effectivegatecpm.com/b7749c6413cf35935cfa37b468c20ce2/invoke.js', '_blank'); 
                             }} 
-                            className="px-3 py-2 rounded-xl bg-game-primary/20 border border-game-primary/30 text-game-primary text-[10px] font-black uppercase tracking-widest hover:bg-game-primary hover:text-white transition-all shadow-lg active:scale-95"
+                            className="px-4 py-2 rounded-xl bg-orange-500 text-slate-950 text-[10px] font-black uppercase tracking-widest hover:bg-orange-400 transition-all shadow-lg active:scale-95 flex items-center gap-2"
                         >
+                            <i className="fas fa-external-link-alt"></i>
                             Go to
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleNav('/admin'); }} className="w-10 h-10 rounded-full bg-slate-800/80 backdrop-blur-sm border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors shadow-lg active:scale-95">
