@@ -42,7 +42,6 @@ const LibraryPage: React.FC = () => {
   const [readerKey, setReaderKey] = useState(0); 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // --- FIX: Moved filteredMaterials declaration before its usage in useEffect dependency array to avoid block-scoped variable error ---
   const filteredMaterials = materials.filter(m => {
       const matchesCategory = activeCategory === 'all' || m.category === activeCategory;
       const matchesSubject = activeSubject === 'all' || m.subjectName === activeSubject;
@@ -348,7 +347,7 @@ const LibraryPage: React.FC = () => {
                          <i className="fas fa-layer-group text-game-primary text-[10px]"></i>
                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Category</h4>
                       </div>
-                      <div className="flex flex-wrap gap-2.5">
+                      <div className="flex wrap gap-2.5">
                           <button 
                             onClick={() => { setActiveCategory('all'); playSound('click'); }}
                             className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${activeCategory === 'all' ? 'bg-game-primary border-white/20 text-slate-950 shadow-lg shadow-game-primary/20' : 'bg-slate-800/50 border-slate-800 text-slate-500'}`}

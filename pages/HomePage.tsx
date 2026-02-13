@@ -1,4 +1,3 @@
-
 import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ref, update } from 'firebase/database';
@@ -147,7 +146,7 @@ const HomePage: React.FC = () => {
                         <button 
                             onClick={(e) => { 
                                 e.stopPropagation(); 
-                                window.open('https://pl28709979.effectivegatecpm.com/b7749c6413cf35935cfa37b468c20ce2/invoke.js', '_blank'); 
+                                window.open('https://www.effectivegatecpm.com/zk6cfndg?key=718a758cc877fb4255e851fa8c9305e0', '_blank'); 
                             }} 
                             className="px-4 py-2 rounded-xl bg-orange-500 text-slate-950 text-[10px] font-black uppercase tracking-widest hover:bg-orange-400 transition-all shadow-lg active:scale-95 flex items-center gap-2"
                         >
