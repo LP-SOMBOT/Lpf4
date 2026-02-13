@@ -14,6 +14,7 @@ import confetti from 'canvas-confetti';
 import { playSound } from './services/audioService';
 import { Button, Modal } from './components/UI';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { CustomAlertManager } from './components/CustomAlertManager';
 
 // Pages
 import AuthPage from './pages/AuthPage';
@@ -314,6 +315,7 @@ const AppContent: React.FC = () => {
                 {showAssistant && <LPAssistant />}
                 {user && <UsernamePrompt />}
                 <PWAInstallPrompt />
+                <CustomAlertManager />
 
                 <Modal isOpen={showVerificationModal} onClose={handleDismissVerification}>
                     <div className="flex flex-col items-center text-center p-4">

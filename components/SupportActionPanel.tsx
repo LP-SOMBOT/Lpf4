@@ -4,7 +4,7 @@ import { ref, update, get, push, serverTimestamp, increment } from 'firebase/dat
 import { db } from '../firebase';
 import { UserProfile } from '../types';
 import { UserContext } from '../contexts';
-import { showToast, showConfirm, showAlert } from '../services/alert';
+import { showToast, showConfirm, showPrompt } from '../services/alert';
 import { playSound } from '../services/audioService';
 
 interface Props {
@@ -22,7 +22,7 @@ export const SupportActionPanel: React.FC<Props> = ({ targetUser }) => {
                 isVerified: !targetUser.isVerified,
                 verificationNotificationPending: !targetUser.isVerified
             });
-            showToast(targetUser.isVerified ? 'Verification Removed' : 'User Verified', 'success');
+            showToast(targetUser.isVerified ? 'Verification Removed' : 'User Verified');
         } catch (e) { showToast("Error", "error"); }
     };
 
@@ -38,7 +38,7 @@ export const SupportActionPanel: React.FC<Props> = ({ targetUser }) => {
                 banned: !targetUser.banned,
                 activeMatch: !targetUser.banned ? null : targetUser.activeMatch
             });
-            showToast(targetUser.banned ? 'User Unbanned' : 'User Banned', 'success');
+            showToast(targetUser.banned ? 'User Unbanned' : 'User Banned');
         } catch (e) { showToast("Error", "error"); }
     };
 
@@ -48,25 +48,14 @@ export const SupportActionPanel: React.FC<Props> = ({ targetUser }) => {
         try {
             await update(ref(db, `users/${targetUser.uid}`), { points: pts });
             setPointsMode(false);
-            showToast("Points Updated", "success");
+            showToast("Points Updated");
         } catch(e) { showToast("Error", "error"); }
     };
 
     const handleChangeUsername = async () => {
         if (!currentStaff) return;
-        const result = await showAlert("Edit Username", "Enter new unique username", "info");
-        const { value: username } = await import('sweetalert2').then(Swal => Swal.default.fire({
-            title: 'New Username',
-            input: 'text',
-            inputPlaceholder: 'Enter unique username...',
-            showCancelButton: true,
-            confirmButtonText: 'Sync',
-            customClass: {
-                popup: 'glass-swal-popup',
-                input: 'glass-swal-input',
-                confirmButton: 'glass-swal-btn-confirm'
-            }
-        }));
+        
+        const username = await showPrompt("New Username", "Enter unique username...");
 
         if (!username) return;
         const clean = username.toLowerCase().replace(/[^a-z0-9_]/g, '');
@@ -86,7 +75,7 @@ export const SupportActionPanel: React.FC<Props> = ({ targetUser }) => {
         try {
             await update(ref(db, `users/${targetUser.uid}`), { username: clean });
             await sendCredentialNotification(targetUser.uid, clean, null);
-            showToast("Username Updated & Notified", "success");
+            showToast("Username Updated & Notified");
         } catch (e) { showToast("Sync failed", "error"); }
     };
 
@@ -102,7 +91,7 @@ export const SupportActionPanel: React.FC<Props> = ({ targetUser }) => {
             // Note: Since client SDK can't reset other users' Auth passwords, 
             // we simulate this by notifying them. In a real app, this would trigger a Cloud Function.
             await sendCredentialNotification(targetUser.uid, targetUser.username || '', newPass);
-            showToast("Password Sent to User", "success");
+            showToast("Password Sent to User");
         } catch (e) { showToast("Action failed", "error"); }
     };
 

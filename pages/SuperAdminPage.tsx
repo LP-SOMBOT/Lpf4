@@ -4,7 +4,7 @@ import { ref, update, onValue, off, set, remove, get, push } from 'firebase/data
 import { db } from '../firebase';
 import { UserProfile, Subject, Chapter, Question, MatchState, QuestionReport } from '../types';
 import { Button, Card, Input, Modal, Avatar } from '../components/UI';
-import { showAlert, showToast, showConfirm } from '../services/alert';
+import { showAlert, showToast, showConfirm, showPrompt } from '../services/alert';
 import { useNavigate } from 'react-router-dom';
 
 const SuperAdminPage: React.FC = () => {
@@ -48,7 +48,6 @@ const SuperAdminPage: React.FC = () => {
       { path: 'users', setter: (data: any) => setUsers(Object.keys(data || {}).map(k => ({ uid: k, ...data[k] }))) },
       { path: 'matches', setter: (data: any) => setMatches(Object.keys(data || {}).map(k => ({ ...data[k], matchId: k })).reverse()) },
       { path: 'reports', setter: (data: any) => setReports(Object.keys(data || {}).map(k => ({ ...data[k], id: k })).reverse()) },
-      // FIX: Add explicit type casting for Subject array to resolve 'unknown[]' assignment error
       { path: 'subjects', setter: (data: any) => setSubjects(Object.values(data || {}).filter((s: any) => s && s.id && s.name) as Subject[]) },
       { 
         path: 'settings/reactions', 
@@ -89,7 +88,7 @@ const SuperAdminPage: React.FC = () => {
   const toggleUserProp = async (uid: string, prop: string, current: any) => {
     try {
       await update(ref(db, `users/${uid}`), { [prop]: !current });
-      showToast("User updated", "success");
+      showToast("User updated");
     } catch(e) { showAlert("Error", "Action failed", "error"); }
   };
 
@@ -98,13 +97,13 @@ const SuperAdminPage: React.FC = () => {
   };
 
   const terminateMatch = async (matchId: string) => {
-    if (await showConfirm("Terminate Match?", "Game will end for all players.", "Terminate", "Cancel", "danger")) {
+    if (await showConfirm("Terminate Match?", "Game will end for all players.")) {
       const match = matches.find(m => m.matchId === matchId);
       const updates: any = {};
       updates[`matches/${matchId}`] = null;
       if (match?.players) Object.keys(match.players).forEach(uid => updates[`users/${uid}/activeMatch`] = null);
       await update(ref(db), updates);
-      showToast("Terminated", "success");
+      showToast("Terminated");
     }
   };
 
@@ -117,14 +116,14 @@ const SuperAdminPage: React.FC = () => {
         answer: editingQuestion.answer
     });
     setEditingQuestion(null);
-    showToast("Updated", "success");
+    showToast("Updated");
   };
 
   const handleDeleteQuestion = async (id: string | number) => {
     if (!selectedChapter) return;
     if (await showConfirm("Delete?", "Permanently remove question?")) {
       await remove(ref(db, `questions/${selectedChapter}/${id}`));
-      showToast("Deleted", "success");
+      showToast("Deleted");
     }
   };
 
@@ -135,7 +134,7 @@ const SuperAdminPage: React.FC = () => {
     DEFAULT_EMOJIS.forEach(e => updates[`settings/reactions/emojis/${push(ref(db, 'settings/reactions/emojis')).key}`] = e);
     DEFAULT_MESSAGES.forEach(m => updates[`settings/reactions/messages/${push(ref(db, 'settings/reactions/messages')).key}`] = m);
     await update(ref(db), updates);
-    showToast('Defaults Loaded', 'success');
+    showToast('Defaults Loaded');
   };
 
   // --- FILTERS ---

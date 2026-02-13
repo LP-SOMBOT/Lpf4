@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ref, onValue, update, onDisconnect, get, set, remove, serverTimestamp, push, onChildAdded, off, query, limitToLast } from 'firebase/database';
@@ -8,9 +9,8 @@ import { MatchState, Question, Chapter, UserProfile, MatchReaction } from '../ty
 import { Avatar, Button, Card, Modal, VerificationBadge } from '../components/UI';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { playSound } from '../services/audioService';
-import { showToast, showConfirm, showAlert } from '../services/alert';
+import { showToast, showConfirm, showAlert, showPrompt } from '../services/alert';
 import confetti from 'canvas-confetti';
-import Swal from 'sweetalert2';
 
 const DEFAULT_EMOJIS = ['😂', '😡', '👏', '😱', '🥲', '🔥', '🏆', '🤯'];
 const DEFAULT_MESSAGES = ['Nasiib wacan!', 'Aad u fiican', 'Iska jir!', 'Hala soo baxo!', 'Mahadsanid'];
@@ -717,27 +717,8 @@ const GamePage: React.FC = () => {
   const handleReport = async () => {
       if (!currentQuestion || !user) return;
       playSound('click');
-      const { value: reason } = await Swal.fire({
-          title: 'Report Question',
-          input: 'select',
-          inputOptions: {
-              'wrong_answer': 'Jawaabta ayaa qaldan (Wrong answer)',
-              'typo': 'Qoraal ayaa qaldan (Typo/Error)',
-              'other': 'Sabab kale (Other)'
-          },
-          inputPlaceholder: 'Dooro sababta...',
-          showCancelButton: true,
-          confirmButtonText: 'Dir (Send)',
-          inputValidator: (value) => {
-              return !value && 'Fadlan dooro sababta (Please select a reason)';
-          },
-          customClass: {
-              popup: 'glass-swal-popup',
-              title: 'glass-swal-title',
-              confirmButton: 'glass-swal-btn-confirm',
-              cancelButton: 'glass-swal-btn-cancel'
-          }
-      });
+      
+      const reason = await showPrompt('Report Question', 'Type reason (e.g. wrong answer, typo)');
 
       if (reason) {
           try {

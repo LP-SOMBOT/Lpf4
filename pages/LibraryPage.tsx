@@ -40,6 +40,7 @@ const LibraryPage: React.FC = () => {
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
   const [readerKey, setReaderKey] = useState(0); 
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Click Outside logic
   useEffect(() => {
@@ -114,9 +115,15 @@ const LibraryPage: React.FC = () => {
   };
 
   const handleRetry = () => {
+      if (isRefreshing) return;
+      setIsRefreshing(true);
       setIframeError(false);
       setIframeLoading(true);
       setReaderKey(prev => prev + 1);
+      playSound('click');
+      
+      // Animation duration to match the visual feel
+      setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   if (!isLibraryEnabled) {
@@ -172,9 +179,10 @@ const LibraryPage: React.FC = () => {
                   </div>
                   <button 
                     onClick={handleRetry} 
-                    className="w-10 h-10 rounded-xl bg-slate-800 text-cyan-400 flex items-center justify-center hover:bg-slate-700 transition-all active:scale-90"
+                    disabled={isRefreshing}
+                    className={`w-10 h-10 rounded-xl bg-slate-800 text-cyan-400 flex items-center justify-center transition-all duration-300 ${isRefreshing ? 'bg-cyan-500/20 text-white shadow-[0_0_20px_rgba(34,211,238,0.4)] ring-2 ring-cyan-500/30' : 'hover:bg-slate-700 active:scale-90'}`}
                   >
-                      <i className="fas fa-redo-alt"></i>
+                      <i className={`fas fa-redo-alt ${isRefreshing ? 'animate-spin' : 'transition-transform duration-500 group-hover:rotate-180'}`}></i>
                   </button>
               </div>
 

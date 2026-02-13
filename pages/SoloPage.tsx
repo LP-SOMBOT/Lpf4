@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ref, get, onValue, off, push, set, serverTimestamp } from 'firebase/database';
@@ -5,9 +6,8 @@ import { db } from '../firebase';
 import { UserContext } from '../contexts';
 import { Button, Card } from '../components/UI';
 import { playSound } from '../services/audioService';
-import { showToast } from '../services/alert';
+import { showToast, showPrompt } from '../services/alert';
 import { Question, Subject, Chapter } from '../types';
-import Swal from 'sweetalert2';
 
 // Utility to shuffle array
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -194,24 +194,7 @@ const SoloPage: React.FC = () => {
     if (!currentQ || !user) return;
     playSound('click');
     
-    const { value: reason } = await Swal.fire({
-        title: 'Report Question',
-        input: 'select',
-        inputOptions: {
-            'wrong_answer': 'Jawaabta ayaa qaldan (Wrong answer)',
-            'typo': 'Qoraal ayaa qaldan (Typo/Error)',
-            'other': 'Sabab kale (Other)'
-        },
-        inputPlaceholder: 'Dooro sababta...',
-        showCancelButton: true,
-        confirmButtonText: 'Dir (Send)',
-        customClass: {
-            popup: 'glass-swal-popup',
-            title: 'glass-swal-title',
-            confirmButton: 'glass-swal-btn-confirm',
-            cancelButton: 'glass-swal-btn-cancel'
-        }
-    });
+    const reason = await showPrompt('Report Question', 'Tell us what is wrong with this question.');
 
     if (reason) {
         try {

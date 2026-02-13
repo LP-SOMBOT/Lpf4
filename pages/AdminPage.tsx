@@ -6,7 +6,7 @@ import { Button, Input, Card, Modal } from '../components/UI';
 import { Question, Subject, Chapter, StudyMaterial } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { read, utils, writeFile } from 'xlsx';
-import { showAlert, showConfirm, showToast } from '../services/alert';
+import { showAlert, showConfirm, showToast, showPrompt } from '../services/alert';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -413,7 +413,7 @@ export const AdminPage: React.FC = () => {
       const newValue = !isLibraryEnabled;
       try {
           await update(ref(db, 'settings/library'), { enabled: newValue });
-          showToast(`Library ${newValue ? 'Enabled' : 'Disabled'}`, 'success');
+          showToast(`Library ${newValue ? 'Enabled' : 'Disabled'}`);
       } catch (e) {
           showAlert("Error", "Failed to toggle library", "error");
       }
@@ -538,7 +538,7 @@ export const AdminPage: React.FC = () => {
       if (!confirm) return;
       try {
           await remove(ref(db, `studyMaterials/${item.id}`));
-          showToast("Deleted", "success");
+          showToast("Deleted");
       } catch(e) {
           showAlert("Error", "Failed to delete PDF.", "error");
       }
@@ -554,7 +554,7 @@ export const AdminPage: React.FC = () => {
           const keyToDelete = Object.keys(data).find(k => data[k] === val);
           if (keyToDelete) {
               await remove(ref(db, `settings/library/${type}/${keyToDelete}`));
-              showToast("Label removed", "success");
+              showToast("Label removed");
           }
       }
   };
