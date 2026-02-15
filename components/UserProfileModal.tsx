@@ -15,6 +15,10 @@ interface Props {
 export const UserProfileModal: React.FC<Props> = ({ user, onClose, actionLabel, onAction }) => {
     const { profile: myProfile } = useContext(UserContext);
 
+    const isSuperAdmin = myProfile?.roles?.superAdmin === true;
+    const isSupport = myProfile?.isSupport || myProfile?.roles?.support === true;
+    const canManage = isSuperAdmin || isSupport;
+
     return (
         <Modal isOpen={true} onClose={onClose} title={user.name}>
              <div className="flex flex-col items-center mb-6">
@@ -52,8 +56,8 @@ export const UserProfileModal: React.FC<Props> = ({ user, onClose, actionLabel, 
                     </div>
                 )}
 
-                {/* Support Panel (Only visible to Support Staff) */}
-                {myProfile?.isSupport && <SupportActionPanel targetUser={user} />}
+                {/* Support Panel (Visible to Super Admin and Support Staff) */}
+                {canManage && <SupportActionPanel targetUser={user} />}
             </div>
             
             <div className="flex gap-3">

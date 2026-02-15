@@ -9,12 +9,15 @@ import { showAlert, showToast, showConfirm, showPrompt } from '../services/alert
 import { useNavigate } from 'react-router-dom';
 
 const SuperAdminPage: React.FC = () => {
-  const { profile: myProfile } = useContext(UserContext);
+  const { profile: myProfile, loading: profileLoading } = useContext(UserContext);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [activeTab, setActiveTab] = useState<'home' | 'users' | 'quizzes' | 'arena' | 'reports'>('home');
   const navigate = useNavigate();
   
+  // UI State
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+
   // --- DATA STATES ---
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [matches, setMatches] = useState<MatchState[]>([]);
@@ -40,10 +43,10 @@ const SuperAdminPage: React.FC = () => {
   // --- AUTHENTICATION ---
   useEffect(() => {
       // Auto-unlock if user is a Super Admin based on profile roles
-      if (myProfile?.roles?.superAdmin) {
+      if (!profileLoading && myProfile?.roles?.superAdmin) {
           setIsAuthenticated(true);
       }
-  }, [myProfile]);
+  }, [myProfile, profileLoading]);
 
   const checkPin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,13 +211,14 @@ const SuperAdminPage: React.FC = () => {
   }, [users, matches, reports]);
 
   // --- UI HELPERS ---
-  const SidebarItem = ({ id, icon, active }: { id: string, icon: string, active: boolean }) => (
+  const SidebarItem = ({ id, icon, label, active }: { id: string, icon: string, label: string, active: boolean }) => (
       <button 
         onClick={() => setActiveTab(id as any)}
-        className={`w-12 h-12 mb-6 rounded-2xl flex items-center justify-center transition-all duration-300 relative group ${active ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'text-slate-500 hover:text-slate-200'}`}
+        className={`w-full mb-2 rounded-2xl flex items-center transition-all duration-300 relative group overflow-hidden ${isSidebarExpanded ? 'px-4 py-3 gap-4' : 'justify-center py-3 w-12 h-12 mx-auto'} ${active ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/50'}`}
       >
-          <i className={`fas ${icon} text-xl`}></i>
-          {active && <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-6 bg-cyan-400 rounded-r-full shadow-[0_0_10px_rgba(34,211,238,0.8)]"></div>}
+          <i className={`fas ${icon} text-xl shrink-0`}></i>
+          {isSidebarExpanded && <span className="font-bold text-sm uppercase tracking-wide whitespace-nowrap">{label}</span>}
+          {active && <div className={`absolute top-1/2 -translate-y-1/2 w-1 h-6 bg-cyan-400 rounded-r-full shadow-[0_0_10px_rgba(34,211,238,0.8)] ${isSidebarExpanded ? 'left-0' : '-left-1'}`}></div>}
       </button>
   );
 
@@ -271,23 +275,40 @@ const SuperAdminPage: React.FC = () => {
   return (
     <div className="flex h-screen bg-[#0b1120] text-white font-sans overflow-hidden select-none">
         
-        {/* SIDEBAR - Fixed Menu */}
-        <div className="w-24 border-r border-slate-800 flex flex-col items-center py-8 z-20 bg-[#0b1120] hidden md:flex">
-            <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mb-10 shadow-lg shadow-cyan-500/20 cursor-pointer hover:scale-105 transition-transform" onClick={() => navigate('/')}>
-                <i className="fas fa-bolt text-xl text-white"></i>
+        {/* SIDEBAR */}
+        <div className={`transition-all duration-300 border-r border-slate-800 flex flex-col items-center py-8 z-20 bg-[#0b1120] hidden md:flex ${isSidebarExpanded ? 'w-64' : 'w-20'}`}>
+            <div className="flex items-center gap-3 mb-10 cursor-pointer" onClick={() => navigate('/')}>
+                <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
+                    <i className="fas fa-bolt text-xl text-white"></i>
+                </div>
+                {isSidebarExpanded && (
+                    <div className="overflow-hidden whitespace-nowrap animate__animated animate__fadeInLeft animate__faster">
+                        <h2 className="font-black text-lg tracking-tight">LP-ADMIN</h2>
+                        <p className="text-[9px] text-cyan-500 font-bold uppercase tracking-[0.2em]">Console v2.0</p>
+                    </div>
+                )}
             </div>
             
-            <div className="flex-1 w-full flex flex-col items-center custom-scrollbar overflow-y-auto">
-                <SidebarItem id="home" icon="fa-th-large" active={activeTab === 'home'} />
-                <SidebarItem id="users" icon="fa-users" active={activeTab === 'users'} />
-                <SidebarItem id="quizzes" icon="fa-layer-group" active={activeTab === 'quizzes'} />
-                <SidebarItem id="arena" icon="fa-gamepad" active={activeTab === 'arena'} />
-                <SidebarItem id="reports" icon="fa-flag" active={activeTab === 'reports'} />
+            <div className="flex-1 w-full px-3 flex flex-col gap-1 custom-scrollbar overflow-y-auto">
+                <SidebarItem id="home" icon="fa-th-large" label="Dashboard" active={activeTab === 'home'} />
+                <SidebarItem id="users" icon="fa-users" label="User Database" active={activeTab === 'users'} />
+                <SidebarItem id="quizzes" icon="fa-layer-group" label="Content Mgr" active={activeTab === 'quizzes'} />
+                <SidebarItem id="arena" icon="fa-gamepad" label="Live Arena" active={activeTab === 'arena'} />
+                <SidebarItem id="reports" icon="fa-flag" label="Reports" active={activeTab === 'reports'} />
             </div>
 
-            <button onClick={() => navigate('/')} className="w-10 h-10 rounded-full bg-slate-800 text-slate-500 hover:text-white flex items-center justify-center transition-colors mt-4">
-                <i className="fas fa-sign-out-alt"></i>
-            </button>
+            <div className="w-full px-4 flex flex-col gap-4 mt-4">
+                <button 
+                    onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                    className="w-full h-10 rounded-xl bg-slate-900 text-slate-500 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center border border-slate-800"
+                >
+                    <i className={`fas ${isSidebarExpanded ? 'fa-chevron-left' : 'fa-chevron-right'}`}></i>
+                </button>
+                <button onClick={() => navigate('/')} className={`w-full h-10 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center ${isSidebarExpanded ? 'justify-start px-4 gap-3' : 'justify-center'} transition-colors`}>
+                    <i className="fas fa-sign-out-alt"></i>
+                    {isSidebarExpanded && <span className="text-xs font-bold uppercase">Exit Console</span>}
+                </button>
+            </div>
         </div>
 
         {/* MAIN CONTENT */}
@@ -311,8 +332,8 @@ const SuperAdminPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="text-right hidden sm:block">
-                            <div className="text-white font-bold text-sm">Super Admin</div>
-                            <div className="text-slate-500 text-[10px] uppercase font-black tracking-wider">Full Access</div>
+                            <div className="text-white font-bold text-sm">{myProfile?.name || 'Admin'}</div>
+                            <div className="text-slate-500 text-[10px] uppercase font-black tracking-wider">Super Admin</div>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-purple-500/20 border-2 border-purple-500 flex items-center justify-center overflow-hidden">
                             <i className="fas fa-user-astronaut text-purple-400"></i>
@@ -515,7 +536,7 @@ const SuperAdminPage: React.FC = () => {
             </div>
         </div>
 
-        {/* --- USER DETAIL MODAL --- */}
+        {/* --- USER DETAIL MODAL (SUPER ADMIN VERSION) --- */}
         {selectedUser && (
             <Modal isOpen={true} title="User Manager" onClose={() => setSelectedUser(null)}>
                 <div className="flex flex-col items-center mb-6 pt-2">
