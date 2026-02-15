@@ -89,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
                 <button 
                     key={item.path} 
                     onClick={() => navigate(item.path)}
-                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-2xl transition-all duration-300 relative overflow-hidden group min-w-[60px]
+                    className={`flex-1 flex flex-col items-center justify-center py-2 md:py-3 rounded-2xl transition-all duration-300 relative overflow-hidden group min-w-[50px] md:min-w-[60px]
                         ${isActive ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'}
                     `}
                 >
@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
                         <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 to-transparent rounded-2xl animate__animated animate__fadeIn"></div>
                     )}
                     <div className="relative">
-                        <i className={`fas ${item.icon} text-xl mb-1 z-10 transition-transform duration-300 ${isActive ? '-translate-y-1 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'group-active:scale-90'}`}></i>
+                        <i className={`fas ${item.icon} text-lg md:text-xl mb-1 z-10 transition-transform duration-300 ${isActive ? '-translate-y-1 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'group-active:scale-90'}`}></i>
                         {item.isNew && (
                             <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[8px] font-black px-1.5 rounded-full animate-pulse border border-[#0f172a] shadow-lg">
                                 N
