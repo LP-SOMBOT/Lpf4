@@ -166,6 +166,39 @@ const SuperAdminPage: React.FC = () => {
     }
   };
 
+  const terminateAllMatches = async () => {
+      if (matches.length === 0) return;
+      
+      const confirm = await showConfirm(
+          "NUKE ARENA?", 
+          `This will forcefully end all ${matches.length} active matches. Players will be kicked.`, 
+          "CLEAR ALL", 
+          "Cancel", 
+          "danger"
+      );
+
+      if (!confirm) return;
+
+      const updates: any = {};
+      matches.forEach(m => {
+          // Delete match from DB
+          updates[`matches/${m.matchId}`] = null;
+          // Reset players activeMatch status
+          if (m.players) {
+              Object.keys(m.players).forEach(uid => {
+                  updates[`users/${uid}/activeMatch`] = null;
+              });
+          }
+      });
+
+      try {
+          await update(ref(db), updates);
+          showToast("Arena Cleared", "success");
+      } catch (e) {
+          showAlert("Error", "Failed to clear matches", "error");
+      }
+  };
+
   const handleUpdateQuestion = async () => {
     if (!editingQuestion) return;
     const path = `questions/${editingQuestion.subject}/${editingQuestion.id}`;
@@ -486,9 +519,16 @@ const SuperAdminPage: React.FC = () => {
                 {/* --- ARENA TAB --- */}
                 {activeTab === 'arena' && (
                     <div className="bg-[#1e293b] rounded-[2.5rem] p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
-                        <h2 className="text-xl font-black text-white mb-6 uppercase tracking-widest flex items-center gap-2">
-                            <i className="fas fa-gamepad text-green-400"></i> Active Arena
-                        </h2>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                <i className="fas fa-gamepad text-green-400"></i> Active Arena
+                            </h2>
+                            {matches.length > 0 && (
+                                <Button size="sm" variant="danger" onClick={terminateAllMatches} className="!py-2 !px-4 !text-[10px] shadow-red-500/20">
+                                    <i className="fas fa-bomb mr-2"></i> CLEAR ALL
+                                </Button>
+                            )}
+                        </div>
                         <div className="space-y-4">
                             {matches.map(m => (
                                 <div key={m.matchId} className="bg-[#0b1120] p-5 rounded-2xl border border-slate-800 flex justify-between items-center group hover:border-green-500/30 transition-colors">
