@@ -82,14 +82,14 @@ export const Navbar: React.FC<NavbarProps> = ({ orientation = 'horizontal' }) =>
   // Mobile Horizontal - Neon Glass Island
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 p-4 pointer-events-none flex justify-center pb-6">
-        <div className="pointer-events-auto bg-[#0f172a]/90 backdrop-blur-2xl border border-cyan-500/20 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] rounded-3xl px-2 py-2 flex items-center justify-between gap-1 w-full max-w-md ring-1 ring-white/5">
-            {navItems.slice(0, 5).map((item) => {
+        <div className="pointer-events-auto bg-[#0f172a]/90 backdrop-blur-2xl border border-cyan-500/20 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] rounded-3xl px-2 py-2 flex items-center gap-1 w-full max-w-md ring-1 ring-white/5 overflow-x-auto custom-scrollbar-hide">
+            {navItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
                 <button 
                     key={item.path} 
                     onClick={() => navigate(item.path)}
-                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-2xl transition-all duration-300 relative overflow-hidden group
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-2xl transition-all duration-300 relative overflow-hidden group min-w-[60px]
                         ${isActive ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'}
                     `}
                 >
