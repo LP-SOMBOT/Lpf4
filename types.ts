@@ -21,6 +21,7 @@ export interface UserProfile {
   verificationNotificationPending?: boolean; // Trigger for Congrats Modal
   isSupport?: boolean; // Orange tick (Legacy Support Verified)
   allowCustomAvatar?: boolean; // Privilege to upload custom pics
+  customBadge?: string; // Super Admin custom badge URL
   isGuest?: boolean;
   isOnline?: boolean;
   lastSeen?: number;

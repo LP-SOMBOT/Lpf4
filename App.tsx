@@ -273,7 +273,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  const showNavbar = ['/', '/lobby', '/leaderboard', '/profile', '/about', '/social', '/library', '/support', '/adminlp'].includes(location.pathname);
+  const showNavbar = ['/', '/lobby', '/leaderboard', '/profile', '/about', '/social', '/library', '/support'].includes(location.pathname);
   const showAssistant = user && !location.pathname.includes('/game') && !location.pathname.includes('/chat') && !location.pathname.includes('/support') && !location.pathname.includes('/calculator');
 
   return (

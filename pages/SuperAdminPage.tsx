@@ -17,6 +17,7 @@ const SuperAdminPage: React.FC = () => {
   
   // UI State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // --- DATA STATES ---
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -246,7 +247,10 @@ const SuperAdminPage: React.FC = () => {
   // --- UI HELPERS ---
   const SidebarItem = ({ id, icon, label, active }: { id: string, icon: string, label: string, active: boolean }) => (
       <button 
-        onClick={() => setActiveTab(id as any)}
+        onClick={() => {
+            setActiveTab(id as any);
+            setIsMobileMenuOpen(false); // Close mobile menu on select
+        }}
         className={`w-full mb-2 rounded-2xl flex items-center transition-all duration-300 relative group overflow-hidden ${isSidebarExpanded ? 'px-4 py-3 gap-4' : 'justify-center py-3 w-12 h-12 mx-auto'} ${active ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/50'}`}
       >
           <i className={`fas ${icon} text-xl shrink-0`}></i>
@@ -308,9 +312,22 @@ const SuperAdminPage: React.FC = () => {
   return (
     <div className="flex h-screen bg-[#0b1120] text-white font-sans overflow-hidden select-none">
         
-        {/* SIDEBAR */}
-        <div className={`transition-all duration-300 border-r border-slate-800 flex flex-col items-center py-8 z-20 bg-[#0b1120] hidden md:flex ${isSidebarExpanded ? 'w-64' : 'w-20'}`}>
-            <div className="flex items-center gap-3 mb-10 cursor-pointer" onClick={() => navigate('/')}>
+        {/* Mobile Overlay */}
+        {isMobileMenuOpen && (
+            <div 
+                className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm md:hidden"
+                onClick={() => setIsMobileMenuOpen(false)}
+            ></div>
+        )}
+
+        {/* SIDEBAR - Responsive Drawer */}
+        <div className={`
+            fixed inset-y-0 left-0 z-30 bg-[#0b1120] border-r border-slate-800 flex flex-col items-center py-8 transition-all duration-300
+            md:static md:translate-x-0
+            ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
+            ${isSidebarExpanded ? 'w-64' : 'w-20'}
+        `}>
+            <div className="flex items-center gap-3 mb-10 cursor-pointer px-2" onClick={() => navigate('/')}>
                 <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
                     <i className="fas fa-bolt text-xl text-white"></i>
                 </div>
@@ -333,7 +350,7 @@ const SuperAdminPage: React.FC = () => {
             <div className="w-full px-4 flex flex-col gap-4 mt-4">
                 <button 
                     onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-                    className="w-full h-10 rounded-xl bg-slate-900 text-slate-500 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center border border-slate-800"
+                    className="w-full h-10 rounded-xl bg-slate-900 text-slate-500 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center border border-slate-800 hidden md:flex"
                 >
                     <i className={`fas ${isSidebarExpanded ? 'fa-chevron-left' : 'fa-chevron-right'}`}></i>
                 </button>
@@ -345,20 +362,28 @@ const SuperAdminPage: React.FC = () => {
         </div>
 
         {/* MAIN CONTENT */}
-        <div className="flex-1 flex flex-col relative overflow-hidden">
+        <div className="flex-1 flex flex-col relative overflow-hidden w-full">
             
             {/* HEADER */}
-            <header className="px-8 py-6 flex justify-between items-center border-b border-slate-800/50 bg-[#0b1120]/95 backdrop-blur-sm z-10">
+            <header className="px-4 md:px-8 py-4 md:py-6 flex justify-between items-center border-b border-slate-800/50 bg-[#0b1120]/95 backdrop-blur-sm z-10">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/')} className="md:hidden w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center">
-                        <i className="fas fa-arrow-left"></i>
+                    {/* Hamburger Button (Mobile Only) */}
+                    <button 
+                        onClick={() => {
+                            setIsMobileMenuOpen(true);
+                            setIsSidebarExpanded(true); // Ensure expanded on mobile open for better view
+                        }} 
+                        className="md:hidden w-10 h-10 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center active:scale-95 transition-transform"
+                    >
+                        <i className="fas fa-bars"></i>
                     </button>
+
                     <div>
-                        <h1 className="text-2xl font-black text-white tracking-tight">SUPER ADMIN</h1>
-                        <p className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em]">Central Command</p>
+                        <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">SUPER ADMIN</h1>
+                        <p className="text-[9px] font-black text-cyan-500 uppercase tracking-[0.3em]">Central Command</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 md:gap-6">
                     <div className="relative cursor-pointer" onClick={() => setActiveTab('reports')}>
                         <i className="fas fa-bell text-slate-400 text-xl hover:text-white transition-colors"></i>
                         {stats.reports > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_#ef4444]"></span>}
@@ -376,14 +401,14 @@ const SuperAdminPage: React.FC = () => {
             </header>
 
             {/* SCROLLABLE AREA */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar w-full">
                 
                 {/* --- DASHBOARD HOME --- */}
                 {activeTab === 'home' && (
                     <div className="max-w-7xl mx-auto space-y-8 animate__animated animate__fadeIn">
                         
                         {/* 4 Stats Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                             <StatCard title="Total Users" value={stats.totalUsers.toLocaleString()} sub="+12.5%" chartColor="#22d3ee" icon="fa-users" />
                             <StatCard title="Live Battles" value={stats.activeMatches.toString()} sub="Active" chartColor="#4ade80" icon="fa-gamepad" />
                             <StatCard title="New Recruits" value={stats.newUsers.toString()} sub="+24h" chartColor="#fb923c" icon="fa-user-plus" />
@@ -424,7 +449,7 @@ const SuperAdminPage: React.FC = () => {
 
                 {/* --- USERS TAB --- */}
                 {activeTab === 'users' && (
-                    <div className="bg-[#1e293b] rounded-[2.5rem] p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
+                    <div className="bg-[#1e293b] rounded-[2.5rem] p-4 md:p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
                         <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center">
                             <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
                                 <i className="fas fa-users text-cyan-400"></i> User Database
@@ -442,7 +467,7 @@ const SuperAdminPage: React.FC = () => {
                         </div>
                         <div className="space-y-3">
                             {filteredUsers.slice(0, 50).map(u => (
-                                <div key={u.uid} className="bg-[#0b1120] p-4 rounded-2xl flex items-center justify-between group hover:border-cyan-500/30 border border-transparent transition-all">
+                                <div key={u.uid} className="bg-[#0b1120] p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between group hover:border-cyan-500/30 border border-transparent transition-all gap-4">
                                     <div className="flex items-center gap-4">
                                         <Avatar src={u.avatar} size="sm" isVerified={u.isVerified} />
                                         <div>
@@ -457,7 +482,7 @@ const SuperAdminPage: React.FC = () => {
                                     </div>
                                     <button 
                                         onClick={() => { setSelectedUser(u); setUserPointsEdit(String(u.points)); }} 
-                                        className="bg-slate-800 hover:bg-cyan-500 hover:text-black text-cyan-400 px-4 py-2 rounded-xl text-xs font-black uppercase transition-colors"
+                                        className="bg-slate-800 hover:bg-cyan-500 hover:text-black text-cyan-400 px-4 py-2 rounded-xl text-xs font-black uppercase transition-colors w-full sm:w-auto"
                                     >
                                         Manage
                                     </button>
@@ -469,15 +494,15 @@ const SuperAdminPage: React.FC = () => {
 
                 {/* --- QUIZZES TAB --- */}
                 {activeTab === 'quizzes' && (
-                    <div className="bg-[#1e293b] rounded-[2.5rem] p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
+                    <div className="bg-[#1e293b] rounded-[2.5rem] p-4 md:p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
                         <h2 className="text-xl font-black text-white mb-6 uppercase tracking-widest flex items-center gap-2">
                             <i className="fas fa-layer-group text-purple-400"></i> Content Manager
                         </h2>
-                        <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                             <select 
                                 value={selectedSubject} 
                                 onChange={e => setSelectedSubject(e.target.value)}
-                                className="bg-[#0b1120] text-white p-4 rounded-xl font-bold border-none outline-none focus:ring-1 focus:ring-cyan-500"
+                                className="bg-[#0b1120] text-white p-4 rounded-xl font-bold border-none outline-none focus:ring-1 focus:ring-cyan-500 w-full"
                             >
                                 <option value="">Select Subject</option>
                                 {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -485,7 +510,7 @@ const SuperAdminPage: React.FC = () => {
                             <select 
                                 value={selectedChapter} 
                                 onChange={e => setSelectedChapter(e.target.value)}
-                                className="bg-[#0b1120] text-white p-4 rounded-xl font-bold border-none outline-none focus:ring-1 focus:ring-cyan-500"
+                                className="bg-[#0b1120] text-white p-4 rounded-xl font-bold border-none outline-none focus:ring-1 focus:ring-cyan-500 w-full"
                                 disabled={!selectedSubject}
                             >
                                 <option value="">Select Chapter</option>
@@ -495,10 +520,10 @@ const SuperAdminPage: React.FC = () => {
                         <div className="space-y-3">
                             {questions.map((q, idx) => (
                                 <div key={q.id} className="bg-[#0b1120] p-4 rounded-2xl border border-slate-800 flex justify-between items-start hover:border-purple-500/30 transition-colors">
-                                    <div className="flex gap-3">
-                                        <div className="text-cyan-500 font-black text-lg w-8 pt-1">Q{idx+1}</div>
-                                        <div>
-                                            <div className="text-white font-bold text-sm mb-2">{q.question}</div>
+                                    <div className="flex gap-3 min-w-0">
+                                        <div className="text-cyan-500 font-black text-lg w-8 pt-1 shrink-0">Q{idx+1}</div>
+                                        <div className="min-w-0">
+                                            <div className="text-white font-bold text-sm mb-2 break-words">{q.question}</div>
                                             <div className="flex flex-wrap gap-2">
                                                 {q.options.map((o, i) => (
                                                     <span key={i} className={`text-[10px] px-2 py-1 rounded ${i === q.answer ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-slate-800 text-slate-500'}`}>{o}</span>
@@ -506,7 +531,7 @@ const SuperAdminPage: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex flex-col gap-2">
+                                    <div className="flex flex-col gap-2 ml-2">
                                         <button onClick={() => setEditingQuestion(q)} className="text-cyan-400 hover:text-white"><i className="fas fa-edit"></i></button>
                                     </div>
                                 </div>
@@ -518,7 +543,7 @@ const SuperAdminPage: React.FC = () => {
 
                 {/* --- ARENA TAB --- */}
                 {activeTab === 'arena' && (
-                    <div className="bg-[#1e293b] rounded-[2.5rem] p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
+                    <div className="bg-[#1e293b] rounded-[2.5rem] p-4 md:p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
                                 <i className="fas fa-gamepad text-green-400"></i> Active Arena
@@ -531,8 +556,8 @@ const SuperAdminPage: React.FC = () => {
                         </div>
                         <div className="space-y-4">
                             {matches.map(m => (
-                                <div key={m.matchId} className="bg-[#0b1120] p-5 rounded-2xl border border-slate-800 flex justify-between items-center group hover:border-green-500/30 transition-colors">
-                                    <div>
+                                <div key={m.matchId} className="bg-[#0b1120] p-5 rounded-2xl border border-slate-800 flex justify-between items-center group hover:border-green-500/30 transition-colors flex-wrap gap-4">
+                                    <div className="min-w-0 flex-1">
                                         <div className="text-cyan-400 text-[10px] font-black uppercase tracking-widest mb-1">{m.subjectTitle}</div>
                                         <div className="text-white font-bold text-sm flex items-center gap-2">
                                             {Object.keys(m.players || {}).length} Players

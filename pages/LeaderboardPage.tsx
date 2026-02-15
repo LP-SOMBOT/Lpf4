@@ -39,6 +39,7 @@ const LeaderboardPage: React.FC = () => {
                  avatar: data[key].avatar || '',
                  isVerified: data[key].isVerified,
                  isSupport: data[key].isSupport,
+                 customBadge: data[key].customBadge,
                  banned: data[key].banned,
                  activeMatch: data[key].activeMatch,
                  isOnline: data[key].isOnline
@@ -126,7 +127,7 @@ const LeaderboardPage: React.FC = () => {
                         <div className="flex-1 min-w-0 pr-2">
                             <div className="font-bold text-sm md:text-base text-slate-900 dark:text-white truncate flex items-center gap-2">
                                 {p.name}
-                                {p.isVerified && <VerificationBadge size="xs" className="text-blue-500" />}
+                                {(p.isVerified || p.customBadge) && <VerificationBadge size="xs" className="text-blue-500" src={p.customBadge} />}
                                 {p.isSupport && <i className="fas fa-check-circle text-game-primary text-xs" title="Support"></i>}
                                 {isMe && <span className="bg-game-primary text-white text-[9px] px-1.5 py-0.5 rounded-md font-black tracking-wide">You</span>}
                             </div>

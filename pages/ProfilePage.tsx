@@ -10,6 +10,19 @@ import { playSound } from '../services/audioService';
 import { generateAvatarUrl } from '../constants';
 import { showToast, showAlert } from '../services/alert';
 
+const PRESET_BADGES = [
+    "https://cdn-icons-png.flaticon.com/512/12559/12559876.png", // Verified
+    "https://cdn-icons-png.flaticon.com/512/2583/2583344.png", // Crown
+    "https://cdn-icons-png.flaticon.com/512/1828/1828884.png", // Star
+    "https://cdn-icons-png.flaticon.com/512/771/771237.png", // Diamond
+    "https://cdn-icons-png.flaticon.com/512/929/929440.png", // Shield
+    "https://cdn-icons-png.flaticon.com/512/785/785116.png", // Fire
+    "https://cdn-icons-png.flaticon.com/512/1356/1356479.png", // Rocket
+    "https://cdn-icons-png.flaticon.com/512/3579/3579059.png", // Lightning
+    "https://cdn-icons-png.flaticon.com/512/833/833472.png", // Heart
+    "https://cdn-icons-png.flaticon.com/512/2855/2855269.png"  // Skull
+];
+
 const ProfilePage: React.FC = () => {
   const { profile, user } = useContext(UserContext);
   const navigate = useNavigate();
@@ -23,6 +36,10 @@ const ProfilePage: React.FC = () => {
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [randomAvatars, setRandomAvatars] = useState<string[]>([]);
   
+  // Badge Selection State (Super Admin)
+  const [showBadgeSelector, setShowBadgeSelector] = useState(false);
+  const [customBadgeUrl, setCustomBadgeUrl] = useState('');
+  
   // Custom Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +51,7 @@ const ProfilePage: React.FC = () => {
     if (profile) {
       setEditName(profile.name);
       setCurrentAvatarUrl(profile.avatar);
+      setCustomBadgeUrl(profile.customBadge || '');
       // Strictly prevent prompt if guest using robust check
       // Guests from AuthPage have 'isGuest: true'.
       if (!profile.username && !profile.isGuest) {
@@ -186,6 +204,23 @@ const ProfilePage: React.FC = () => {
       fileInputRef.current?.click();
   };
 
+  const handleSaveBadge = async (url: string | null) => {
+      if (!user) return;
+      try {
+          // If null, remove custom badge and keep isVerified logic
+          if (url === null) {
+              await update(ref(db, `users/${user.uid}`), { customBadge: null });
+          } else {
+              await update(ref(db, `users/${user.uid}`), { customBadge: url });
+          }
+          playSound('correct');
+          setShowBadgeSelector(false);
+          showToast("Badge Updated!", "success");
+      } catch (e) {
+          showAlert("Error", "Failed to update badge", "error");
+      }
+  };
+
   if (!profile) return null;
 
   const currentPoints = profile.points || 0;
@@ -193,6 +228,7 @@ const ProfilePage: React.FC = () => {
   const pointsInCurrentLevel = currentPoints % 10;
   const progressPercent = (pointsInCurrentLevel / 10) * 100;
   const pointsToNext = 10 - pointsInCurrentLevel;
+  const isSuperAdmin = profile.roles?.superAdmin;
 
   return (
     <div className="min-h-full p-4 flex flex-col transition-colors max-w-3xl mx-auto w-full pb-24 pt-24">
@@ -257,16 +293,27 @@ const ProfilePage: React.FC = () => {
             </div>
         ) : (
             <>
-                <h2 
-                    onClick={() => setIsEditing(true)}
-                    className="text-2xl font-black text-white cursor-pointer hover:text-game-primary transition-colors flex items-center justify-center gap-2 group"
-                    title="Click to edit name"
-                >
-                    {profile.name}
-                    {profile.isVerified && <VerificationBadge size="lg" className="text-blue-500" />}
-                    {profile.isSupport && <i className="fas fa-check-circle text-game-primary text-lg" title="Support Team"></i>}
-                    <i className="fas fa-pencil-alt text-xs opacity-0 group-hover:opacity-100 transition-opacity text-game-primary"></i>
-                </h2>
+                <div className="flex items-center justify-center gap-2 group relative">
+                    <h2 
+                        onClick={() => setIsEditing(true)}
+                        className="text-2xl font-black text-white cursor-pointer hover:text-game-primary transition-colors flex items-center justify-center gap-2"
+                        title="Click to edit name"
+                    >
+                        {profile.name}
+                        {(profile.isVerified || profile.customBadge) && <VerificationBadge size="lg" className="text-blue-500" src={profile.customBadge} />}
+                        {profile.isSupport && <i className="fas fa-check-circle text-game-primary text-lg" title="Support Team"></i>}
+                    </h2>
+                    
+                    {isSuperAdmin && (
+                        <button 
+                            onClick={() => setShowBadgeSelector(true)}
+                            className="w-6 h-6 rounded-full bg-slate-700 hover:bg-game-primary text-white flex items-center justify-center ml-1 transition-all"
+                            title="Edit Badge (Super Admin)"
+                        >
+                            <i className="fas fa-id-badge text-xs"></i>
+                        </button>
+                    )}
+                </div>
                 <div className="flex items-center gap-2 text-gray-300 font-bold font-mono bg-slate-800 px-3 py-1 rounded-full mt-2">
                     @{profile.username || 'unknown'}
                 </div>
@@ -307,6 +354,42 @@ const ProfilePage: React.FC = () => {
               <Button fullWidth variant="secondary" className="mt-6" onClick={() => setRandomAvatars(Array.from({length: 9}, () => Math.random().toString(36).substring(7)))}>
                  <i className="fas fa-sync mr-2"></i> Randomize
               </Button>
+          </div>
+      </Modal>
+
+      {/* Badge Selector Modal (Super Admin) */}
+      <Modal isOpen={showBadgeSelector} title="Custom Badge" onClose={() => setShowBadgeSelector(false)}>
+          <div className="space-y-6">
+              <p className="text-center text-slate-400 text-sm font-bold">Select a premium badge icon.</p>
+              
+              <div className="grid grid-cols-5 gap-3">
+                  {PRESET_BADGES.map((url, idx) => (
+                      <button 
+                        key={idx} 
+                        onClick={() => handleSaveBadge(url)}
+                        className={`p-2 rounded-xl border-2 transition-all hover:scale-110 ${customBadgeUrl === url ? 'bg-game-primary/20 border-game-primary' : 'bg-slate-800 border-slate-700 hover:border-slate-500'}`}
+                      >
+                          <img src={url} alt="Badge" className="w-full h-full object-contain" />
+                      </button>
+                  ))}
+              </div>
+
+              <div className="relative">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700"></div></div>
+                  <div className="relative flex justify-center text-xs font-black uppercase tracking-widest"><span className="px-2 bg-[#0f172a] text-slate-500">OR Custom URL</span></div>
+              </div>
+
+              <Input 
+                  placeholder="https://..." 
+                  value={customBadgeUrl} 
+                  onChange={(e) => setCustomBadgeUrl(e.target.value)}
+                  className="!bg-slate-800 !border-slate-700 !text-white"
+              />
+              
+              <div className="flex gap-2">
+                  <Button fullWidth onClick={() => handleSaveBadge(customBadgeUrl)}>Save Custom</Button>
+                  <Button fullWidth variant="danger" onClick={() => handleSaveBadge(null)}>Reset</Button>
+              </div>
           </div>
       </Modal>
       

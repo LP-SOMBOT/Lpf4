@@ -125,7 +125,7 @@ const HomePage: React.FC = () => {
                 <div>
                     <h1 className="text-white font-black text-xl leading-tight flex items-center gap-1">
                         Hi, {profile?.name}
-                        {profile?.isVerified && <VerificationBadge size="sm" className="text-cyan-400" />}
+                        {(profile?.isVerified || profile?.customBadge) && <VerificationBadge size="sm" className="text-cyan-400" src={profile?.customBadge} />}
                     </h1>
                     {/* XP Bar */}
                     <div className="w-32 h-2.5 bg-slate-800 rounded-full mt-1.5 overflow-hidden relative border border-slate-700 shadow-inner">
