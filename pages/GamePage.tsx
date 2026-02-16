@@ -1058,12 +1058,11 @@ const GamePage: React.FC = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="p-6 pt-4 flex gap-4">
+                  <div className="p-6 pt-4 flex gap-3">
                       <Button 
                         onClick={handleLeave} 
-                        fullWidth 
                         size="lg" 
-                        className={`shadow-xl text-lg ${winnerUid === user?.uid ? 'bg-gradient-to-r from-yellow-500 to-orange-600 border-orange-700' : 'bg-slate-700 border-slate-800 hover:bg-slate-600'}`}
+                        className={`shadow-xl text-lg w-full ${winnerUid === user?.uid ? 'bg-gradient-to-r from-yellow-500 to-orange-600 border-orange-700' : 'bg-slate-700 border-slate-800 hover:bg-slate-600'}`}
                       >
                           {winnerUid === user?.uid ? 'CLAIM VICTORY' : 'CONTINUE'}
                       </Button>

@@ -3,11 +3,12 @@ import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { ref, update, onValue, off, set, remove, get, push, serverTimestamp, query, limitToLast, increment } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
-import { UserProfile, Subject, Chapter, Question, MatchState, QuestionReport, LibraryViewLog } from '../types';
+import { UserProfile, Subject, Chapter, Question, MatchState, QuestionReport, LibraryViewLog, StudyMaterial } from '../types';
 import { Button, Card, Input, Modal, Avatar, VerificationBadge } from '../components/UI';
 import { showAlert, showToast, showConfirm, showPrompt } from '../services/alert';
 import { useNavigate } from 'react-router-dom';
 import { playSound } from '../services/audioService';
+import { read, utils, writeFile } from 'xlsx';
 
 const formatRelativeTime = (timestamp: number | undefined) => {
     if (!timestamp) return 'Unknown';
@@ -44,12 +45,18 @@ const SuperAdminPage: React.FC = () => {
   
   // --- UI STATES ---
   const [searchTerm, setSearchTerm] = useState('');
-  const [fabOpen, setFabOpen] = useState(false);
   
-  // Selection States
+  // Content Manager State
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedChapter, setSelectedChapter] = useState<string>('');
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [inputMode, setInputMode] = useState<'manual' | 'bulk' | 'parser'>('manual');
+  const [questionText, setQuestionText] = useState('');
+  const [options, setOptions] = useState<string[]>(['', '', '', '']); 
+  const [correctAnswer, setCorrectAnswer] = useState(0);
+  const [rawText, setRawText] = useState('');
+  const [newItemName, setNewItemName] = useState('');
+  const [modalType, setModalType] = useState<'subject' | 'chapter' | null>(null);
   
   // Report Handling State
   const [activeReport, setActiveReport] = useState<QuestionReport | null>(null);
@@ -57,7 +64,6 @@ const SuperAdminPage: React.FC = () => {
   // User Management
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [userPointsEdit, setUserPointsEdit] = useState<string>('');
-  const [editingRoles, setEditingRoles] = useState({ superAdmin: false, admin: false, support: false });
 
   // --- AUTHENTICATION ---
   useEffect(() => {
@@ -109,25 +115,55 @@ const SuperAdminPage: React.FC = () => {
     };
   }, [isAuthenticated]);
 
+  // Load Chapters
+  useEffect(() => {
+    if (!selectedSubject) {
+        setChapters([]);
+        setSelectedChapter('');
+        return;
+    }
+    const chapRef = ref(db, `chapters/${selectedSubject}`);
+    const unsub = onValue(chapRef, (snapshot) => {
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            const list = Object.values(data) as Chapter[];
+            setChapters(list);
+            if (list.length > 0 && !list.find(c => c.id === selectedChapter)) {
+                setSelectedChapter(list[0].id);
+            }
+        } else {
+            setChapters([]);
+            setSelectedChapter('');
+        }
+    });
+    return () => off(chapRef);
+  }, [selectedSubject]);
+
+  // Load Questions
+  useEffect(() => {
+      if (!selectedChapter) {
+          setQuestions([]);
+          return;
+      }
+      const qRef = ref(db, `questions/${selectedChapter}`);
+      const unsub = onValue(qRef, (snapshot) => {
+          if (snapshot.exists()) {
+              const data = snapshot.val();
+              const list = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+              setQuestions(list);
+          } else {
+              setQuestions([]);
+          }
+      });
+      return () => off(qRef);
+  }, [selectedChapter]);
+
   // --- ACTIONS ---
   const toggleUserProp = async (uid: string, prop: string, current: any) => {
     try {
       await update(ref(db, `users/${uid}`), { [prop]: !current });
       showToast(`User ${prop} updated`);
     } catch(e) { showAlert("Error", "Action failed", "error"); }
-  };
-
-  const saveUserRoles = async () => {
-      if (!selectedUser) return;
-      const roles = editingRoles;
-      const updates: any = {};
-      updates[`users/${selectedUser.uid}/roles`] = roles;
-      updates[`users/${selectedUser.uid}/isSupport`] = roles.support;
-      updates[`users/${selectedUser.uid}/role`] = roles.admin ? 'admin' : 'user';
-      try {
-          await update(ref(db), updates);
-          showToast("User roles updated", "success");
-      } catch(e) { showAlert("Error", "Failed to update roles", "error"); }
   };
 
   const saveUserPoints = async () => {
@@ -183,7 +219,6 @@ const SuperAdminPage: React.FC = () => {
             answer: editingQuestion.answer
         });
 
-        // NOTIFICATION LOGIC
         if (activeReport && myProfile) {
             const reporterUid = activeReport.reporterUid;
             const participants = [myProfile.uid, reporterUid].sort();
@@ -201,7 +236,7 @@ const SuperAdminPage: React.FC = () => {
             updates[`chats/${chatId}/unread/${reporterUid}/count`] = increment(1);
             updates[`chats/${chatId}/participants/${myProfile.uid}`] = true;
             updates[`chats/${chatId}/participants/${reporterUid}`] = true;
-            updates[`reports/${activeReport.id}`] = null; // Auto dismiss
+            updates[`reports/${activeReport.id}`] = null;
 
             await update(ref(db), updates);
             showToast("Corrected & User Notified", "success");
@@ -214,6 +249,129 @@ const SuperAdminPage: React.FC = () => {
     } catch (e) {
         showAlert("Error", "Failed to update question.", "error");
     }
+  };
+
+  const terminateMatch = async (matchId: string) => {
+      const confirm = await showConfirm("Force End Match?", "This will immediately stop the game.");
+      if (!confirm) return;
+      try {
+          await remove(ref(db, `matches/${matchId}`));
+          showToast("Match Terminated", "success");
+      } catch(e) { showToast("Failed", "error"); }
+  };
+
+  // --- CONTENT MANAGER LOGIC ---
+  const handleCreateItem = async () => {
+      if (!newItemName.trim()) return;
+      const cleanId = newItemName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      try {
+          if (modalType === 'subject') {
+              await set(ref(db, `subjects/${cleanId}`), { id: cleanId, name: newItemName });
+              setSelectedSubject(cleanId);
+          } else if (modalType === 'chapter') {
+              const fullChapterId = `${selectedSubject}_${cleanId}`;
+              await set(ref(db, `chapters/${selectedSubject}/${fullChapterId}`), { id: fullChapterId, name: newItemName, subjectId: selectedSubject });
+              setSelectedChapter(fullChapterId);
+          }
+          setNewItemName('');
+          setModalType(null);
+          showToast("Item created", "success");
+      } catch (e) { showAlert("Error", "Create failed", "error"); }
+  };
+
+  const handleAddQuestion = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedChapter) return;
+      try {
+          await push(ref(db, `questions/${selectedChapter}`), {
+              question: questionText,
+              options,
+              answer: correctAnswer,
+              subject: selectedChapter,
+              createdAt: Date.now()
+          });
+          setQuestionText('');
+          setOptions(['', '', '', '']);
+          setCorrectAnswer(0);
+          showToast("Question added", "success");
+      } catch(e) { showAlert("Error", "Add failed", "error"); }
+  };
+
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !selectedChapter) return;
+      try {
+          const buffer = await file.arrayBuffer();
+          const wb = read(buffer, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data: any[][] = utils.sheet_to_json(ws, { header: 1 });
+          const updates: any = {};
+          let count = 0;
+          data.slice(1).forEach(row => {
+              if (row.length < 3) return;
+              const qText = row[0];
+              const opts = [row[1], row[2], row[3], row[4]].filter(o => o !== undefined).map(String);
+              const ansIdx = parseInt(row[5]) - 1 || 0;
+              const newKey = push(ref(db, `questions/${selectedChapter}`)).key;
+              if (newKey) {
+                  updates[`questions/${selectedChapter}/${newKey}`] = {
+                      question: String(qText), options: opts, answer: ansIdx, subject: selectedChapter, createdAt: Date.now()
+                  };
+                  count++;
+              }
+          });
+          if (count > 0) { await update(ref(db), updates); showToast(`Uploaded ${count} questions`, "success"); }
+      } catch(e) { showAlert("Error", "Upload failed", "error"); }
+      e.target.value = '';
+  };
+
+  const handleTextParse = async () => {
+      if (!rawText.trim() || !selectedChapter) return;
+      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l);
+      const updates: any = {};
+      let count = 0;
+      let currentQ: any = null;
+
+      const saveCurrent = () => {
+          if (currentQ && currentQ.options.length >= 2) {
+              const newKey = push(ref(db, `questions/${selectedChapter}`)).key;
+              if (newKey) {
+                  updates[`questions/${selectedChapter}/${newKey}`] = {
+                      question: currentQ.question, options: currentQ.options, answer: currentQ.answer, subject: selectedChapter, createdAt: Date.now()
+                  };
+                  count++;
+              }
+          }
+      };
+
+      lines.forEach(line => {
+          const qMatch = line.match(/^(\d+)[\.\)]\s+(.+)/);
+          if (qMatch) {
+              saveCurrent();
+              currentQ = { question: qMatch[2], options: [], answer: 0 };
+              return;
+          }
+          const optMatch = line.match(/^([a-dA-D])[\.\)]\s+(.+)/);
+          if (currentQ && optMatch) {
+              currentQ.options.push(optMatch[2]);
+              return;
+          }
+          const ansMatch = line.match(/^(?:Answer|Ans|Correct)\s*[:\-]?\s*([a-dA-D])/i);
+          if (currentQ && ansMatch) {
+              currentQ.answer = Math.max(0, ansMatch[1].toLowerCase().charCodeAt(0) - 97);
+          }
+      });
+      saveCurrent();
+
+      if (count > 0) { await update(ref(db), updates); setRawText(''); showToast(`Parsed ${count} questions`, "success"); }
+      else showAlert("Error", "No valid questions found", "warning");
+  };
+
+  const handleDownloadTemplate = () => {
+      const ws = utils.json_to_sheet([{ "Question": "Q1", "Option A": "A", "Option B": "B", "Option C": "C", "Option D": "D", "Correct Answer (1-4)": 1 }]);
+      const wb = utils.book_new();
+      utils.book_append_sheet(wb, ws, "Template");
+      writeFile(wb, "quiz_template.xlsx");
   };
 
   // --- UI HELPERS ---
@@ -259,9 +417,10 @@ const SuperAdminPage: React.FC = () => {
   }
 
   // Calculate Stats
+  const activeMatches = matches.filter(m => m.status === 'active');
   const stats = {
       totalUsers: users.length,
-      activeMatches: matches.filter(m => m.status === 'active').length,
+      activeMatches: activeMatches.length,
       newUsers: users.filter(u => (u.createdAt || 0) > Date.now() - 86400000).length,
       reports: reports.length
   };
@@ -319,6 +478,251 @@ const SuperAdminPage: React.FC = () => {
                     </div>
                 )}
 
+                {/* --- USERS TAB --- */}
+                {activeTab === 'users' && (
+                    <div className="bg-[#1e293b] rounded-[2.5rem] p-4 md:p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
+                        <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center">
+                            <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3"><i className="fas fa-users text-cyan-400"></i> User Database</h2>
+                            <div className="relative w-full md:w-64"><i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i><input id="user-search" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#0b1120] border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white text-sm font-bold focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="Search users..." /></div>
+                        </div>
+                        <div className="space-y-3">
+                            {users.filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 50).map(u => (
+                                <div key={u.uid} className="bg-[#0b1120] p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between group hover:border-cyan-500/30 border border-transparent transition-all gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <Avatar src={u.avatar} seed={u.uid} size="sm" isVerified={u.isVerified} />
+                                        <div>
+                                            <div className="text-white font-bold text-sm flex items-center gap-2">{u.name}{u.banned && <span className="text-[8px] bg-red-500 px-1.5 rounded text-white uppercase font-black">Banned</span>}</div>
+                                            <div className="text-slate-500 text-xs font-mono">@{u.username || 'guest'} • <span className="text-cyan-400">{u.points} PTS</span></div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => { setSelectedUser(u); setUserPointsEdit(String(u.points)); }} className="bg-slate-800 hover:bg-cyan-500 hover:text-black text-cyan-400 px-4 py-2 rounded-xl text-xs font-black uppercase transition-colors w-full sm:w-auto">Manage</button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* --- ARENA TAB --- */}
+                {activeTab === 'arena' && (
+                    <div className="animate__animated animate__fadeIn space-y-6">
+                        <div className="flex justify-between items-center mb-2 px-2">
+                            <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+                                <i className="fas fa-gamepad text-green-400"></i> Live Arena
+                            </h2>
+                            <div className="text-green-400 font-bold text-xs uppercase tracking-widest bg-green-900/20 px-3 py-1 rounded-full border border-green-500/20 animate-pulse">
+                                {activeMatches.length} Matches In Progress
+                            </div>
+                        </div>
+                        {activeMatches.length === 0 ? (
+                            <div className="bg-[#1e293b] rounded-[2.5rem] p-10 text-center border border-slate-700/50">
+                                <i className="fas fa-ghost text-4xl text-slate-600 mb-4"></i>
+                                <p className="text-slate-500 font-bold text-sm uppercase tracking-wider">The arena is quiet.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {activeMatches.map(m => {
+                                    const pIds = Object.keys(m.players || {});
+                                    const p1 = m.players?.[pIds[0]];
+                                    const p2 = m.players?.[pIds[1]];
+                                    return (
+                                        <div key={m.matchId} className="bg-[#1e293b] rounded-[2rem] p-5 border border-slate-700/50 shadow-lg relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 bg-green-500 text-black text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest">Live</div>
+                                            <div className="text-center mb-6 mt-2">
+                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{m.subjectTitle || 'Battle'}</div>
+                                                <div className="text-white font-black text-xl">Q{m.currentQ + 1}</div>
+                                            </div>
+                                            <div className="flex justify-between items-center mb-6 px-2">
+                                                <div className="text-center w-20">
+                                                    <Avatar src={p1?.avatar} size="sm" className="mx-auto mb-2 border-2 border-slate-600" />
+                                                    <div className="text-white font-bold text-xs truncate">{p1?.name}</div>
+                                                    <div className="text-cyan-400 font-black text-lg">{m.scores?.[pIds[0]] || 0}</div>
+                                                </div>
+                                                <div className="text-slate-600 text-xl font-black italic">VS</div>
+                                                <div className="text-center w-20">
+                                                    <Avatar src={p2?.avatar} size="sm" className="mx-auto mb-2 border-2 border-slate-600" />
+                                                    <div className="text-white font-bold text-xs truncate">{p2?.name}</div>
+                                                    <div className="text-orange-400 font-black text-lg">{m.scores?.[pIds[1]] || 0}</div>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => terminateMatch(m.matchId)} className="w-full bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center justify-center gap-2 border border-red-500/20">
+                                                <i className="fas fa-ban"></i> Terminate
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* --- VISITORS TAB --- */}
+                {activeTab === 'visitors' && (
+                    <div className="animate__animated animate__fadeIn space-y-6">
+                        <div className="flex justify-between items-center mb-2 px-2">
+                            <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+                                <i className="fas fa-shoe-prints text-indigo-400"></i> Library Logs
+                            </h2>
+                        </div>
+                        <div className="bg-[#1e293b] rounded-[2.5rem] p-6 border border-slate-700/50 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-700 text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                                            <th className="py-4 pl-4">User</th>
+                                            <th className="py-4">Resource</th>
+                                            <th className="py-4 text-right pr-4">Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-sm font-bold text-slate-300">
+                                        {libraryLogs.map(log => {
+                                            const u = getUserDetails(log.uid);
+                                            return (
+                                                <tr key={log.id} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors">
+                                                    <td className="py-3 pl-4 flex items-center gap-3">
+                                                        <Avatar src={u.avatar} size="xs" />
+                                                        <span className="truncate max-w-[150px]">{u.name}</span>
+                                                    </td>
+                                                    <td className="py-3 text-cyan-400 truncate max-w-[200px]">{log.fileName}</td>
+                                                    <td className="py-3 text-right pr-4 text-slate-500 text-xs font-mono">{formatRelativeTime(log.timestamp)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {libraryLogs.length === 0 && (
+                                            <tr><td colSpan={3} className="py-8 text-center text-slate-500 italic">No activity logs found.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- QUIZZES (CONTENT MGR) TAB --- */}
+                {activeTab === 'quizzes' && (
+                    <div className="animate__animated animate__fadeIn space-y-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
+                            {/* Left Panel: Navigation */}
+                            <div className="bg-[#1e293b] rounded-[2.5rem] p-6 border border-slate-700/50 flex flex-col h-full">
+                                <div className="mb-6 flex justify-between items-center">
+                                    <h3 className="font-black text-white uppercase tracking-widest text-sm">Hierarchy</h3>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setModalType('subject')} className="bg-cyan-500/20 text-cyan-400 p-2 rounded-lg hover:bg-cyan-500 hover:text-black transition-all"><i className="fas fa-folder-plus"></i></button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+                                    {subjects.map(sub => (
+                                        <div key={sub.id} className="space-y-2">
+                                            <div 
+                                                onClick={() => setSelectedSubject(sub.id)}
+                                                className={`p-3 rounded-xl cursor-pointer font-bold text-sm flex items-center justify-between transition-colors ${selectedSubject === sub.id ? 'bg-cyan-500 text-black' : 'bg-[#0b1120] text-slate-400 hover:text-white'}`}
+                                            >
+                                                <span>{sub.name}</span>
+                                                {selectedSubject === sub.id && <button onClick={(e) => { e.stopPropagation(); setModalType('chapter'); }} className="text-black/50 hover:text-black"><i className="fas fa-plus-circle"></i></button>}
+                                            </div>
+                                            {selectedSubject === sub.id && (
+                                                <div className="pl-4 space-y-1 border-l-2 border-slate-700 ml-2">
+                                                    {chapters.map(chap => (
+                                                        <div 
+                                                            key={chap.id} 
+                                                            onClick={() => setSelectedChapter(chap.id)}
+                                                            className={`p-2 rounded-lg cursor-pointer text-xs font-bold transition-colors ${selectedChapter === chap.id ? 'text-cyan-400 bg-cyan-900/20' : 'text-slate-500 hover:text-slate-300'}`}
+                                                        >
+                                                            {chap.name}
+                                                        </div>
+                                                    ))}
+                                                    {chapters.length === 0 && <div className="text-[10px] text-slate-600 italic px-2">No chapters</div>}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Right Panel: Content */}
+                            <div className="lg:col-span-2 bg-[#1e293b] rounded-[2.5rem] p-6 border border-slate-700/50 flex flex-col h-full relative overflow-hidden">
+                                {selectedChapter ? (
+                                    <>
+                                        <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-700/50">
+                                            <h3 className="font-black text-white uppercase tracking-tighter text-xl">
+                                                <i className="fas fa-layer-group text-purple-400 mr-2"></i> 
+                                                {chapters.find(c => c.id === selectedChapter)?.name || 'Editor'}
+                                            </h3>
+                                            <div className="flex bg-[#0b1120] rounded-xl p-1">
+                                                <button onClick={() => setInputMode('manual')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inputMode === 'manual' ? 'bg-purple-500 text-white' : 'text-slate-500'}`}>Manual</button>
+                                                <button onClick={() => setInputMode('parser')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inputMode === 'parser' ? 'bg-purple-500 text-white' : 'text-slate-500'}`}>Parse</button>
+                                                <button onClick={() => setInputMode('bulk')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inputMode === 'bulk' ? 'bg-purple-500 text-white' : 'text-slate-500'}`}>Excel</button>
+                                            </div>
+                                        </div>
+
+                                        {/* Input Area */}
+                                        <div className="mb-6 bg-[#0b1120] p-4 rounded-2xl border border-slate-700/50">
+                                            {inputMode === 'manual' && (
+                                                <form onSubmit={handleAddQuestion} className="space-y-4">
+                                                    <Input value={questionText} onChange={e => setQuestionText(e.target.value)} placeholder="Question..." className="!bg-slate-800 !border-slate-700 !text-white" />
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {options.map((opt, i) => (
+                                                            <div key={i} className="flex gap-2">
+                                                                <button type="button" onClick={() => setCorrectAnswer(i)} className={`w-10 h-10 rounded-lg flex items-center justify-center font-black transition-colors ${correctAnswer === i ? 'bg-green-500 text-black' : 'bg-slate-800 text-slate-500'}`}>{String.fromCharCode(65+i)}</button>
+                                                                <Input value={opt} onChange={e => { const n = [...options]; n[i] = e.target.value; setOptions(n); }} placeholder={`Option ${i+1}`} className="!bg-slate-800 !border-slate-700 !text-white !mb-0" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <Button type="submit" size="sm" fullWidth className="bg-purple-600 hover:bg-purple-500">Add Question</Button>
+                                                </form>
+                                            )}
+                                            {inputMode === 'parser' && (
+                                                <div className="space-y-4">
+                                                    <textarea value={rawText} onChange={e => setRawText(e.target.value)} className="w-full h-32 bg-slate-800 border border-slate-700 rounded-xl p-3 text-white text-sm font-mono outline-none" placeholder="1. Question? a) Op1 b) Op2 Ans: a"></textarea>
+                                                    <Button onClick={handleTextParse} size="sm" fullWidth className="bg-purple-600 hover:bg-purple-500">Parse & Add</Button>
+                                                </div>
+                                            )}
+                                            {inputMode === 'bulk' && (
+                                                <div className="flex gap-4 items-center justify-center py-6 border-2 border-dashed border-slate-700 rounded-xl hover:border-purple-500 transition-colors relative cursor-pointer">
+                                                    <input type="file" accept=".xlsx" onChange={handleBulkUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                                    <div className="text-center">
+                                                        <i className="fas fa-file-excel text-3xl text-green-500 mb-2"></i>
+                                                        <div className="text-xs font-bold text-slate-400">Drop Excel File</div>
+                                                    </div>
+                                                    <button onClick={handleDownloadTemplate} className="absolute top-2 right-2 text-xs text-slate-500 hover:text-white z-20"><i className="fas fa-download"></i></button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Questions List */}
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                                            {questions.map((q, i) => (
+                                                <div key={q.id} className="bg-[#0b1120] p-4 rounded-xl border border-slate-800 hover:border-slate-600 transition-colors group relative">
+                                                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => setEditingQuestion(q)} className="text-cyan-400 hover:text-white"><i className="fas fa-edit"></i></button>
+                                                        <button onClick={async () => { if(await showConfirm('Delete?','Irreversible')) { await remove(ref(db, `questions/${selectedChapter}/${q.id}`)); showToast('Deleted'); } }} className="text-red-500 hover:text-white"><i className="fas fa-trash"></i></button>
+                                                    </div>
+                                                    <div className="flex gap-3">
+                                                        <span className="text-slate-600 font-mono text-xs">#{i+1}</span>
+                                                        <div className="flex-1">
+                                                            <p className="text-white font-bold text-sm mb-2">{q.question}</p>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                {q.options.map((o, idx) => (
+                                                                    <div key={idx} className={`text-xs px-2 py-1 rounded border ${idx === q.answer ? 'bg-green-900/20 border-green-500/30 text-green-400' : 'border-slate-800 text-slate-500'}`}>{o}</div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {questions.length === 0 && <div className="text-center py-10 text-slate-500 italic">No questions yet.</div>}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                                        <i className="fas fa-arrow-left text-4xl mb-4 animate-bounce-slow"></i>
+                                        <p className="font-bold text-sm uppercase tracking-widest">Select a Chapter</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'reports' && (
                     <div className="animate__animated animate__fadeIn space-y-6">
                         <div className="flex justify-between items-center mb-2 px-2">
@@ -364,30 +768,6 @@ const SuperAdminPage: React.FC = () => {
                         </div>
                     </div>
                 )}
-                
-                {/* --- USERS TAB --- */}
-                {activeTab === 'users' && (
-                    <div className="bg-[#1e293b] rounded-[2.5rem] p-4 md:p-8 border border-slate-700/50 min-h-[500px] animate__animated animate__fadeIn">
-                        <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center">
-                            <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3"><i className="fas fa-users text-cyan-400"></i> User Database</h2>
-                            <div className="relative w-full md:w-64"><i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i><input id="user-search" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#0b1120] border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white text-sm font-bold focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="Search users..." /></div>
-                        </div>
-                        <div className="space-y-3">
-                            {users.filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 50).map(u => (
-                                <div key={u.uid} className="bg-[#0b1120] p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between group hover:border-cyan-500/30 border border-transparent transition-all gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <Avatar src={u.avatar} size="sm" isVerified={u.isVerified} />
-                                        <div>
-                                            <div className="text-white font-bold text-sm flex items-center gap-2">{u.name}{u.banned && <span className="text-[8px] bg-red-500 px-1.5 rounded text-white uppercase font-black">Banned</span>}</div>
-                                            <div className="text-slate-500 text-xs font-mono">@{u.username || 'guest'} • <span className="text-cyan-400">{u.points} PTS</span></div>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => { setSelectedUser(u); setUserPointsEdit(String(u.points)); }} className="bg-slate-800 hover:bg-cyan-500 hover:text-black text-cyan-400 px-4 py-2 rounded-xl text-xs font-black uppercase transition-colors w-full sm:w-auto">Manage</button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
 
@@ -410,6 +790,13 @@ const SuperAdminPage: React.FC = () => {
                                 <button onClick={() => toggleUserProp(selectedUser.uid, 'banned', selectedUser.banned)} className={`py-2 rounded-lg text-xs font-black uppercase ${selectedUser.banned ? 'bg-green-500/10 text-green-400 border border-green-500/30' : 'bg-slate-700 text-slate-400 border border-slate-600'}`}>{selectedUser.banned ? 'Unban' : 'Ban User'}</button>
                                 <button onClick={() => deleteUser(selectedUser.uid)} className="py-2 rounded-lg text-xs font-black uppercase bg-red-600 text-white hover:bg-red-700 col-span-2">Delete User</button>
                             </div>
+                        </div>
+                        <div className="p-4 bg-[#0b1120] rounded-2xl border border-slate-800">
+                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Adjust Points</label>
+                             <div className="flex gap-2">
+                                 <Input type="number" value={userPointsEdit} onChange={e => setUserPointsEdit(e.target.value)} className="!bg-slate-800 !border-slate-700 !text-white !mb-0" />
+                                 <Button onClick={saveUserPoints} size="sm">Save</Button>
+                             </div>
                         </div>
                     </div>
                 </div>
@@ -446,6 +833,14 @@ const SuperAdminPage: React.FC = () => {
                 </div>
             </Modal>
         )}
+
+        {/* --- CREATE MODAL --- */}
+        <Modal isOpen={!!modalType} title={`Add New ${modalType}`} onClose={() => setModalType(null)}>
+            <div className="space-y-4">
+                <Input value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Enter Name" className="!bg-slate-800 !border-slate-700 !text-white" autoFocus />
+                <Button fullWidth onClick={handleCreateItem}>Create</Button>
+            </div>
+        </Modal>
     </div>
   );
 };

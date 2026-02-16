@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useContext, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ref, onValue, push, serverTimestamp, update, get, query, limitToLast, onChildAdded, off, increment, onChildChanged } from 'firebase/database';
+import { ref, onValue, push, serverTimestamp, update, get, query, limitToLast, onChildAdded, off, increment, onChildChanged, set } from 'firebase/database';
 import { Howler } from 'howler';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
@@ -554,9 +554,20 @@ const ChatPage: React.FC = () => {
                         {chapters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
-                <Button fullWidth onClick={() => {
+                <Button fullWidth onClick={async () => {
                     const code = Math.floor(1000 + Math.random() * 9000).toString();
                     const subName = subjects.find(s => s.id === selectedSubject)?.name || "Battle";
+                    
+                    // Create the room entry immediately so invite works seamlessly
+                    await set(ref(db, `rooms/${code}`), {
+                        host: user?.uid,
+                        sid: selectedSubject,
+                        lid: selectedChapter,
+                        questionLimit: 10,
+                        createdAt: Date.now(),
+                        linkedChatPath: `chats/${chatId}/messages`
+                    });
+
                     sendMessage(undefined, 'invite', code, subName);
                     setShowGameSetup(false);
                     navigate('/lobby', { state: { hostedCode: code } });
