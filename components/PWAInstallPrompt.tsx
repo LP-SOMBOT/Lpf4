@@ -10,13 +10,6 @@ export const PWAInstallPrompt: React.FC = () => {
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
 
   useEffect(() => {
-    // Check if dismissed previously (within last 24h)
-    const dismissedTs = localStorage.getItem('pwa_prompt_dismissed');
-    if (dismissedTs) {
-        const diff = Date.now() - parseInt(dismissedTs);
-        if (diff < 24 * 60 * 60 * 1000) return; // Hide for 24h
-    }
-
     // 1. Android/Chrome Event Listener
     const handler = (e: Event) => {
       e.preventDefault();
@@ -51,7 +44,6 @@ export const PWAInstallPrompt: React.FC = () => {
 
   const handleDismiss = () => {
       setIsVisible(false);
-      localStorage.setItem('pwa_prompt_dismissed', Date.now().toString());
       playSound('click');
   };
 
