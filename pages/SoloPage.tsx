@@ -386,7 +386,7 @@ const SoloPage: React.FC = () => {
       {showReportModal && questions[currentQIndex] && (
           <ReportModal 
             question={questions[currentQIndex]} 
-            chapterId={questions[currentQIndex].subject || selectedChapterId} 
+            chapterId={selectedChapterId} 
             onClose={() => setShowReportModal(false)} 
           />
       )}
