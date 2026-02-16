@@ -1,5 +1,5 @@
 
-import React, { useContext, useState, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut, updateProfile } from 'firebase/auth';
 import { ref, update, get } from 'firebase/database';
@@ -10,18 +10,43 @@ import { playSound } from '../services/audioService';
 import { generateAvatarUrl } from '../constants';
 import { showToast, showAlert } from '../services/alert';
 
-const PRESET_BADGES = [
-    "https://cdn-icons-png.flaticon.com/512/12559/12559876.png", // Verified
-    "https://cdn-icons-png.flaticon.com/512/2583/2583344.png", // Crown
-    "https://cdn-icons-png.flaticon.com/512/1828/1828884.png", // Star
-    "https://cdn-icons-png.flaticon.com/512/771/771237.png", // Diamond
-    "https://cdn-icons-png.flaticon.com/512/929/929440.png", // Shield
-    "https://cdn-icons-png.flaticon.com/512/785/785116.png", // Fire
-    "https://cdn-icons-png.flaticon.com/512/1356/1356479.png", // Rocket
-    "https://cdn-icons-png.flaticon.com/512/3579/3579059.png", // Lightning
-    "https://cdn-icons-png.flaticon.com/512/833/833472.png", // Heart
-    "https://cdn-icons-png.flaticon.com/512/2855/2855269.png"  // Skull
+// --- EXTENDED ICON LIBRARY ---
+const BADGE_LIBRARY = [
+    // Ranks & Status
+    { url: "https://cdn-icons-png.flaticon.com/512/12559/12559876.png", category: "Rank", tags: ["verified", "check", "blue"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/2583/2583344.png", category: "Rank", tags: ["crown", "king", "queen", "gold"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/1828/1828884.png", category: "Rank", tags: ["star", "favorite", "yellow"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/771/771237.png", category: "Rank", tags: ["diamond", "gem", "rich"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/929/929440.png", category: "Rank", tags: ["shield", "security", "guard"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/6469/6469274.png", category: "Rank", tags: ["medal", "gold", "first"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/3113/3113023.png", category: "Rank", tags: ["trophy", "cup", "winner"] },
+
+    // Elements & Nature
+    { url: "https://cdn-icons-png.flaticon.com/512/785/785116.png", category: "Nature", tags: ["fire", "flame", "hot", "burn"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/3579/3579059.png", category: "Nature", tags: ["lightning", "bolt", "storm", "energy"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/414/414825.png", category: "Nature", tags: ["water", "drop", "sea"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/1598/1598431.png", category: "Nature", tags: ["earth", "globe", "world"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/1169/1169659.png", category: "Nature", tags: ["leaf", "plant", "green"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/1827/1827827.png", category: "Nature", tags: ["moon", "night", "sleep"] },
+    
+    // Gaming & Sci-Fi
+    { url: "https://cdn-icons-png.flaticon.com/512/1356/1356479.png", category: "Gaming", tags: ["rocket", "space", "fly"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/2855/2855269.png", category: "Gaming", tags: ["skull", "death", "danger"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/681/681564.png", category: "Gaming", tags: ["gamepad", "controller", "play"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/1500/1500427.png", category: "Gaming", tags: ["robot", "bot", "ai"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/2621/2621040.png", category: "Gaming", tags: ["alien", "space", "ufo"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/2316/2316752.png", category: "Gaming", tags: ["sword", "battle", "fight"] },
+
+    // Fun & Abstract
+    { url: "https://cdn-icons-png.flaticon.com/512/833/833472.png", category: "Fun", tags: ["heart", "love", "like"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/742/742751.png", category: "Fun", tags: ["smile", "happy", "face"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/2072/2072130.png", category: "Fun", tags: ["ghost", "spooky", "halloween"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/1998/1998592.png", category: "Fun", tags: ["cool", "glasses", "sunglasses"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/260/260250.png", category: "Fun", tags: ["peace", "hand", "victory"] },
+    { url: "https://cdn-icons-png.flaticon.com/512/1139/1139982.png", category: "Fun", tags: ["music", "note", "song"] }
 ];
+
+const CATEGORIES = ["All", "Rank", "Nature", "Gaming", "Fun"];
 
 const ProfilePage: React.FC = () => {
   const { profile, user } = useContext(UserContext);
@@ -40,6 +65,11 @@ const ProfilePage: React.FC = () => {
   const [showBadgeSelector, setShowBadgeSelector] = useState(false);
   const [customBadgeUrl, setCustomBadgeUrl] = useState('');
   
+  // Badge Browser State
+  const [badgeTab, setBadgeTab] = useState<'browse' | 'search' | 'custom'>('browse');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [badgeSearch, setBadgeSearch] = useState('');
+
   // Custom Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +97,15 @@ const ProfilePage: React.FC = () => {
           setRandomAvatars(seeds);
       }
   }, [showAvatarSelector]);
+
+  // Reset badge modal state on open
+  useEffect(() => {
+      if (showBadgeSelector) {
+          setBadgeTab('browse');
+          setActiveCategory('All');
+          setBadgeSearch('');
+      }
+  }, [showBadgeSelector]);
 
   const handleLogout = () => {
     playSound('click');
@@ -221,6 +260,21 @@ const ProfilePage: React.FC = () => {
       }
   };
 
+  const handleRandomizeBadge = () => {
+      const randomIcon = BADGE_LIBRARY[Math.floor(Math.random() * BADGE_LIBRARY.length)];
+      handleSaveBadge(randomIcon.url);
+  };
+
+  // Filtered Badges Logic
+  const filteredBadges = useMemo(() => {
+      if (badgeTab === 'search') {
+          if (!badgeSearch.trim()) return BADGE_LIBRARY;
+          return BADGE_LIBRARY.filter(b => b.tags.some(t => t.includes(badgeSearch.toLowerCase())));
+      }
+      if (activeCategory === 'All') return BADGE_LIBRARY;
+      return BADGE_LIBRARY.filter(b => b.category === activeCategory);
+  }, [badgeTab, activeCategory, badgeSearch]);
+
   if (!profile) return null;
 
   const currentPoints = profile.points || 0;
@@ -357,38 +411,117 @@ const ProfilePage: React.FC = () => {
           </div>
       </Modal>
 
-      {/* Badge Selector Modal (Super Admin) */}
-      <Modal isOpen={showBadgeSelector} title="Custom Badge" onClose={() => setShowBadgeSelector(false)}>
-          <div className="space-y-6">
-              <p className="text-center text-slate-400 text-sm font-bold">Select a premium badge icon.</p>
+      {/* Badge Selector Modal (Super Admin) - REFACTORED */}
+      <Modal isOpen={showBadgeSelector} title="Badge Center" onClose={() => setShowBadgeSelector(false)}>
+          <div className="flex flex-col h-[500px]">
               
-              <div className="grid grid-cols-5 gap-3">
-                  {PRESET_BADGES.map((url, idx) => (
-                      <button 
-                        key={idx} 
-                        onClick={() => handleSaveBadge(url)}
-                        className={`p-2 rounded-xl border-2 transition-all hover:scale-110 ${customBadgeUrl === url ? 'bg-game-primary/20 border-game-primary' : 'bg-slate-800 border-slate-700 hover:border-slate-500'}`}
-                      >
-                          <img src={url} alt="Badge" className="w-full h-full object-contain" />
-                      </button>
-                  ))}
+              {/* Tab Navigation */}
+              <div className="flex bg-slate-800 p-1 rounded-xl mb-4 shrink-0">
+                  <button onClick={() => setBadgeTab('browse')} className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition-all ${badgeTab === 'browse' ? 'bg-game-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Browse</button>
+                  <button onClick={() => setBadgeTab('search')} className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition-all ${badgeTab === 'search' ? 'bg-game-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Search</button>
+                  <button onClick={() => setBadgeTab('custom')} className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition-all ${badgeTab === 'custom' ? 'bg-game-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Custom URL</button>
               </div>
 
-              <div className="relative">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700"></div></div>
-                  <div className="relative flex justify-center text-xs font-black uppercase tracking-widest"><span className="px-2 bg-[#0f172a] text-slate-500">OR Custom URL</span></div>
+              {/* Main Content Area */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+                  
+                  {/* BROWSE MODE */}
+                  {badgeTab === 'browse' && (
+                      <div className="space-y-4">
+                          {/* Categories Horizontal Scroll */}
+                          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar-hide">
+                              {CATEGORIES.map(cat => (
+                                  <button 
+                                    key={cat} 
+                                    onClick={() => setActiveCategory(cat)}
+                                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase whitespace-nowrap transition-all border ${activeCategory === cat ? 'bg-white text-slate-900 border-white' : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500'}`}
+                                  >
+                                      {cat}
+                                  </button>
+                              ))}
+                          </div>
+                          
+                          {/* Icons Grid */}
+                          <div className="grid grid-cols-5 gap-3 p-1">
+                              {filteredBadges.map((badge, idx) => (
+                                  <button 
+                                    key={idx} 
+                                    onClick={() => handleSaveBadge(badge.url)}
+                                    className={`aspect-square p-2 rounded-xl border-2 bg-slate-800 border-slate-700 hover:border-game-primary hover:scale-110 transition-all flex items-center justify-center ${customBadgeUrl === badge.url ? 'ring-2 ring-game-primary ring-offset-2 ring-offset-slate-900' : ''}`}
+                                  >
+                                      <img src={badge.url} alt="Badge" className="w-full h-full object-contain" />
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+
+                  {/* SEARCH MODE */}
+                  {badgeTab === 'search' && (
+                      <div className="space-y-4">
+                          <Input 
+                              placeholder="Search icons (e.g. fire, king)..." 
+                              value={badgeSearch} 
+                              onChange={(e) => setBadgeSearch(e.target.value)} 
+                              icon="fa-search"
+                              className="!bg-slate-800 !border-slate-700"
+                              autoFocus
+                          />
+                          <div className="grid grid-cols-5 gap-3 p-1">
+                              {filteredBadges.length > 0 ? filteredBadges.map((badge, idx) => (
+                                  <button 
+                                    key={idx} 
+                                    onClick={() => handleSaveBadge(badge.url)}
+                                    className="aspect-square p-2 rounded-xl border-2 bg-slate-800 border-slate-700 hover:border-game-primary hover:scale-110 transition-all flex items-center justify-center"
+                                  >
+                                      <img src={badge.url} alt="Badge" className="w-full h-full object-contain" />
+                                  </button>
+                              )) : (
+                                  <div className="col-span-5 text-center py-10 text-slate-500 font-bold text-sm">
+                                      No icons found.
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  )}
+
+                  {/* CUSTOM MODE */}
+                  {badgeTab === 'custom' && (
+                      <div className="flex flex-col justify-center h-full space-y-6">
+                          <div className="text-center space-y-2">
+                              <i className="fas fa-link text-4xl text-slate-600"></i>
+                              <p className="text-sm font-bold text-slate-400">Paste a direct image URL.</p>
+                          </div>
+                          <Input 
+                              placeholder="https://example.com/icon.png" 
+                              value={customBadgeUrl} 
+                              onChange={(e) => setCustomBadgeUrl(e.target.value)}
+                              className="!bg-slate-800 !border-slate-700"
+                          />
+                          <Button fullWidth onClick={() => handleSaveBadge(customBadgeUrl)}>
+                              Save Custom URL
+                          </Button>
+                          <div className="text-[10px] text-slate-500 text-center leading-relaxed px-4">
+                              Tip: You can use Flaticon or any CDN. Right-click an image online and select "Copy Image Link".
+                          </div>
+                      </div>
+                  )}
               </div>
 
-              <Input 
-                  placeholder="https://..." 
-                  value={customBadgeUrl} 
-                  onChange={(e) => setCustomBadgeUrl(e.target.value)}
-                  className="!bg-slate-800 !border-slate-700 !text-white"
-              />
-              
-              <div className="flex gap-2">
-                  <Button fullWidth onClick={() => handleSaveBadge(customBadgeUrl)}>Save Custom</Button>
-                  <Button fullWidth variant="danger" onClick={() => handleSaveBadge(null)}>Reset</Button>
+              {/* Footer Actions */}
+              <div className="pt-4 mt-2 border-t border-slate-700 grid grid-cols-2 gap-3 shrink-0">
+                  <button 
+                    onClick={handleRandomizeBadge} 
+                    className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl text-xs font-black uppercase transition-colors"
+                  >
+                      <i className="fas fa-dice"></i> Randomize
+                  </button>
+                  <button 
+                    onClick={() => handleSaveBadge(null)} 
+                    className="flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white py-3 rounded-xl text-xs font-black uppercase border border-red-500/50 transition-colors"
+                  >
+                      <i className="fas fa-trash"></i> Remove Badge
+                  </button>
               </div>
           </div>
       </Modal>

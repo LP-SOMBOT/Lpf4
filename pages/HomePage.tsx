@@ -8,7 +8,6 @@ import { Avatar, Card, Modal, Button, VerificationBadge } from '../components/UI
 import { playSound } from '../services/audioService';
 import { generateAvatarUrl } from '../constants';
 import { showToast } from '../services/alert';
-import confetti from 'canvas-confetti';
 
 const HomePage: React.FC = () => {
   const { profile, user } = useContext(UserContext);
@@ -17,8 +16,8 @@ const HomePage: React.FC = () => {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [avatarSeeds, setAvatarSeeds] = useState<string[]>([]);
   
-  // New Year Celebration State
-  const [showNewYear, setShowNewYear] = useState(false);
+  // Ramadan Countdown State
+  const [ramadanTimer, setRamadanTimer] = useState<{d: number, h: number, m: number, s: number} | null>(null);
 
   useEffect(() => {
     // Prompt to change avatar if not updated yet (Once per user lifetime)
@@ -28,45 +27,30 @@ const HomePage: React.FC = () => {
     }
   }, [profile]);
 
-  // New Year 2026 Logic
+  // Ramadan Countdown Logic (Target: Feb 18, 2026 as per API spec)
   useEffect(() => {
-      const hasCelebrated = localStorage.getItem('celebrated_2026');
-      if (!hasCelebrated && user) {
-          // Delay slightly to allow page load transition
-          const timer = setTimeout(() => {
-              setShowNewYear(true);
-              triggerFireworks();
-              playSound('win');
-          }, 800);
-          return () => clearTimeout(timer);
-      }
-  }, [user]);
+      const targetDate = new Date("2026-02-18T00:00:00.000Z").getTime();
+      
+      const updateTimer = () => {
+          const now = Date.now();
+          const diff = targetDate - now;
+          
+          if (diff > 0) {
+              setRamadanTimer({
+                  d: Math.floor(diff / (1000 * 60 * 60 * 24)),
+                  h: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+                  m: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+                  s: Math.floor((diff % (1000 * 60)) / 1000)
+              });
+          } else {
+              setRamadanTimer(null);
+          }
+      };
 
-  const triggerFireworks = () => {
-      const duration = 3 * 1000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
-
-      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-      const interval: any = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
-        const particleCount = 50 * (timeLeft / duration);
-        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-      }, 250);
-  };
-
-  const handleCloseNewYear = () => {
-      localStorage.setItem('celebrated_2026', 'true');
-      setShowNewYear(false);
-      playSound('click');
-  };
+      updateTimer();
+      const interval = setInterval(updateTimer, 1000);
+      return () => clearInterval(interval);
+  }, []);
 
   const handleAvatarSelect = async (seed: string) => {
       if (!user) return;
@@ -165,6 +149,27 @@ const HomePage: React.FC = () => {
         {/* MAIN CONTENT */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 z-10 custom-scrollbar">
             
+            {/* RAMADAN COUNTDOWN WIDGET */}
+            {ramadanTimer && (
+                <div className="bg-[#022c22]/60 border border-emerald-500/20 rounded-2xl p-3 flex items-center justify-between shadow-lg shadow-emerald-900/20 backdrop-blur-sm relative overflow-hidden group animate__animated animate__fadeIn">
+                    <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors pointer-events-none"></div>
+                    <div className="flex items-center gap-3 relative z-10">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20 shadow-inner">
+                            <i className="fas fa-moon text-sm"></i>
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-1">Ramadan 1447H</div>
+                            <div className="text-sm font-black text-emerald-100 tabular-nums leading-none tracking-tight">
+                                {ramadanTimer.d}d {ramadanTimer.h}h {ramadanTimer.m}m {ramadanTimer.s}s
+                            </div>
+                        </div>
+                    </div>
+                    <div className="relative z-10">
+                         <span className="text-[9px] font-black text-emerald-400/50 bg-emerald-900/40 px-2 py-1 rounded border border-emerald-500/10">2026</span>
+                    </div>
+                </div>
+            )}
+
             {/* HERO: BATTLE QUIZ */}
             <div onClick={() => handleNav('/lobby')} className="relative group cursor-pointer">
                 {/* Glow Behind */}
@@ -298,16 +303,6 @@ const HomePage: React.FC = () => {
              <Button fullWidth variant="secondary" className="mt-6" onClick={refreshAvatars}>
                 <i className="fas fa-sync mr-2"></i> Randomize
              </Button>
-        </Modal>
-
-        {/* New Year Modal */}
-        <Modal isOpen={showNewYear} onClose={handleCloseNewYear}>
-             <div className="text-center py-4">
-                 <div className="text-6xl mb-4 animate-bounce">🎉</div>
-                 <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2 uppercase tracking-tighter">Happy New Year!</h2>
-                 <p className="text-slate-500 dark:text-slate-300 text-sm mb-6 font-bold">Welcome to 2026! Get ready for a year of epic battles.</p>
-                 <Button fullWidth onClick={handleCloseNewYear} className="shadow-xl">Let's Go!</Button>
-             </div>
         </Modal>
 
     </div>
