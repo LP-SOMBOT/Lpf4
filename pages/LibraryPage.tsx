@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ref, onValue, off } from 'firebase/database';
+import { ref, onValue, off, push, serverTimestamp } from 'firebase/database';
 import { db } from '../firebase';
 import { StudyMaterial } from '../types';
 import { Card, Button } from '../components/UI';
 import { playSound } from '../services/audioService';
+import { UserContext } from '../contexts';
 
 const LibraryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useContext(UserContext);
   const filterPanelRef = useRef<HTMLDivElement>(null);
   
   // Instant initialization from cache to prevent "long loading" blank states
@@ -105,6 +108,18 @@ const LibraryPage: React.FC = () => {
       setIframeLoading(true);
       setIframeError(false);
       setReaderKey(prev => prev + 1);
+
+      // LOG ANALYTICS VIEW
+      if (user) {
+          try {
+              push(ref(db, 'analytics/libraryViews'), {
+                  uid: user.uid,
+                  materialId: item.id,
+                  fileName: item.fileName,
+                  timestamp: serverTimestamp()
+              });
+          } catch(e) { console.error("Analytics error", e); }
+      }
   };
 
   const closeReader = () => {

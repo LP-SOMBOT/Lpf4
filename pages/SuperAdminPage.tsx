@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo, useContext } from 'react';
-import { ref, update, onValue, off, set, remove, get, push, serverTimestamp } from 'firebase/database';
+import { ref, update, onValue, off, set, remove, get, push, serverTimestamp, query, limitToLast } from 'firebase/database';
 import { db } from '../firebase';
 import { UserContext } from '../contexts';
-import { UserProfile, Subject, Chapter, Question, MatchState, QuestionReport } from '../types';
+import { UserProfile, Subject, Chapter, Question, MatchState, QuestionReport, LibraryViewLog } from '../types';
 import { Button, Card, Input, Modal, Avatar, VerificationBadge } from '../components/UI';
 import { showAlert, showToast, showConfirm, showPrompt } from '../services/alert';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +12,7 @@ const SuperAdminPage: React.FC = () => {
   const { profile: myProfile, loading: profileLoading } = useContext(UserContext);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
-  const [activeTab, setActiveTab] = useState<'home' | 'users' | 'quizzes' | 'arena' | 'reports'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'users' | 'quizzes' | 'arena' | 'reports' | 'visitors'>('home');
   const navigate = useNavigate();
   
   // UI State
@@ -26,6 +26,7 @@ const SuperAdminPage: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [libraryLogs, setLibraryLogs] = useState<LibraryViewLog[]>([]);
   
   // --- UI STATES ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,7 +76,22 @@ const SuperAdminPage: React.FC = () => {
       return () => off(dbRef, 'value', listener);
     });
 
-    return () => unsubs.forEach(fn => fn());
+    // Special listener for Library Views (Limit to last 100 for performance)
+    const logsQuery = query(ref(db, 'analytics/libraryViews'), limitToLast(100));
+    const logsUnsub = onValue(logsQuery, (snap) => {
+        if (snap.exists()) {
+            const data = snap.val();
+            const logs = Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() as LibraryViewLog[];
+            setLibraryLogs(logs);
+        } else {
+            setLibraryLogs([]);
+        }
+    });
+
+    return () => {
+        unsubs.forEach(fn => fn());
+        logsUnsub();
+    };
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -224,11 +240,19 @@ const SuperAdminPage: React.FC = () => {
       }
   };
 
-  // --- FILTERS ---
+  // --- FILTERS & SORTERS ---
   const filteredUsers = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return users.filter(u => u.name?.toLowerCase().includes(term) || u.username?.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term));
   }, [users, searchTerm]);
+
+  // Recent Visitors (Sorted by Last Seen descending)
+  const recentVisitors = useMemo(() => {
+      return [...users]
+        .filter(u => u.lastSeen) // Must have visited at least once
+        .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))
+        .slice(0, 50); // Show top 50
+  }, [users]);
 
   // --- COMPUTED METRICS ---
   const stats = useMemo(() => {
@@ -243,6 +267,17 @@ const SuperAdminPage: React.FC = () => {
           reports: reports.length
       };
   }, [users, matches, reports]);
+
+  // --- HELPERS ---
+  const formatTime = (ts?: number) => {
+      if (!ts) return 'N/A';
+      return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getUserDetails = (uid: string) => {
+      const u = users.find(user => user.uid === uid);
+      return u ? { name: u.name, avatar: u.avatar, username: u.username } : { name: 'Unknown User', avatar: '', username: 'unknown' };
+  };
 
   // --- UI HELPERS ---
   const SidebarItem = ({ id, icon, label, active }: { id: string, icon: string, label: string, active: boolean }) => (
@@ -341,6 +376,7 @@ const SuperAdminPage: React.FC = () => {
             
             <div className="flex-1 w-full px-3 flex flex-col gap-1 custom-scrollbar overflow-y-auto">
                 <SidebarItem id="home" icon="fa-th-large" label="Dashboard" active={activeTab === 'home'} />
+                <SidebarItem id="visitors" icon="fa-shoe-prints" label="Visitors & Logs" active={activeTab === 'visitors'} />
                 <SidebarItem id="users" icon="fa-users" label="User Database" active={activeTab === 'users'} />
                 <SidebarItem id="quizzes" icon="fa-layer-group" label="Content Mgr" active={activeTab === 'quizzes'} />
                 <SidebarItem id="arena" icon="fa-gamepad" label="Live Arena" active={activeTab === 'arena'} />
@@ -442,6 +478,73 @@ const SuperAdminPage: React.FC = () => {
                                     ))}
                                     {matches.length === 0 && <div className="text-center text-slate-600 text-xs py-10">No recent activity</div>}
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- VISITORS & LOGS TAB --- */}
+                {activeTab === 'visitors' && (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 animate__animated animate__fadeIn">
+                        
+                        {/* RECENT VISITORS */}
+                        <div className="bg-[#1e293b] rounded-[2.5rem] p-4 md:p-8 border border-slate-700/50 shadow-xl flex flex-col max-h-[800px]">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                    <i className="fas fa-shoe-prints text-orange-400"></i> Recent Visitors
+                                </h2>
+                                <span className="bg-slate-900 text-slate-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase">Top 50</span>
+                            </div>
+                            <div className="overflow-y-auto custom-scrollbar flex-1 space-y-3 pr-2">
+                                {recentVisitors.map(u => (
+                                    <div key={u.uid} className="bg-[#0b1120] p-4 rounded-2xl flex items-center gap-4 border border-slate-800 hover:border-orange-500/30 transition-all cursor-pointer group" onClick={() => setSelectedUser(u)}>
+                                        <Avatar src={u.avatar} seed={u.uid} size="md" isVerified={u.isVerified} isOnline={u.isOnline} />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-white font-bold text-sm truncate">{u.name}</h4>
+                                                <span className="text-[10px] font-black text-slate-500">{formatTime(u.lastSeen)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <p className="text-slate-500 text-xs font-mono truncate">@{u.username || 'guest'}</p>
+                                                <span className="text-[9px] bg-slate-800 px-2 py-0.5 rounded text-cyan-400 font-bold">{u.points} XP</span>
+                                            </div>
+                                            {u.email && <div className="text-[10px] text-slate-600 mt-1 truncate">{u.email}</div>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* LIBRARY ANALYTICS */}
+                        <div className="bg-[#1e293b] rounded-[2.5rem] p-4 md:p-8 border border-slate-700/50 shadow-xl flex flex-col max-h-[800px]">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                    <i className="fas fa-book-open text-cyan-400"></i> Library Views
+                                </h2>
+                                <span className="bg-slate-900 text-slate-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase">Last 100</span>
+                            </div>
+                            <div className="overflow-y-auto custom-scrollbar flex-1 space-y-3 pr-2">
+                                {libraryLogs.map(log => {
+                                    const userDetails = getUserDetails(log.uid);
+                                    return (
+                                        <div key={log.id} className="bg-[#0b1120] p-3 rounded-2xl flex items-center gap-4 border border-slate-800 hover:border-cyan-500/30 transition-all">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-cyan-500 border border-slate-700 shrink-0">
+                                                <i className="fas fa-file-pdf"></i>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-white font-bold text-xs truncate mb-1">{log.fileName}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <Avatar src={userDetails.avatar} size="xs" />
+                                                    <span className="text-[10px] text-slate-400 truncate max-w-[100px]">{userDetails.name}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-[9px] font-black text-slate-600 uppercase tracking-wide text-right">
+                                                {formatTime(log.timestamp)}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {libraryLogs.length === 0 && <div className="text-center text-slate-600 py-10 font-bold">No library activity yet.</div>}
                             </div>
                         </div>
                     </div>
@@ -605,7 +708,7 @@ const SuperAdminPage: React.FC = () => {
         {selectedUser && (
             <Modal isOpen={true} title="User Manager" onClose={() => setSelectedUser(null)}>
                 <div className="flex flex-col items-center mb-6 pt-2">
-                    <Avatar src={selectedUser.avatar} size="xl" isVerified={selectedUser.isVerified} className="mb-4 border-4 border-slate-700 shadow-xl" />
+                    <Avatar src={selectedUser.avatar} seed={selectedUser.uid} size="xl" isVerified={selectedUser.isVerified} className="mb-4 border-4 border-slate-700 shadow-xl" />
                     <h2 className="text-2xl font-black text-white">{selectedUser.name}</h2>
                     <p className="text-slate-500 text-sm font-bold mb-4">@{selectedUser.username || 'guest'}</p>
                     

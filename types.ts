@@ -128,3 +128,11 @@ export interface StudyMaterial {
   fileSize: string; // e.g. "2.4 MB"
   uploadDate: number;
 }
+
+export interface LibraryViewLog {
+  id: string;
+  uid: string;
+  materialId: string;
+  fileName: string;
+  timestamp: number;
+}
