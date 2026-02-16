@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { ref, update, onValue, off, set, remove, get, push, serverTimestamp, query, limitToLast, increment } from 'firebase/database';
 import { db } from '../firebase';
@@ -27,7 +26,7 @@ const SuperAdminPage: React.FC = () => {
   const { profile: myProfile, loading: profileLoading } = useContext(UserContext);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
-  const [activeTab, setActiveTab] = useState<'home' | 'users' | 'quizzes' | 'arena' | 'reports' | 'visitors'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'users' | 'roles' | 'quizzes' | 'arena' | 'reports' | 'visitors'>('home');
   const navigate = useNavigate();
   
   // UI State
@@ -46,6 +45,7 @@ const SuperAdminPage: React.FC = () => {
   
   // --- UI STATES ---
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleSearchTerm, setRoleSearchTerm] = useState('');
   
   // Content Manager State
   const [selectedSubject, setSelectedSubject] = useState<string>('');
@@ -65,6 +65,8 @@ const SuperAdminPage: React.FC = () => {
   // User Management
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [userPointsEdit, setUserPointsEdit] = useState<string>('');
+  const [expandedSection, setExpandedSection] = useState<string>('roles'); // Default to roles for quick access
+  const [editUsername, setEditUsername] = useState('');
 
   // --- AUTHENTICATION ---
   useEffect(() => {
@@ -72,6 +74,15 @@ const SuperAdminPage: React.FC = () => {
           setIsAuthenticated(true);
       }
   }, [myProfile, profileLoading]);
+
+  // Reset User Modal State
+  useEffect(() => {
+      if (selectedUser) {
+          setUserPointsEdit(String(selectedUser.points || 0));
+          setEditUsername(selectedUser.username || '');
+          // Keep the expanded section open if already interacting
+      }
+  }, [selectedUser]);
 
   const checkPin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,8 +174,33 @@ const SuperAdminPage: React.FC = () => {
   const toggleUserProp = async (uid: string, prop: string, current: any) => {
     try {
       await update(ref(db, `users/${uid}`), { [prop]: !current });
-      showToast(`User ${prop} updated`);
+      showToast(`User ${prop} ${!current ? 'Granted' : 'Revoked'}`);
     } catch(e) { showAlert("Error", "Action failed", "error"); }
+  };
+
+  const toggleRole = async (roleType: 'superAdmin' | 'admin' | 'support') => {
+      if (!selectedUser) return;
+      
+      const currentState = selectedUser.roles?.[roleType] || (roleType === 'support' && selectedUser.isSupport);
+      
+      if (!currentState && roleType === 'superAdmin') {
+          if (!await showConfirm("Grant Super Admin?", "This user will have full destructive access to the system.")) return;
+      }
+
+      const updates: any = {};
+      const pathBase = `users/${selectedUser.uid}`;
+      updates[`${pathBase}/roles/${roleType}`] = !currentState;
+
+      // Legacy Sync
+      if (roleType === 'support') updates[`${pathBase}/isSupport`] = !currentState;
+      if (roleType === 'admin') updates[`${pathBase}/role`] = !currentState ? 'admin' : 'user';
+
+      try {
+          await update(ref(db), updates);
+          showToast(`${roleType.toUpperCase()} ${!currentState ? 'Granted' : 'Revoked'}`);
+      } catch(e) {
+          showAlert("Error", "Failed to update role", "error");
+      }
   };
 
   const saveUserPoints = async () => {
@@ -173,6 +209,51 @@ const SuperAdminPage: React.FC = () => {
       if (isNaN(pts)) return;
       await update(ref(db, `users/${selectedUser.uid}`), { points: pts });
       showToast("Points updated", "success");
+  };
+
+  const saveUsername = async () => {
+      if (!selectedUser || !editUsername.trim()) return;
+      const clean = editUsername.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      
+      if (users.some(u => u.uid !== selectedUser.uid && u.username === clean)) {
+          showToast("Username already taken", "error");
+          return;
+      }
+
+      await update(ref(db, `users/${selectedUser.uid}`), { username: clean });
+      showToast("Username updated", "success");
+  };
+
+  const sendCredentialReset = async () => {
+      if (!selectedUser || !myProfile) return;
+      if (!await showConfirm("Reset Credentials?", "This will generate a new password and send it to the user's secure chat.")) return;
+
+      const newPass = Math.random().toString(36).slice(-8).toUpperCase();
+      const participants = [myProfile.uid, selectedUser.uid].sort();
+      const chatId = `${participants[0]}_${participants[1]}`;
+      
+      const msgRef = push(ref(db, `chats/${chatId}/messages`));
+      const msgId = msgRef.key!;
+      
+      const updates: any = {};
+      updates[`chats/${chatId}/messages/${msgId}`] = {
+          id: msgId,
+          sender: myProfile.uid,
+          text: "System: Your password has been reset by an administrator.",
+          type: 'credential',
+          newUsername: selectedUser.username || editUsername,
+          newPassword: newPass,
+          timestamp: serverTimestamp(),
+          msgStatus: 'sent'
+      };
+      updates[`chats/${chatId}/lastMessage`] = "SECURE_UPDATE";
+      updates[`chats/${chatId}/lastTimestamp`] = serverTimestamp();
+      updates[`chats/${chatId}/unread/${selectedUser.uid}/count`] = increment(1);
+      updates[`chats/${chatId}/participants/${myProfile.uid}`] = true;
+      updates[`chats/${chatId}/participants/${selectedUser.uid}`] = true;
+
+      await update(ref(db), updates);
+      showToast("Credentials Sent to Chat", "success");
   };
 
   const deleteUser = async (uid: string) => {
@@ -406,6 +487,17 @@ const SuperAdminPage: React.FC = () => {
       </div>
   );
 
+  // Role Filtering Logic for Roles Tab
+  const superAdmins = users.filter(u => u.roles?.superAdmin);
+  const admins = users.filter(u => u.roles?.admin || u.role === 'admin');
+  const supportStaff = users.filter(u => u.roles?.support || u.isSupport);
+  
+  // Search for Role Tab
+  const filteredRoleCandidates = users.filter(u => 
+      (u.name?.toLowerCase().includes(roleSearchTerm.toLowerCase()) || 
+       u.username?.toLowerCase().includes(roleSearchTerm.toLowerCase()))
+  );
+
   if (!isAuthenticated) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1120] p-6 font-sans">
@@ -438,6 +530,9 @@ const SuperAdminPage: React.FC = () => {
       })()
   };
 
+  // User History Logic for Modal
+  const userActivityMatches = selectedUser ? matches.filter(m => m.players && m.players[selectedUser.uid]).slice(0, 5) : [];
+
   return (
     <div className="flex h-screen bg-[#0b1120] text-white font-sans overflow-hidden select-none">
         
@@ -455,6 +550,7 @@ const SuperAdminPage: React.FC = () => {
                 <SidebarItem id="home" icon="fa-th-large" label="Dashboard" active={activeTab === 'home'} />
                 <SidebarItem id="visitors" icon="fa-shoe-prints" label="Visitors & Logs" active={activeTab === 'visitors'} />
                 <SidebarItem id="users" icon="fa-users" label="User Database" active={activeTab === 'users'} />
+                <SidebarItem id="roles" icon="fa-user-shield" label="Role Manager" active={activeTab === 'roles'} />
                 <SidebarItem id="quizzes" icon="fa-layer-group" label="Content Mgr" active={activeTab === 'quizzes'} />
                 <SidebarItem id="arena" icon="fa-gamepad" label="Live Arena" active={activeTab === 'arena'} />
                 <SidebarItem id="reports" icon="fa-flag" label="Reports" active={activeTab === 'reports'} />
@@ -550,6 +646,172 @@ const SuperAdminPage: React.FC = () => {
                                     <button onClick={() => { setSelectedUser(u); setUserPointsEdit(String(u.points)); }} className="bg-slate-800 hover:bg-cyan-500 hover:text-black text-cyan-400 px-4 py-2 rounded-xl text-xs font-black uppercase transition-colors w-full sm:w-auto">Manage</button>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* --- ROLES TAB (Redesigned) --- */}
+                {activeTab === 'roles' && (
+                    <div className="h-[calc(100vh-140px)] flex flex-col animate__animated animate__fadeIn relative">
+                        {/* Header & Search */}
+                        <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 shrink-0 px-2 z-20">
+                            <div>
+                                <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">Command</span> Hierarchy
+                                </h2>
+                                <p className="text-slate-400 text-xs font-bold mt-1 uppercase tracking-widest">System Access Control Level</p>
+                            </div>
+                            
+                            {/* Search */}
+                            <div className="relative w-full md:w-96 group">
+                                <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                                <div className="relative bg-[#0f172a] border border-slate-700 rounded-2xl flex items-center px-4 py-3 shadow-xl transition-all focus-within:border-purple-500/50 focus-within:shadow-purple-500/20">
+                                    <i className="fas fa-search text-slate-500 mr-3 group-focus-within:text-purple-400 transition-colors"></i>
+                                    <input 
+                                        className="bg-transparent border-none outline-none text-white text-sm font-bold w-full placeholder-slate-600"
+                                        placeholder="Search user to assign roles..."
+                                        value={roleSearchTerm}
+                                        onChange={e => setRoleSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                                
+                                {/* Dropdown results */}
+                                {roleSearchTerm && (
+                                    <div className="absolute top-full left-0 right-0 mt-3 bg-[#1e293b]/95 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto custom-scrollbar z-50 animate__animated animate__fadeInUp animate__faster">
+                                        {filteredRoleCandidates.length === 0 ? (
+                                            <div className="p-6 text-center">
+                                                <i className="fas fa-ghost text-slate-600 text-2xl mb-2"></i>
+                                                <div className="text-slate-500 text-xs font-bold">No users found.</div>
+                                            </div>
+                                        ) : (
+                                            <div className="p-2 space-y-1">
+                                                <div className="px-3 py-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Search Results</div>
+                                                {filteredRoleCandidates.slice(0, 10).map(u => (
+                                                    <div 
+                                                        key={u.uid} 
+                                                        onClick={() => { setSelectedUser(u); setRoleSearchTerm(''); }} 
+                                                        className="group/item p-3 rounded-xl hover:bg-white/5 cursor-pointer flex items-center gap-4 transition-all border border-transparent hover:border-white/5"
+                                                    >
+                                                        <div className="relative shrink-0">
+                                                            <Avatar src={u.avatar} size="sm" className="border-2 border-slate-700 group-hover/item:border-purple-500 transition-colors" />
+                                                            {u.isVerified && <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-0.5 border border-[#1e293b]"><i className="fas fa-check text-[8px] text-white"></i></div>}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-sm font-black text-white group-hover/item:text-purple-400 transition-colors truncate">{u.name}</div>
+                                                            <div className="text-slate-500 text-xs font-mono truncate">@{u.username || 'guest'}</div>
+                                                        </div>
+                                                        <div className="opacity-0 group-hover/item:opacity-100 transition-all transform translate-x-2 group-hover/item:translate-x-0">
+                                                            <span className="text-[10px] font-black text-white bg-purple-600 px-3 py-1.5 rounded-lg shadow-lg">SELECT</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* The 3 Columns */}
+                        <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 px-2 custom-scrollbar">
+                            <div className="flex gap-6 h-full min-w-[1000px] md:min-w-0">
+                                
+                                {/* Super Admin Column */}
+                                <div className="flex-1 flex flex-col bg-[#1e293b]/40 backdrop-blur-md rounded-[2.5rem] border border-purple-500/20 relative overflow-hidden group shadow-2xl">
+                                   <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-purple-600/10 to-transparent pointer-events-none"></div>
+                                   
+                                   {/* Column Header */}
+                                   <div className="p-6 border-b border-purple-500/10 flex items-center gap-4 relative z-10">
+                                       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-purple-600/30">
+                                           <i className="fas fa-user-astronaut text-2xl"></i>
+                                       </div>
+                                       <div>
+                                           <h3 className="text-xl font-black text-white uppercase tracking-tight">Super Admin</h3>
+                                           <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">{superAdmins.length} Architects</p>
+                                       </div>
+                                   </div>
+
+                                   {/* List */}
+                                   <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                       {superAdmins.map(u => (
+                                           <div key={u.uid} className="bg-[#0f172a]/60 p-4 rounded-2xl border border-purple-500/10 hover:border-purple-500/40 transition-all group/card flex items-center gap-4 relative overflow-hidden">
+                                               <div className="absolute inset-0 bg-purple-600/5 opacity-0 group-hover/card:opacity-100 transition-opacity"></div>
+                                               <Avatar src={u.avatar} seed={u.uid} size="md" className="border-2 border-purple-500/50 shadow-lg" />
+                                               <div className="min-w-0 flex-1 relative z-10">
+                                                   <div className="text-white font-bold text-sm truncate">{u.name}</div>
+                                                   <div className="text-slate-500 text-[10px] font-mono">@{u.username}</div>
+                                               </div>
+                                               <button onClick={() => setSelectedUser(u)} className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500 hover:text-white flex items-center justify-center transition-all relative z-10">
+                                                   <i className="fas fa-cog"></i>
+                                               </button>
+                                           </div>
+                                       ))}
+                                   </div>
+                                </div>
+
+                                {/* Admin Column */}
+                                <div className="flex-1 flex flex-col bg-[#1e293b]/40 backdrop-blur-md rounded-[2.5rem] border border-blue-500/20 relative overflow-hidden group shadow-2xl">
+                                   <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-blue-600/10 to-transparent pointer-events-none"></div>
+                                   
+                                   <div className="p-6 border-b border-blue-500/10 flex items-center gap-4 relative z-10">
+                                       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                                           <i className="fas fa-user-cog text-2xl"></i>
+                                       </div>
+                                       <div>
+                                           <h3 className="text-xl font-black text-white uppercase tracking-tight">Admin</h3>
+                                           <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">{admins.length} Overseers</p>
+                                       </div>
+                                   </div>
+
+                                   <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                       {admins.map(u => (
+                                           <div key={u.uid} className="bg-[#0f172a]/60 p-4 rounded-2xl border border-blue-500/10 hover:border-blue-500/40 transition-all group/card flex items-center gap-4 relative overflow-hidden">
+                                               <div className="absolute inset-0 bg-blue-600/5 opacity-0 group-hover/card:opacity-100 transition-opacity"></div>
+                                               <Avatar src={u.avatar} seed={u.uid} size="md" className="border-2 border-blue-500/50 shadow-lg" />
+                                               <div className="min-w-0 flex-1 relative z-10">
+                                                   <div className="text-white font-bold text-sm truncate">{u.name}</div>
+                                                   <div className="text-slate-500 text-[10px] font-mono">@{u.username}</div>
+                                               </div>
+                                               <button onClick={() => setSelectedUser(u)} className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white flex items-center justify-center transition-all relative z-10">
+                                                   <i className="fas fa-cog"></i>
+                                               </button>
+                                           </div>
+                                       ))}
+                                   </div>
+                                </div>
+
+                                {/* Support Column */}
+                                <div className="flex-1 flex flex-col bg-[#1e293b]/40 backdrop-blur-md rounded-[2.5rem] border border-orange-500/20 relative overflow-hidden group shadow-2xl">
+                                   <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-orange-600/10 to-transparent pointer-events-none"></div>
+                                   
+                                   <div className="p-6 border-b border-orange-500/10 flex items-center gap-4 relative z-10">
+                                       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30">
+                                           <i className="fas fa-headset text-2xl"></i>
+                                       </div>
+                                       <div>
+                                           <h3 className="text-xl font-black text-white uppercase tracking-tight">Support</h3>
+                                           <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">{supportStaff.length} Guardians</p>
+                                       </div>
+                                   </div>
+
+                                   <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                       {supportStaff.map(u => (
+                                           <div key={u.uid} className="bg-[#0f172a]/60 p-4 rounded-2xl border border-orange-500/10 hover:border-orange-500/40 transition-all group/card flex items-center gap-4 relative overflow-hidden">
+                                               <div className="absolute inset-0 bg-orange-600/5 opacity-0 group-hover/card:opacity-100 transition-opacity"></div>
+                                               <Avatar src={u.avatar} seed={u.uid} size="md" className="border-2 border-orange-500/50 shadow-lg" />
+                                               <div className="min-w-0 flex-1 relative z-10">
+                                                   <div className="text-white font-bold text-sm truncate">{u.name}</div>
+                                                   <div className="text-slate-500 text-[10px] font-mono">@{u.username}</div>
+                                               </div>
+                                               <button onClick={() => setSelectedUser(u)} className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white flex items-center justify-center transition-all relative z-10">
+                                                   <i className="fas fa-cog"></i>
+                                               </button>
+                                           </div>
+                                       ))}
+                                   </div>
+                                </div>
+
+                            </div>
                         </div>
                     </div>
                 )}
@@ -958,33 +1220,137 @@ const SuperAdminPage: React.FC = () => {
             </div>
         </div>
 
-        {/* --- USER MODAL --- */}
+        {/* --- USER MANAGER MODAL (Super Admin Upgrade) --- */}
         {selectedUser && (
             <Modal isOpen={true} title="User Manager" onClose={() => setSelectedUser(null)}>
-                <div className="flex flex-col items-center mb-6 pt-2">
-                    <Avatar src={selectedUser.avatar} seed={selectedUser.uid} size="xl" isVerified={selectedUser.isVerified} className="mb-4 border-4 border-slate-700 shadow-xl" />
-                    <h2 className="text-2xl font-black text-white">{selectedUser.name}</h2>
-                    <p className="text-slate-500 text-sm font-bold mb-4">@{selectedUser.username || 'guest'}</p>
-                    <div className="grid grid-cols-2 gap-4 w-full mb-6">
-                        <div className="bg-[#0b1120] p-3 rounded-xl text-center border border-slate-800"><div className="text-[10px] text-slate-500 uppercase font-black">Points</div><div className="text-xl text-cyan-400 font-black">{selectedUser.points}</div></div>
-                        <div className="bg-[#0b1120] p-3 rounded-xl text-center border border-slate-800"><div className="text-[10px] text-slate-500 uppercase font-black">Role</div><div className="text-sm text-white font-bold">{selectedUser.roles?.superAdmin ? 'Super Admin' : selectedUser.roles?.support ? 'Staff' : 'User'}</div></div>
+                <div className="space-y-4 pt-2">
+                    
+                    {/* Header: User Summary */}
+                    <div className="flex flex-col items-center mb-6">
+                        <Avatar src={selectedUser.avatar} seed={selectedUser.uid} size="lg" isVerified={selectedUser.isVerified} className="mb-3 border-2 border-white shadow-lg" />
+                        <h2 className="text-xl font-black text-white flex items-center gap-2">
+                            {selectedUser.name}
+                            {selectedUser.roles?.superAdmin && <i className="fas fa-user-astronaut text-purple-400" title="Super Admin"></i>}
+                            {selectedUser.isSupport && <i className="fas fa-shield-alt text-orange-400" title="Staff"></i>}
+                        </h2>
+                        <p className="text-slate-500 font-bold text-xs bg-slate-900 px-3 py-1 rounded-full border border-slate-800 font-mono mt-1">
+                            ID: {selectedUser.uid.substring(0, 8)}...
+                        </p>
                     </div>
-                    <div className="w-full space-y-4">
-                        <div className="p-4 bg-[#0b1120] rounded-2xl border border-slate-800">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Quick Actions</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => toggleUserProp(selectedUser.uid, 'isVerified', selectedUser.isVerified)} className={`py-2 rounded-lg text-xs font-black uppercase ${selectedUser.isVerified ? 'bg-red-500/10 text-red-400 border border-red-500/30' : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'}`}>{selectedUser.isVerified ? 'Unverify' : 'Verify'}</button>
-                                <button onClick={() => toggleUserProp(selectedUser.uid, 'banned', selectedUser.banned)} className={`py-2 rounded-lg text-xs font-black uppercase ${selectedUser.banned ? 'bg-green-500/10 text-green-400 border border-green-500/30' : 'bg-slate-700 text-slate-400 border border-slate-600'}`}>{selectedUser.banned ? 'Unban' : 'Ban User'}</button>
-                                <button onClick={() => deleteUser(selectedUser.uid)} className="py-2 rounded-lg text-xs font-black uppercase bg-red-600 text-white hover:bg-red-700 col-span-2">Delete User</button>
+
+                    {/* Section 1: Profile & Security */}
+                    <div className="bg-[#0b1120] rounded-2xl border border-slate-700/50 overflow-hidden">
+                        <button onClick={() => setExpandedSection(expandedSection === 'profile' ? '' : 'profile')} className="w-full flex items-center justify-between p-4 bg-slate-800/30 hover:bg-slate-800/50 transition-colors">
+                            <span className="text-xs font-black text-slate-300 uppercase tracking-widest"><i className="fas fa-user-lock mr-2 text-blue-400"></i> Profile & Security</span>
+                            <i className={`fas fa-chevron-down text-slate-500 transition-transform ${expandedSection === 'profile' ? 'rotate-180' : ''}`}></i>
+                        </button>
+                        {expandedSection === 'profile' && (
+                            <div className="p-4 space-y-4 animate__animated animate__fadeIn">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block">Username</label>
+                                    <div className="flex gap-2">
+                                        <Input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="!bg-slate-900 !border-slate-800 !text-white !mb-0" />
+                                        <Button onClick={saveUsername} size="sm" className="!rounded-xl"><i className="fas fa-save"></i></Button>
+                                    </div>
+                                </div>
+                                <div className="border-t border-slate-800 pt-3">
+                                    <button onClick={sendCredentialReset} className="w-full py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:border-slate-600 transition-all flex items-center justify-center gap-2">
+                                        <i className="fas fa-key text-yellow-500"></i> Reset Password & Notify
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="p-4 bg-[#0b1120] rounded-2xl border border-slate-800">
-                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Adjust Points</label>
-                             <div className="flex gap-2">
-                                 <Input type="number" value={userPointsEdit} onChange={e => setUserPointsEdit(e.target.value)} className="!bg-slate-800 !border-slate-700 !text-white !mb-0" />
-                                 <Button onClick={saveUserPoints} size="sm">Save</Button>
-                             </div>
-                        </div>
+                        )}
+                    </div>
+
+                    {/* Section 2: Roles & Permissions */}
+                    <div className="bg-[#0b1120] rounded-2xl border border-slate-700/50 overflow-hidden">
+                        <button onClick={() => setExpandedSection(expandedSection === 'roles' ? '' : 'roles')} className="w-full flex items-center justify-between p-4 bg-slate-800/30 hover:bg-slate-800/50 transition-colors">
+                            <span className="text-xs font-black text-slate-300 uppercase tracking-widest"><i className="fas fa-id-badge mr-2 text-purple-400"></i> Roles & Privileges</span>
+                            <i className={`fas fa-chevron-down text-slate-500 transition-transform ${expandedSection === 'roles' ? 'rotate-180' : ''}`}></i>
+                        </button>
+                        {expandedSection === 'roles' && (
+                            <div className="p-4 grid grid-cols-2 gap-3 animate__animated animate__fadeIn">
+                                <button onClick={() => toggleUserProp(selectedUser.uid, 'isVerified', selectedUser.isVerified)} className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${selectedUser.isVerified ? 'bg-blue-500/10 border-blue-500 text-blue-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                                    <i className="fas fa-check-circle text-lg"></i>
+                                    <span className="text-[9px] font-black uppercase">{selectedUser.isVerified ? 'Revoke Verify' : 'Grant Verify'}</span>
+                                </button>
+                                <button onClick={() => toggleRole('support')} className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${selectedUser.roles?.support || selectedUser.isSupport ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                                    <i className="fas fa-shield-alt text-lg"></i>
+                                    <span className="text-[9px] font-black uppercase">{selectedUser.roles?.support || selectedUser.isSupport ? 'Revoke Staff' : 'Grant Staff'}</span>
+                                </button>
+                                <button onClick={() => toggleRole('admin')} className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${selectedUser.roles?.admin ? 'bg-blue-500/10 border-blue-500 text-blue-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                                    <i className="fas fa-user-cog text-lg"></i>
+                                    <span className="text-[9px] font-black uppercase">{selectedUser.roles?.admin ? 'Revoke Admin' : 'Grant Admin'}</span>
+                                </button>
+                                <button onClick={() => toggleRole('superAdmin')} className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${selectedUser.roles?.superAdmin ? 'bg-purple-500/10 border-purple-500 text-purple-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                                    <i className="fas fa-user-astronaut text-lg"></i>
+                                    <span className="text-[9px] font-black uppercase">{selectedUser.roles?.superAdmin ? 'Revoke SA' : 'Grant SA'}</span>
+                                </button>
+                                <button onClick={() => toggleUserProp(selectedUser.uid, 'banned', selectedUser.banned)} className={`col-span-2 p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${selectedUser.banned ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                                    <i className="fas fa-ban text-lg"></i>
+                                    <span className="text-[9px] font-black uppercase">{selectedUser.banned ? 'Unban User' : 'Ban User'}</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Section 3: Game Data */}
+                    <div className="bg-[#0b1120] rounded-2xl border border-slate-700/50 overflow-hidden">
+                        <button onClick={() => setExpandedSection(expandedSection === 'game' ? '' : 'game')} className="w-full flex items-center justify-between p-4 bg-slate-800/30 hover:bg-slate-800/50 transition-colors">
+                            <span className="text-xs font-black text-slate-300 uppercase tracking-widest"><i className="fas fa-database mr-2 text-green-400"></i> Game Data</span>
+                            <i className={`fas fa-chevron-down text-slate-500 transition-transform ${expandedSection === 'game' ? 'rotate-180' : ''}`}></i>
+                        </button>
+                        {expandedSection === 'game' && (
+                            <div className="p-4 space-y-4 animate__animated animate__fadeIn">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block">Total Points</label>
+                                    <div className="flex gap-2">
+                                        <Input type="number" value={userPointsEdit} onChange={e => setUserPointsEdit(e.target.value)} className="!bg-slate-900 !border-slate-800 !text-white !mb-0" />
+                                        <Button onClick={saveUserPoints} size="sm" className="!rounded-xl"><i className="fas fa-check"></i></Button>
+                                    </div>
+                                </div>
+                                <button onClick={async () => { if(await showConfirm('Reset Active Match?','Clears stuck state')) { await update(ref(db, `users/${selectedUser.uid}`), { activeMatch: null }); showToast('State Cleared'); } }} className="w-full py-3 bg-red-900/20 text-red-400 border border-red-900/30 rounded-xl text-xs font-bold uppercase hover:bg-red-900/40 transition-all">
+                                    Force Clear Match State
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Section 4: Activity Log */}
+                    <div className="bg-[#0b1120] rounded-2xl border border-slate-700/50 overflow-hidden">
+                        <button onClick={() => setExpandedSection(expandedSection === 'activity' ? '' : 'activity')} className="w-full flex items-center justify-between p-4 bg-slate-800/30 hover:bg-slate-800/50 transition-colors">
+                            <span className="text-xs font-black text-slate-300 uppercase tracking-widest"><i className="fas fa-history mr-2 text-cyan-400"></i> Activity Log</span>
+                            <i className={`fas fa-chevron-down text-slate-500 transition-transform ${expandedSection === 'activity' ? 'rotate-180' : ''}`}></i>
+                        </button>
+                        {expandedSection === 'activity' && (
+                            <div className="p-4 animate__animated animate__fadeIn">
+                                {userActivityMatches.length === 0 ? (
+                                    <div className="text-center py-4 text-slate-500 text-xs italic">No recent matches found.</div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {userActivityMatches.map(m => (
+                                            <div key={m.matchId} className="bg-slate-900 p-2 rounded-lg border border-slate-800 flex justify-between items-center text-xs">
+                                                <div className="text-slate-300 font-bold">{m.subjectTitle}</div>
+                                                <div className={`font-black uppercase ${m.winner === selectedUser.uid ? 'text-green-400' : m.winner === 'draw' ? 'text-slate-400' : 'text-red-400'}`}>
+                                                    {m.winner === selectedUser.uid ? 'WON' : m.winner === 'draw' ? 'DRAW' : 'LOST'}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between text-[10px] text-slate-500 font-mono">
+                                    <span>Registered: {new Date(selectedUser.createdAt || 0).toLocaleDateString()}</span>
+                                    <span>Last Seen: {formatRelativeTime(selectedUser.lastSeen)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Critical Actions */}
+                    <div className="pt-2">
+                        <button onClick={() => deleteUser(selectedUser.uid)} className="w-full py-3 bg-red-600 text-white rounded-xl text-xs font-black uppercase shadow-lg hover:bg-red-700 transition-all">
+                            Delete Account
+                        </button>
                     </div>
                 </div>
             </Modal>
