@@ -222,75 +222,77 @@ const HomePage: React.FC = () => {
         {/* MAIN CONTENT */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 z-10 custom-scrollbar">
             
-            {/* RAMADAN BANNER (New) */}
-            <div className="relative overflow-hidden rounded-2xl p-6 bg-gradient-to-r from-emerald-900 to-[#020617] border border-emerald-500/30 shadow-lg shadow-emerald-900/20 group animate__animated animate__fadeInDown">
+            {/* RAMADAN BANNER (Compact) */}
+            <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-r from-emerald-900 to-[#020617] border border-emerald-500/30 shadow-lg shadow-emerald-900/20 group animate__animated animate__fadeInDown">
                 <div className="absolute inset-0 ramadan-pattern opacity-10"></div>
                 <div className="absolute right-0 bottom-0 opacity-20 transform translate-x-4 translate-y-4">
-                    <i className="fas fa-moon text-8xl text-emerald-400"></i>
+                    <i className="fas fa-moon text-6xl text-emerald-400"></i>
                 </div>
-                <div className="relative z-10 flex flex-col items-center text-center">
-                    <div className="font-arabic text-3xl text-yellow-400 drop-shadow-md mb-1">رمضان مبارك</div>
-                    <div className="text-white font-black uppercase tracking-[0.3em] text-xs mb-3">Ramadan Kareem</div>
+                <div className="relative z-10 flex flex-row items-center justify-between">
+                    <div>
+                        <div className="font-arabic text-2xl text-yellow-400 drop-shadow-md mb-0.5">رمضان مبارك</div>
+                        <div className="text-white font-black uppercase tracking-[0.2em] text-[10px]">Ramadan Kareem</div>
+                    </div>
                     {ramadanTimer && (
-                       <div className="inline-flex items-center gap-3 bg-black/30 px-4 py-2 rounded-xl border border-yellow-500/20 backdrop-blur-sm">
+                       <div className="inline-flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-xl border border-yellow-500/20 backdrop-blur-sm">
                            <div className="text-center">
-                               <div className="text-lg font-black text-white leading-none">{ramadanTimer.d}</div>
-                               <div className="text-[8px] text-emerald-400 uppercase font-bold">Days</div>
+                               <div className="text-sm font-black text-white leading-none">{ramadanTimer.d}</div>
+                               <div className="text-[7px] text-emerald-400 uppercase font-bold">Days</div>
                            </div>
-                           <div className="h-6 w-[1px] bg-white/10"></div>
+                           <div className="h-4 w-[1px] bg-white/10"></div>
                            <div className="text-center">
-                               <div className="text-lg font-black text-white leading-none">{ramadanTimer.h}</div>
-                               <div className="text-[8px] text-emerald-400 uppercase font-bold">Hrs</div>
+                               <div className="text-sm font-black text-white leading-none">{ramadanTimer.h}</div>
+                               <div className="text-[7px] text-emerald-400 uppercase font-bold">Hrs</div>
                            </div>
-                           <div className="h-6 w-[1px] bg-white/10"></div>
+                           <div className="h-4 w-[1px] bg-white/10"></div>
                            <div className="text-center">
-                               <div className="text-lg font-black text-white leading-none">{ramadanTimer.m}</div>
-                               <div className="text-[8px] text-emerald-400 uppercase font-bold">Min</div>
+                               <div className="text-sm font-black text-white leading-none">{ramadanTimer.m}</div>
+                               <div className="text-[7px] text-emerald-400 uppercase font-bold">Min</div>
                            </div>
                        </div>
                     )}
                 </div>
             </div>
 
-            {/* HERO: BATTLE QUIZ (Ramadan Styled) */}
+            {/* HERO: BATTLE QUIZ (Compact) */}
             <div onClick={() => handleNav('/lobby')} className="relative group cursor-pointer mt-2">
                 {/* Glow Behind */}
-                <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-[2.5rem] blur opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-[2rem] blur opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
                 
-                <div className="relative bg-gradient-to-b from-[#1e293b]/90 to-[#0f172a]/95 backdrop-blur-xl border border-yellow-500/30 rounded-[2.5rem] p-6 overflow-hidden shadow-2xl">
+                <div className="relative bg-gradient-to-b from-[#1e293b]/90 to-[#0f172a]/95 backdrop-blur-xl border border-yellow-500/30 rounded-[2rem] p-5 overflow-hidden shadow-xl h-40">
                     {/* Corner Accents */}
-                    <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-yellow-500/50 rounded-tl-[2rem]"></div>
-                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-orange-500/50 rounded-br-[2rem]"></div>
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-yellow-500/50 rounded-tl-[1.5rem]"></div>
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-orange-500/50 rounded-br-[1.5rem]"></div>
 
                     {/* Header Tags */}
-                    <div className="flex gap-2 mb-2 relative z-10">
-                        <span className="bg-orange-500/10 text-orange-400 border border-orange-500/30 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-[0_0_10px_rgba(236,72,153,0.2)]">
+                    <div className="flex gap-2 mb-1 relative z-10">
+                        <span className="bg-orange-500/10 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-[0_0_10px_rgba(236,72,153,0.2)]">
                             <i className="fas fa-fire animate-pulse"></i> Iftar Special
                         </span>
-                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-[0_0_10px_rgba(59,130,246,0.2)]">
                             Multiplayer
                         </span>
                     </div>
 
                     <div className="flex justify-between items-center relative z-10">
-                        <div className="mt-2">
-                            <h2 className="text-5xl font-black text-white italic tracking-tighter leading-[0.85] drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+                        <div className="mt-1">
+                            <h2 className="text-3xl md:text-4xl font-black text-white italic tracking-tighter leading-[0.9] drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
                                 BATTLE <br />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-white to-orange-400 animate-gradient-x">QUIZ</span>
                             </h2>
-                            <div className="h-1 w-12 bg-yellow-500 rounded-full mt-3 mb-6 shadow-[0_0_10px_rgba(234,179,8,0.8)]"></div>
+                            <div className="h-1 w-8 bg-yellow-500 rounded-full mt-2 mb-3 shadow-[0_0_10px_rgba(234,179,8,0.8)]"></div>
                             
-                            <button className="bg-gradient-to-r from-yellow-600 to-orange-600 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(234,179,8,0.4)] flex items-center gap-2 group-hover:scale-105 transition-transform active:scale-95 border border-white/20">
+                            <button className="bg-gradient-to-r from-yellow-600 to-orange-600 text-white px-5 py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest shadow-[0_0_20px_rgba(234,179,8,0.4)] flex items-center gap-2 group-hover:scale-105 transition-transform active:scale-95 border border-white/20">
                                 PLAY NOW <i className="fas fa-arrow-right"></i>
                             </button>
                         </div>
 
                         {/* Graphic */}
-                        <div className="absolute -right-6 -bottom-6 opacity-90 pointer-events-none transform scale-110">
+                        <div className="absolute -right-2 -bottom-2 opacity-90 pointer-events-none transform scale-100">
                              <div className="relative">
-                                 <i className="fas fa-gamepad text-8xl text-orange-600/80 transform rotate-12 drop-shadow-[0_0_30px_rgba(234,88,12,0.3)] absolute right-10 -top-10 animate-float" style={{animationDelay: '1s'}}></i>
-                                 <i className="fas fa-gamepad text-8xl text-yellow-500 transform -rotate-12 drop-shadow-[0_0_30px_rgba(234,179,8,0.4)] relative z-10 animate-float"></i>
-                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-black text-4xl italic z-20 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] transform -skew-x-12">VS</div>
+                                 <i className="fas fa-gamepad text-6xl text-orange-600/80 transform rotate-12 drop-shadow-[0_0_30px_rgba(234,88,12,0.3)] absolute right-4 -top-4 animate-float" style={{animationDelay: '1s'}}></i>
+                                 <i className="fas fa-gamepad text-6xl text-yellow-500 transform -rotate-12 drop-shadow-[0_0_30px_rgba(234,179,8,0.4)] relative z-10 animate-float"></i>
+                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-black text-2xl italic z-20 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] transform -skew-x-12">VS</div>
                              </div>
                         </div>
                     </div>
